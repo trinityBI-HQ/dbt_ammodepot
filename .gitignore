@@ -1,4 +1,12 @@
-/projects/dbt/lib
-/projects/dbt/bin
-/projects/dbt/logs
-
+/projects/dbt_paulo/lib
+/projects/dbt_paulo/bin
+/projects/dbt_paulo/logs
+/projects/dbt_daniel/lib
+/projects/dbt_daniel/logs
+/projects/dbt_daniel/bin
+/projects/dbt_ricardo/lib
+/projects/dbt_ricardo/logs
+/projects/dbt_ricardo/bin
+/projects/dbt_fabrizio/lib
+/projects/dbt_fabriziologs
+/projects/dbt_fabrizio/bin
