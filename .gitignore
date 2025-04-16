@@ -1,2 +1,4 @@
-/projects/dbt/lib/
+./projects/dbt/lib
+./projects/dbt/bin
+./projects/dbt/logs
 
