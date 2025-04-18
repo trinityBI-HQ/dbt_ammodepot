@@ -1,0 +1,6 @@
+.dbtenv/
+target/
+dbt_packages/
+logs/
+.DS_Store
+../../.DS_Store
