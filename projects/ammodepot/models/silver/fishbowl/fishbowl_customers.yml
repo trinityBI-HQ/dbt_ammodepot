@@ -1,0 +1,106 @@
+version: 2
+
+models:
+  - name: fishbowl_customers
+    description: >
+      Silver layer table containing cleaned customer data from Fishbowl inventory system.
+      Contains customer information, account details, and preferences for sales and shipping.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: customer_id
+        description: Unique identifier for the customer
+        tests:
+          - unique
+          - not_null
+      
+      - name: customer_name
+        description: Customer's business or individual name
+        
+      - name: customer_number
+        description: Customer's assigned identification number
+        
+      - name: status_id
+        description: Reference to customer status (active, inactive, etc.)
+        
+      - name: account_id
+        description: Reference to the accounting system account
+        
+      - name: sysuser_id
+        description: System user ID associated with the customer
+        
+      - name: is_tax_exempt
+        description: Flag indicating whether the customer is exempt from taxes
+        
+      - name: tax_rate_id
+        description: Reference to the tax rate applied to this customer
+        
+      - name: is_active
+        description: Flag indicating whether the customer is currently active
+        
+      - name: currency_id
+        description: Reference to the currency used for this customer's transactions
+        
+      - name: credit_limit
+        description: Maximum credit amount allowed for this customer
+        
+      - name: date_created
+        description: Date when the customer record was created
+        
+      - name: to_be_emailed
+        description: Flag indicating whether documents should be emailed to the customer
+        
+      - name: to_be_printed
+        description: Flag indicating whether documents should be printed for the customer
+        
+      - name: accounting_id
+        description: External accounting system identifier
+        
+      - name: currency_rate
+        description: Exchange rate for the customer's currency
+        
+      - name: custom_fields
+        description: JSON containing any custom fields defined for the customer
+        
+      - name: accounting_hash
+        description: Hash value for accounting system integration
+        
+      - name: tax_exempt_number
+        description: Tax exemption certificate number if applicable
+        
+      - name: carrier_service_id
+        description: Reference to the preferred carrier service
+        
+      - name: date_last_modified
+        description: Date when the customer record was last modified
+        
+      - name: default_carrier_id
+        description: Reference to the default shipping carrier
+        
+      - name: issuable_status_id
+        description: Reference to the status that determines if orders can be issued
+        
+      - name: default_priority_id
+        description: Reference to the default priority for this customer's orders
+        
+      - name: default_salesman_id
+        description: Reference to the default salesperson assigned to this customer
+        
+      - name: default_ship_terms_id
+        description: Reference to the default shipping terms for this customer
+        
+      - name: default_payment_terms_id
+        description: Reference to the default payment terms for this customer
+        
+      - name: customer_note
+        description: General notes about the customer
+        
+      - name: customer_url
+        description: Website or other URL associated with the customer
+        
+      - name: last_changed_user
+        description: Username of the last person to modify the customer record
+        
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer
