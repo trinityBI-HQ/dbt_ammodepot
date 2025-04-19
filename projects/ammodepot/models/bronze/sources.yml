@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: bronze            # reference name in your SQL
+    schema: bronze          # where your raw tables live
+    tables:
+      - name: bronze_test        # dbt will look for bronze.orders
+      - name: bronze_test2
+
+#This tells dbt:
+#{{ source('bronze','bronze_test') }}
