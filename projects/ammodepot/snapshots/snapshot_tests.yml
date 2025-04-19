@@ -1,0 +1,10 @@
+version: 2
+
+snapshots:
+  - name: bronze_test_snapshot
+    description: "Tracks historical changes in bronze.bronze_test"
+    tests:
+      - not_null:
+          column_name: id
+      - unique:
+          column_name: id
