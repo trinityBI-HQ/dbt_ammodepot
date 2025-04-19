@@ -1,7 +1,6 @@
 name: 'ammodepot'
 version: '1.0.0'
 
-# ← this is required when you use per‑model configs
 config-version: 2
 
 profile: 'ammodepot'
@@ -18,15 +17,16 @@ clean-targets:
   - "dbt_packages"
 
 models:
+  # Default: any model not in silver/ or gold/ will go to target.schema
   ammodepot:
-    # default schema if a model isn’t in bronze/silver/gold
     +schema: "{{ target.schema }}"
-    bronze:
-      +schema: bronze
-      +materialized: view
-    silver:
-      +schema: silver
-      +materialized: table
-    gold:
-      +schema: gold
-      +materialized: table
+
+  # All files in models/silver/ (and subfolders) become tables in schema 'silver'
+  silver:
+    +schema: silver
+    +materialized: table
+
+  # All files in models/gold/ (and subfolders) become tables in schema 'gold'
+  gold:
+    +schema: gold
+    +materialized: table
