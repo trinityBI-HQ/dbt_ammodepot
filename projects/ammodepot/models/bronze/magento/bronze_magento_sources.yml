@@ -1,0 +1,75 @@
+version: 2
+
+sources:
+  - name: magento
+    description: Magento e-commerce platform raw data
+    schema: magento
+    tables:
+      - name: customer_entity
+        description: Raw customer account data from Magento
+        columns:
+          - name: entity_id
+            description: Primary key for customer
+            tests:
+              - unique
+              - not_null
+      
+      - name: amasty_orderachive_sales_order_grid_archive
+        description: Archived sales order grid data
+        columns:
+          - name: entity_id
+            description: Primary key for order
+            tests:
+              - unique
+              - not_null
+      
+      - name: catalog_category_product
+        description: Mapping between products and categories
+        columns:
+          - name: entity_id
+            description: Primary key for the relation
+            tests:
+              - unique
+              - not_null
+      
+      - name: catalog_category_entity_varchar
+        description: Category attribute values of varchar type
+        columns:
+          - name: value_id
+            description: Primary key for the attribute value
+            tests:
+              - unique
+              - not_null
+      
+      - name: catalog_product_super_link
+        description: Relationship between configurable products and their simple product variants
+        columns:
+          - name: link_id
+            description: Primary key for the relationship
+            tests:
+              - unique
+              - not_null
+      
+      - name: admin_user
+        description: Admin users of the Magento system
+        columns:
+          - name: user_id
+            description: Primary key for admin user
+            tests:
+              - unique
+              - not_null
+      
+      - name: mostviewed_analytics
+        description: Analytics data for most viewed products and content
+        columns:
+          - name: id
+            description: Primary key for analytics record
+            tests:
+              - unique
+              - not_null
+              
+      - name: eav_attribute_option_value
+        description: Values for attribute options
+        columns:
+          - name: value_id
+            description: Primary key for option value

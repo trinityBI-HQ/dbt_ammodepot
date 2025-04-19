@@ -1,0 +1,93 @@
+version: 2
+
+models:
+  - name: fishbowl_vendors
+    description: >
+      Silver layer table containing cleaned vendor data from Fishbowl inventory system.
+      Contains supplier information, account details, and procurement settings.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: vendor_id
+        description: Unique identifier for the vendor
+        tests:
+          - unique
+          - not_null
+      
+      - name: vendor_name
+        description: Vendor's business name
+        tests:
+          - not_null
+        
+      - name: vendor_note
+        description: General notes about the vendor
+        
+      - name: vendor_url
+        description: Website or other URL associated with the vendor
+        
+      - name: lead_time_days
+        description: Standard lead time in days for orders from this vendor
+        
+      - name: status_id
+        description: Reference to vendor status (active, inactive, etc.)
+        
+      - name: account_id
+        description: Reference to the accounting system account
+        
+      - name: sysuser_id
+        description: System user ID associated with the vendor
+        
+      - name: tax_rate_id
+        description: Reference to the tax rate applied to purchases from this vendor
+        
+      - name: account_number
+        description: Account number assigned by the vendor
+        
+      - name: is_active
+        description: Flag indicating whether the vendor is currently active
+        
+      - name: currency_id
+        description: Reference to the currency used for this vendor's transactions
+        
+      - name: credit_limit
+        description: Maximum credit amount extended by this vendor
+        
+      - name: date_entered
+        description: Date when the vendor record was created
+        
+      - name: accounting_id
+        description: External accounting system identifier
+        
+      - name: currency_rate
+        description: Exchange rate for the vendor's currency
+        
+      - name: custom_fields
+        description: JSON containing any custom fields defined for the vendor
+        
+      - name: accounting_hash
+        description: Hash value for accounting system integration
+        
+      - name: minimum_order_amount
+        description: Minimum purchase amount required by the vendor
+        
+      - name: last_changed_user
+        description: Username of the last person to modify the vendor record
+        
+      - name: date_last_modified
+        description: Date when the vendor record was last modified
+        
+      - name: default_carrier_id
+        description: Reference to the default shipping carrier for this vendor
+        
+      - name: default_ship_terms_id
+        description: Reference to the default shipping terms for this vendor
+        
+      - name: default_payment_terms_id
+        description: Reference to the default payment terms for this vendor
+        
+      - name: default_carrier_service_id
+        description: Reference to the default carrier service for this vendor
+        
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer

@@ -1,0 +1,84 @@
+version: 2
+
+models:
+  - name: magento_customer_entities
+    description: >
+      Silver layer table containing cleaned customer data from Magento e-commerce platform.
+      Contains customer profile information and account details.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: customer_id
+        description: Unique identifier for the customer in Magento
+        tests:
+          - unique
+          - not_null
+      
+      - name: customer_email
+        description: Customer's email address used for login and communication
+        tests:
+          - not_null
+        
+      - name: first_name
+        description: Customer's first name
+        
+      - name: last_name
+        description: Customer's last name
+        
+      - name: middle_name
+        description: Customer's middle name or initial if provided
+        
+      - name: name_prefix
+        description: Prefix for the customer's name (e.g., Mr., Mrs., Dr.)
+        
+      - name: name_suffix
+        description: Suffix for the customer's name (e.g., Jr., Sr., Ph.D.)
+        
+      - name: date_of_birth
+        description: Customer's date of birth if provided
+        
+      - name: gender_id
+        description: Reference to the customer's gender (typically 1 for Male, 2 for Female)
+        
+      - name: tax_vat_number
+        description: Customer's tax or VAT identification number
+        
+      - name: customer_group_id
+        description: Reference to the customer group the customer belongs to
+        
+      - name: store_id
+        description: Reference to the store view where the customer account was created
+        
+      - name: website_id
+        description: Reference to the website where the customer account was created
+        
+      - name: created_at
+        description: Date and time when the customer account was created
+        
+      - name: updated_at
+        description: Date and time when the customer account was last updated
+        
+      - name: is_active
+        description: Flag indicating whether the customer account is active
+        
+      - name: registration_source
+        description: Identifier for the source of customer registration
+        
+      - name: default_billing_address_id
+        description: Reference to the customer's default billing address
+        
+      - name: default_shipping_address_id
+        description: Reference to the customer's default shipping address
+        
+      - name: customer_increment_id
+        description: Incremental identifier for the customer
+        
+      - name: is_zendesk_user
+        description: Flag indicating whether the customer is registered in Zendesk
+        
+      - name: disable_auto_group_change
+        description: Flag controlling automatic customer group assignment
+        
+      - name: email_marketing_synced
+        description: Flag indicating whether the customer is synced with email marketing system
