@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: dbt_test_silver2
+    description: |
+      Lightly cleans and types the raw bronze_test2 table.
+      Converts string fields into proper numeric and timestamp types
+      for downstream analysis.
+    tags: [silver, staging]
+    columns:
+      - name: id
+        description: "Primary key for each order record in bronze_test2"
+        tests:
+          - not_null
+          - unique
+
+      - name: user_id
+        description: "Identifier of the user who placed the order"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('users')           # adjust if your users model has a different name
+              field: id
+
+      - name: amount
+        description: "Order amount cast to numeric; must be non‑negative"
+        tests:
+          - not_null
+          - expression_is_true:
+              expr: "amount >= 0"
+
+      - name: order_ts
+        description: "Order timestamp cast to a proper datetime"
+        tests:
+          - not_null
+          - timestamp_not_future
+
+    tests:
+      - dbt_utils.equality:
+          compare_model: ref('dbt_test_silver2_backup')  # if you maintain a baseline table
