@@ -1,0 +1,153 @@
+version: 2
+
+models:
+  - name: fishbowl_parts
+    description: >
+      Silver layer table containing cleaned part data from Fishbowl inventory system.
+      Contains part master data including dimensions, costs, and inventory settings.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: part_id
+        description: Unique identifier for the part
+        tests:
+          - unique
+          - not_null
+      
+      - name: part_number
+        description: Part number/SKU used to identify the part
+        tests:
+          - not_null
+        
+      - name: upc_code
+        description: Universal Product Code assigned to the part if applicable
+        
+      - name: part_description
+        description: Descriptive name for the part
+        
+      - name: part_type_id
+        description: Reference to the type of part (inventory, service, etc.)
+        
+      - name: is_active
+        description: Flag indicating whether the part is currently active in the system
+        
+      - name: abc_code
+        description: ABC classification code for inventory prioritization
+        
+      - name: length
+        description: Physical length of the part
+        
+      - name: width
+        description: Physical width of the part
+        
+      - name: height
+        description: Physical height of the part
+        
+      - name: weight
+        description: Weight of the part
+        
+      - name: size_uom_id
+        description: Reference to the unit of measure used for dimensions
+        
+      - name: weight_uom_id
+        description: Reference to the unit of measure used for weight
+        
+      - name: default_uom_id
+        description: Reference to the default unit of measure for the part
+        
+      - name: tax_id
+        description: Reference to the default tax applied to this part
+        
+      - name: part_details
+        description: Additional detailed information about the part
+        
+      - name: standard_cost
+        description: Standard cost value used for accounting
+        
+      - name: revision_number
+        description: Current revision or version of the part
+        
+      - name: lead_time_days
+        description: Standard lead time in days to procure or manufacture the part
+        
+      - name: alert_note
+        description: Note that will display as an alert when part is used
+        
+      - name: date_created
+        description: Date when the part record was created
+        
+      - name: part_class_id
+        description: Reference to the part classification or category
+        
+      - name: accounting_id
+        description: External accounting system identifier
+        
+      - name: is_configurable
+        description: Flag indicating whether the part has configurable options
+        
+      - name: default_bom_id
+        description: Reference to the default bill of materials for manufacturing
+        
+      - name: receiving_tolerance
+        description: Acceptable variance percentage when receiving this part
+        
+      - name: has_tracking
+        description: Flag indicating whether this part is tracked with serial/lot numbers
+        
+      - name: cogs_account_id
+        description: Reference to the Cost of Goods Sold accounting account
+        
+      - name: cycle_count_tolerance
+        description: Acceptable variance percentage during cycle counting
+        
+      - name: is_controlled
+        description: Flag indicating whether the part is a controlled substance
+        
+      - name: scrap_account_id
+        description: Reference to the account for recording scrapped parts
+        
+      - name: is_serialized
+        description: Flag indicating whether the part is tracked by serial numbers
+        
+      - name: consumption_rate
+        description: Average consumption rate used for forecasting
+        
+      - name: pick_in_uom_of_part
+        description: Flag indicating whether to pick using the part's UOM or each
+        
+      - name: date_last_modified
+        description: Date when the part record was last modified
+        
+      - name: default_product_id
+        description: Reference to the default product associated with this part
+        
+      - name: always_manufacture
+        description: Flag indicating whether to always manufacture instead of purchasing
+        
+      - name: variance_account_id
+        description: Reference to the account for recording inventory variances
+        
+      - name: inventory_account_id
+        description: Reference to the inventory accounting account
+        
+      - name: adjustment_account_id
+        description: Reference to the account for recording inventory adjustments
+        
+      - name: default_po_item_type_id
+        description: Reference to the default purchase order item type
+        
+      - name: default_outsourced_return_item_id
+        description: Reference to the default item type for outsourced returns
+        
+      - name: part_url
+        description: Website or other URL associated with the part
+        
+      - name: last_changed_user
+        description: Username of the last person to modify the part record
+        
+      - name: custom_fields
+        description: JSON containing any custom fields defined for the part
+        
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer
