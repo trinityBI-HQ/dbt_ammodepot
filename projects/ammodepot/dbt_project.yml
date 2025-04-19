@@ -17,16 +17,21 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  # Default: any model not in silver/ or gold/ will go to target.schema
-  ammodepot:
-    +schema: "{{ target.schema }}"
+  # ── DEFAULT for all models not in silver/ or gold/
+  +schema: "{{ target.schema }}"
+  +materialized: view
 
-  # All files in models/silver/ (and subfolders) become tables in schema 'silver'
+  # ── BRONZE layer, if you have models/bronze
+  bronze:
+    +schema: bronze
+    +materialized: view
+
+  # ── SILVER layer: any .sql under models/silver/** → silver.<model> as table
   silver:
     +schema: silver
     +materialized: table
 
-  # All files in models/gold/ (and subfolders) become tables in schema 'gold'
+  # ── GOLD layer: any .sql under models/gold/** → gold.<model> as table
   gold:
     +schema: gold
     +materialized: table
