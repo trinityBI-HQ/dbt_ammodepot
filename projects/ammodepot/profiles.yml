@@ -1,0 +1,12 @@
+ammodepot:
+  outputs:
+    dev:
+      dbname: ammodepot
+      host: airbyte-project-redshift-cluster.chaiaxiqde3z.us-east-1.redshift.amazonaws.com
+      password: QYt5eRJUEzqQYw6#DBj8
+      port: 5439
+      schema: silver
+      threads: 1
+      type: redshift
+      user: admin
+  target: dev
