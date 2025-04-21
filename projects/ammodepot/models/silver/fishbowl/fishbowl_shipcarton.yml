@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: fishbowl_shipcarton
+    description: Silver table containing shipment carton details from Fishbowl.
+    columns:
+      - name: ship_carton_id
+        tests:
+          - unique
+          - not_null
+      - name: shipment_id
+      - name: carton_number
+      - name: carton_weight
+      - name: freight_weight
+      - name: freight_amount
+      - name: tracking_number
