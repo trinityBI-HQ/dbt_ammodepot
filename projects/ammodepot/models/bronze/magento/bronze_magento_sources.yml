@@ -73,27 +73,51 @@ sources:
         columns:
           - name: value_id
             description: Primary key for option value
-            
+            tests:
+              - unique
+              - not_null
+              
       - name: store
         description: List of stores
         columns:
           - name: store_id
-            description: Primary key for option value
+            description: Primary key for the store
+            tests:
+              - unique
+              - not_null
 
       - name: sales_order
-        description: Orders data from magento
+        description: Orders data from Magento
         columns:
           - name: entity_id
-            description: Primary key for option value
+            description: Primary key for the order
+            tests:
+              - unique
+              - not_null
 
       - name: sales_order_item
-        description: Orders items data from magento
+        description: Order items data from Magento
         columns:
           - name: item_id
-            description: Primary key for option value
+            description: Primary key for the order item
+            tests:
+              - unique
+              - not_null
 
       - name: sales_order_address
-        description: Orders Address data from magento
+        description: Order address data from Magento
         columns:
           - name: entity_id
-            description: Primary key for option value
+            description: Primary key for the order address
+            tests:
+              - unique
+              - not_null
+
+      - name: catalog_product_entity
+        description: Product entity details from Magento
+        columns:
+          - name: entity_id
+            description: Primary key for the product entity
+            tests:
+              - unique
+              - not_null

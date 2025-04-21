@@ -1,5 +1,5 @@
 name: 'ammodepot'
-version: '1.0.0'
+version: '1.0'
 
 config-version: 2
 
@@ -12,26 +12,12 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
-clean-targets:
-  - "target"
-  - "dbt_packages"
-
 models:
-  # ── DEFAULT for all models not in silver/ or gold/
-  +schema: "{{ target.schema }}"
-  +materialized: view
-
-  # ── BRONZE layer, if you have models/bronze
-  bronze:
-    +schema: bronze
-    +materialized: view
-
-  # ── SILVER layer: any .sql under models/silver/** → silver.<model> as table
-  silver:
-    +schema: silver
-    +materialized: table
-
-  # ── GOLD layer: any .sql under models/gold/** → gold.<model> as table
-  gold:
-    +schema: gold
-    +materialized: table
+  ammodepot:  
+    silver:
+      +schema: silver
+      +materialized: table
+      
+    gold:
+      +schema: gold
+      +materialized: table

@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: fishbowl_sales_orders
+  - name: fishbowl_so
     description: >
       Silver layer table containing cleaned sales order data from Fishbowl inventory system.
       Includes detailed order, financial, customer, and shipping information.
