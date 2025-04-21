@@ -1,0 +1,207 @@
+version: 2
+
+models:
+  - name: sales_orders
+    description: >
+      Silver layer table containing cleaned sales order data from Fishbowl inventory system.
+      Includes detailed order, financial, customer, and shipping information.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: sales_order_id
+        description: Unique identifier for the sales order
+        tests:
+          - unique
+          - not_null
+
+      - name: sales_order_number
+        description: Sales order number
+        tests:
+          - not_null
+
+      - name: customer_id
+        description: Identifier of the customer placing the order
+
+      - name: order_type_id
+        description: Identifier for the type of order
+
+      - name: status_id
+        description: Identifier for the order status
+
+      - name: created_at
+        description: Timestamp when the sales order was created
+
+      - name: issued_at
+        description: Timestamp when the sales order was issued
+
+      - name: last_modified_at
+        description: Timestamp when the sales order was last modified
+
+      - name: completed_at
+        description: Timestamp when the sales order was completed
+
+      - name: expires_at
+        description: Timestamp when the sales order expires
+
+      - name: first_ship_date
+        description: Date of the first shipment associated with the order
+
+      - name: revision_date
+        description: Date of the latest revision of the order
+
+      - name: subtotal
+        description: Subtotal amount of the sales order before taxes
+
+      - name: total_tax
+        description: Total tax amount applied to the sales order
+
+      - name: total_price
+        description: Total amount (grand total) of the sales order
+
+      - name: total_cost
+        description: Total cost associated with the order
+
+      - name: estimated_tax
+        description: Estimated tax for the order
+
+      - name: mc_total_tax
+        description: Total tax amount in multi-currency
+
+      - name: currency_id
+        description: Identifier of the currency used
+
+      - name: currency_rate
+        description: Exchange rate used for currency conversion
+
+      - name: is_total_including_tax
+        description: Flag indicating if the total includes tax
+
+      - name: customer_po_number
+        description: Customer's purchase order number
+
+      - name: customer_contact_name
+        description: Contact name for the customer
+
+      - name: customer_email
+        description: Email address of the customer
+
+      - name: customer_phone
+        description: Phone number of the customer
+
+      - name: bill_to_name
+        description: Name on the billing address
+
+      - name: bill_to_address
+        description: Billing address
+
+      - name: bill_to_city
+        description: Billing city
+
+      - name: bill_to_zip
+        description: Billing ZIP code
+
+      - name: bill_to_state_id
+        description: Billing state identifier
+
+      - name: bill_to_country_id
+        description: Billing country identifier
+
+      - name: ship_to_name
+        description: Name on the shipping address
+
+      - name: ship_to_address
+        description: Shipping address
+
+      - name: ship_to_city
+        description: Shipping city
+
+      - name: ship_to_zip
+        description: Shipping ZIP code
+
+      - name: ship_to_state_id
+        description: Shipping state identifier
+
+      - name: ship_to_country_id
+        description: Shipping country identifier
+
+      - name: is_ship_to_residential
+        description: Flag indicating if shipping address is residential
+
+      - name: carrier_id
+        description: Shipping carrier identifier
+
+      - name: carrier_service_id
+        description: Shipping carrier service identifier
+
+      - name: ship_terms_id
+        description: Shipping terms identifier
+
+      - name: fob_point_id
+        description: FOB (Free On Board) point identifier
+
+      - name: salesman_name
+        description: Name of the salesman associated with the order
+
+      - name: salesman_id
+        description: Identifier of the salesman
+
+      - name: salesman_initials
+        description: Initials of the salesman
+
+      - name: priority_id
+        description: Priority level identifier of the order
+
+      - name: location_group_id
+        description: Location group identifier associated with the order
+
+      - name: user_name
+        description: Username associated with the order
+
+      - name: created_by_user_id
+        description: Identifier of the user who created the order
+
+      - name: register_id
+        description: Register identifier used for POS transactions
+
+      - name: quickbooks_class_id
+        description: QuickBooks class identifier
+
+      - name: vendor_po_number
+        description: Vendor purchase order number associated with the order
+
+      - name: note
+        description: Additional notes for the sales order
+
+      - name: url
+        description: URL associated with the sales order
+
+      - name: revision_number
+        description: Revision number of the sales order
+
+      - name: payment_terms_id
+        description: Identifier for the payment terms
+
+      - name: tax_rate_id
+        description: Identifier for the applicable tax rate
+
+      - name: tax_rate_name
+        description: Name of the applicable tax rate
+
+      - name: tax_rate
+        description: Tax rate value applied
+
+      - name: to_be_emailed
+        description: Flag indicating if the order should be emailed
+
+      - name: to_be_printed
+        description: Flag indicating if the order should be printed
+
+      - name: payment_link
+        description: Link for online payment
+
+      - name: custom_fields
+        description: JSON containing any custom fields defined for the order
+
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer

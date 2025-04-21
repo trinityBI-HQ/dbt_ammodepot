@@ -1,0 +1,168 @@
+version: 2
+
+models:
+  - name: sales_order_items
+    description: >
+      Silver layer table containing cleaned sales order item data from Magento e-commerce platform.
+      Includes detailed product, pricing, quantity, and financial information per sales order item.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: order_item_id
+        description: Unique identifier for the sales order item
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: Identifier of the associated sales order
+        tests:
+          - not_null
+
+      - name: product_id
+        description: Identifier of the product sold
+
+      - name: parent_item_id
+        description: Identifier of the parent item for configurable or bundled products
+
+      - name: quote_item_id
+        description: Identifier of the related quote item
+
+      - name: store_id
+        description: Identifier of the store from which the order was placed
+
+      - name: sku
+        description: Stock Keeping Unit for the product
+
+      - name: external_order_item_id
+        description: External identifier for the order item, if applicable
+
+      - name: product_name
+        description: Name of the product
+
+      - name: product_description
+        description: Description of the product
+
+      - name: product_type
+        description: Type of the product (e.g., simple, configurable)
+
+      - name: item_weight
+        description: Weight of the individual item
+
+      - name: row_weight
+        description: Total weight for the item row (quantity multiplied by item weight)
+
+      - name: product_options
+        description: JSON or serialized data of product options selected by the customer
+
+      - name: qty_ordered
+        description: Quantity ordered
+
+      - name: qty_shipped
+        description: Quantity shipped
+
+      - name: qty_invoiced
+        description: Quantity invoiced
+
+      - name: qty_refunded
+        description: Quantity refunded
+
+      - name: qty_canceled
+        description: Quantity canceled
+
+      - name: qty_backordered
+        description: Quantity backordered
+
+      - name: unit_price
+        description: Unit price in order currency
+
+      - name: unit_original_price
+        description: Original unit price before discounts in order currency
+
+      - name: row_total
+        description: Total price for the row (qty multiplied by unit price, excluding tax and discounts)
+
+      - name: unit_price_incl_tax
+        description: Unit price including tax in order currency
+
+      - name: row_total_incl_tax
+        description: Total price including tax for the row
+
+      - name: tax_amount
+        description: Total tax amount for the item
+
+      - name: tax_percent
+        description: Applicable tax percentage
+
+      - name: discount_amount
+        description: Discount amount applied to the item
+
+      - name: discount_percent
+        description: Discount percentage applied
+
+      - name: amount_refunded
+        description: Amount refunded for the item
+
+      - name: base_unit_price
+        description: Unit price in base currency
+
+      - name: base_unit_original_price
+        description: Original unit price before discounts in base currency
+
+      - name: base_row_total
+        description: Row total price in base currency
+
+      - name: base_unit_price_incl_tax
+        description: Unit price including tax in base currency
+
+      - name: base_row_total_incl_tax
+        description: Row total including tax in base currency
+
+      - name: base_tax_amount
+        description: Tax amount in base currency
+
+      - name: base_discount_amount
+        description: Discount amount in base currency
+
+      - name: base_amount_refunded
+        description: Refunded amount in base currency
+
+      - name: base_cost
+        description: Cost of the item in base currency
+
+      - name: is_virtual_item
+        description: Flag indicating if the item is virtual
+
+      - name: is_discount_excluded
+        description: Flag indicating if discounts are excluded for this item
+
+      - name: has_free_shipping
+        description: Flag indicating if the item has free shipping
+
+      - name: is_quantity_decimal
+        description: Flag indicating if the quantity is decimal
+
+      - name: is_locked_for_shipping
+        description: Flag indicating if shipping for this item is locked
+
+      - name: is_locked_for_invoicing
+        description: Flag indicating if invoicing for this item is locked
+
+      - name: is_gift_message_available
+        description: Flag indicating if a gift message is available for the item
+
+      - name: gift_message_id
+        description: Identifier of the gift message, if applicable
+
+      - name: item_created_at
+        description: Timestamp when the order item was created
+
+      - name: item_updated_at
+        description: Timestamp when the order item was last updated
+
+      - name: applied_rule_ids
+        description: Comma-separated list of cart price rule IDs applied to the item
+
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer

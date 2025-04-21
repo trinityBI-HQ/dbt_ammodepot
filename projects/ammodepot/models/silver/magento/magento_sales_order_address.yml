@@ -1,0 +1,102 @@
+version: 2
+
+models:
+  - name: sales_order_addresses
+    description: >
+      Silver layer table containing cleaned sales order address data from Magento e-commerce platform.
+      Includes detailed billing and shipping addresses associated with sales orders.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: order_address_id
+        description: Unique identifier for the sales order address
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        description: Identifier of the associated sales order
+        tests:
+          - not_null
+
+      - name: customer_id
+        description: Identifier of the customer associated with the order
+
+      - name: customer_address_id
+        description: Identifier of the customer's saved address book entry
+
+      - name: quote_address_id
+        description: Identifier of the quote address linked to this order
+
+      - name: address_type
+        description: Type of address (billing or shipping)
+
+      - name: first_name
+        description: First name of the contact person
+
+      - name: last_name
+        description: Last name of the contact person
+
+      - name: middle_name
+        description: Middle name of the contact person
+
+      - name: name_prefix
+        description: Prefix of the contact person's name
+
+      - name: name_suffix
+        description: Suffix of the contact person's name
+
+      - name: company
+        description: Company name associated with the address
+
+      - name: street_address
+        description: Street address details
+
+      - name: city
+        description: City of the address
+
+      - name: region
+        description: Region or state of the address
+
+      - name: region_id
+        description: Region identifier
+
+      - name: postcode
+        description: Postal code of the address
+
+      - name: country_code
+        description: Country code (typically ISO 2-letter code)
+
+      - name: phone_number
+        description: Telephone number associated with the address
+
+      - name: fax_number
+        description: Fax number associated with the address
+
+      - name: email
+        description: Email associated with the address
+
+      - name: vat_id
+        description: VAT identification number
+
+      - name: is_vat_valid
+        description: Flag indicating if the VAT ID is valid
+
+      - name: vat_request_id
+        description: Identifier of the VAT validation request
+
+      - name: vat_request_date
+        description: Date of the VAT validation request
+
+      - name: was_vat_request_successful
+        description: Flag indicating if the VAT validation request was successful
+
+      - name: sms_optin_check
+        description: Flag indicating if the customer opted in for SMS communications
+
+      - name: verified_until
+        description: Verification expiry timestamp, if applicable
+
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer

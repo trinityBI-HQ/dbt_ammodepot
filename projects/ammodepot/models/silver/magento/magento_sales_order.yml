@@ -1,0 +1,201 @@
+version: 2
+
+models:
+  - name: magento_sales_orders
+    description: >
+      Silver layer table containing cleaned sales order data from Magento e-commerce platform.
+      Includes order identifiers, statuses, customer information, detailed financials, and shipping details.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: order_id
+        description: Unique identifier for the sales order
+        tests:
+          - unique
+          - not_null
+
+      - name: order_increment_id
+        description: Customer-facing incremental order number
+        tests:
+          - not_null
+
+      - name: store_id
+        description: Identifier of the store associated with the order
+
+      - name: customer_id
+        description: Identifier of the customer who placed the order
+
+      - name: quote_id
+        description: Identifier of the associated quote
+
+      - name: billing_address_id
+        description: Identifier for the billing address
+
+      - name: shipping_address_id
+        description: Identifier for the shipping address
+
+      - name: external_order_id
+        description: External system order identifier, if applicable
+
+      - name: external_customer_id
+        description: External system customer identifier, if applicable
+
+      - name: order_state
+        description: State of the order (e.g., processing, complete)
+
+      - name: order_status
+        description: Specific status of the order within its state
+
+      - name: created_at
+        description: Timestamp when the order was created
+
+      - name: updated_at
+        description: Timestamp when the order was last updated
+
+      - name: customer_email
+        description: Email of the customer
+
+      - name: customer_firstname
+        description: Customer's first name
+
+      - name: customer_lastname
+        description: Customer's last name
+
+      - name: customer_prefix
+        description: Customer's name prefix
+
+      - name: customer_middlename
+        description: Customer's middle name
+
+      - name: customer_suffix
+        description: Customer's name suffix
+
+      - name: customer_dob
+        description: Customer's date of birth
+
+      - name: customer_gender
+        description: Gender of the customer
+
+      - name: customer_group_id
+        description: Customer group identifier
+
+      - name: is_customer_guest
+        description: Flag indicating if the customer checked out as guest
+
+      - name: customer_note
+        description: Additional note from the customer
+
+      - name: should_notify_customer_note
+        description: Flag indicating if the customer should be notified about the note
+
+      - name: customer_taxvat
+        description: Customer's tax/VAT number
+
+      - name: store_name
+        description: Name of the store associated with the order
+
+      - name: order_currency_code
+        description: Currency code of the order
+
+      - name: grand_total
+        description: Total amount of the order
+
+      - name: subtotal
+        description: Subtotal amount before taxes and shipping
+
+      - name: subtotal_incl_tax
+        description: Subtotal amount including taxes
+
+      - name: shipping_amount
+        description: Shipping amount excluding taxes
+
+      - name: shipping_incl_tax
+        description: Shipping amount including taxes
+
+      - name: tax_amount
+        description: Total tax amount applied to the order
+
+      - name: discount_amount
+        description: Total discount amount applied to the order
+
+      - name: total_paid
+        description: Total amount paid
+
+      - name: total_refunded
+        description: Total amount refunded
+
+      - name: total_due
+        description: Total amount due
+
+      - name: total_canceled
+        description: Total amount canceled
+
+      - name: base_currency_code
+        description: Base currency code of the store
+
+      - name: base_grand_total
+        description: Grand total in base currency
+
+      - name: base_subtotal
+        description: Subtotal amount in base currency
+
+      - name: base_subtotal_incl_tax
+        description: Subtotal including tax in base currency
+
+      - name: base_shipping_amount
+        description: Shipping amount in base currency
+
+      - name: base_shipping_incl_tax
+        description: Shipping including tax in base currency
+
+      - name: base_tax_amount
+        description: Tax amount in base currency
+
+      - name: base_discount_amount
+        description: Discount amount in base currency
+
+      - name: base_total_paid
+        description: Total paid in base currency
+
+      - name: base_total_refunded
+        description: Total refunded in base currency
+
+      - name: base_total_due
+        description: Total due in base currency
+
+      - name: base_total_canceled
+        description: Total canceled in base currency
+
+      - name: shipping_method
+        description: Shipping method selected for the order
+
+      - name: shipping_description
+        description: Description of the shipping method
+
+      - name: weight
+        description: Total weight of the order
+
+      - name: total_qty_ordered
+        description: Total quantity of items ordered
+
+      - name: total_item_count
+        description: Total number of distinct items in the order
+
+      - name: can_ship_partially
+        description: Flag indicating if the order can be partially shipped
+
+      - name: coupon_code
+        description: Coupon code applied to the order
+
+      - name: discount_description
+        description: Description of discounts applied
+
+      - name: is_virtual_order
+        description: Flag indicating if the order is virtual (no physical shipment)
+
+      - name: is_email_sent
+        description: Flag indicating if order email was sent to the customer
+
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer
