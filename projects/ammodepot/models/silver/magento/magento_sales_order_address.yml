@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: sales_order_addresses
+  - name: magento_sales_order_address
     description: >
       Silver layer table containing cleaned sales order address data from Magento e-commerce platform.
       Includes detailed billing and shipping addresses associated with sales orders.

@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: f_sales
+    description: Gold layer table consolidating detailed sales data from Fishbowl and Magento integrations.
+    columns:
+      - name: so_item_id
+        description: Unique identifier for the sales order item.
+        tests:
+          - unique
+          - not_null
+
+      - name: so_id
+        description: Identifier for the sales order from Fishbowl.
+
+      - name: product_id
+        description: Identifier for the product sold.
+
+      - name: sku
+        description: Stock Keeping Unit of the product.
+
+      - name: product_description
+        description: Description of the product sold.
+
+      - name: product_price
+        description: Price of the product as listed in Fishbowl.
+
+      - name: quantity_ordered
+        description: Quantity of the product ordered.
+
+      - name: quantity_shipped
+        description: Quantity of the product shipped.
+
+      - name: unit_price
+        description: Unit selling price of the product in the order.
+
+      - name: total_price
+        description: Total selling price for the item line.
+
+      - name: total_cost
+        description: Total cost of the product in the order.
+
+      - name: ship_date
+        description: Date when the order was shipped.
+
+      - name: tracking_number
+        description: Shipping tracking number.
+
+      - name: carton_weight
+        description: Weight of the shipment carton.
+
+      - name: freight_amount
+        description: Freight cost associated with the shipment.
+
+      - name: magento_order_item_identity
+        description: Magento-specific identifier linking the Fishbowl order item to Magento.
+
+      - name: id_produto_magento
+        description: Magento product identifier linked to Fishbowl product.
+
+      - name: sales_order_item_magento
+        description: Magento sales order item identifier linked to Fishbowl.
