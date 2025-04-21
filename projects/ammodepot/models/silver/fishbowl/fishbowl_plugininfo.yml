@@ -1,0 +1,37 @@
+version: 2
+
+models:
+  - name: plugin_info
+    description: >
+      Silver layer table containing cleaned plugin information from the Fishbowl inventory system.
+      Includes plugin metadata and associated context.
+    config:
+      schema: silver
+      materialized: table
+    columns:
+      - name: plugin_info_id
+        description: Unique identifier for the plugin information record
+        tests:
+          - unique
+          - not_null
+
+      - name: record_id
+        description: Foreign key reference to another table's record
+
+      - name: group_id
+        description: Grouping identifier for categorizing plugin info
+
+      - name: channel_id
+        description: Context-specific channel identifier
+
+      - name: plugin_name
+        description: Name of the plugin providing this data
+
+      - name: plugin_info_data
+        description: Detailed information or metadata provided by the plugin
+
+      - name: related_table_name
+        description: Name of the table to which the record_id refers
+
+      - name: etl_loaded_at
+        description: Timestamp when this record was loaded into the silver layer
