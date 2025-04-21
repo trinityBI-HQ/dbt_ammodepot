@@ -73,3 +73,27 @@ sources:
         columns:
           - name: value_id
             description: Primary key for option value
+            
+      - name: store
+        description: List of stores
+        columns:
+          - name: store_id
+            description: Primary key for option value
+
+      - name: sales_order
+        description: Orders data from magento
+        columns:
+          - name: entity_id
+            description: Primary key for option value
+
+      - name: sales_order_item
+        description: Orders items data from magento
+        columns:
+          - name: item_id
+            description: Primary key for option value
+
+      - name: sales_order_address
+        description: Orders Address data from magento
+        columns:
+          - name: entity_id
+            description: Primary key for option value
