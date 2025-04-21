@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: fishbowl_ship
+    description: Silver table containing shipment details from Fishbowl.
+    columns:
+      - name: shipment_id
+        tests:
+          - unique
+          - not_null
+      - name: so_id
+      - name: carrier_service_id
+      - name: ship_date
+      - name: tracking_number

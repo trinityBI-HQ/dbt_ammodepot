@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: fishbowl_product
+    description: Silver table containing product details from Fishbowl.
+    columns:
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+      - name: part_id
+      - name: sku
+      - name: product_description
+      - name: product_price
+      - name: is_active
