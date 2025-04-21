@@ -54,11 +54,11 @@ WITH source_data AS (
 
 
     FROM
-        {{ source('magento', 'sales_order_address') }} -- Use the correct source name and table name
+        -- Source is defined in DDL as AD_AIRBYTE.AIRBYTE_SCHEMA.SALES_ORDER_ADDRESS
+        -- Assuming you have a dbt source named 'ad_airbyte' pointing to AD_AIRBYTE.AIRBYTE_SCHEMA
+        {{ source('magento', 'sales_order_address') }}
     WHERE
-        -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
-        -- This IS NULL check assumes it behaves like a standard timestamp NULL.
-        -- If deletion is marked by empty strings or specific text, adjust this condition.
+        -- Filter out soft deletes. This DDL correctly uses TIMESTAMP_TZ for this column.
         _ab_cdc_deleted_at IS NULL
 )
 

@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: magento_sales_order_items
+  - name: magento_sales_order_item
     description: >
       Silver layer table containing cleaned sales order item data from Magento e-commerce platform.
       Includes detailed product, pricing, quantity, and financial information per sales order item.

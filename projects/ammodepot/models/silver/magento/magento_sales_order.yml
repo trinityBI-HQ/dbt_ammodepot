@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: magento_sales_orders
+  - name: magento_sales_order
     description: >
       Silver layer table containing cleaned sales order data from Magento e-commerce platform.
       Includes order identifiers, statuses, customer information, detailed financials, and shipping details.

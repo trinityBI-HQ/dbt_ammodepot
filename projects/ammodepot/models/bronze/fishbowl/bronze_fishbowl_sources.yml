@@ -2,117 +2,78 @@ version: 2
 
 sources:
   - name: fishbowl
-    description: Fishbowl inventory management system raw data
+    description: Fishbowl inventory management raw data
     schema: fishbowl
     tables:
       - name: customer
-        description: Raw customer data from Fishbowl
+        description: Fishbowl Customer data
         columns:
           - name: id
-            description: Primary key for customer
+            description: Primary key for Customer
             tests:
               - unique
               - not_null
-      
+
       - name: part
-        description: Raw part/inventory item data from Fishbowl
+        description: Fishbowl Part data
         columns:
           - name: id
-            description: Primary key for part
             tests:
               - unique
               - not_null
-      
-      - name: vendor
-        description: Raw vendor/supplier data from Fishbowl
+
+      - name: soitem
+        description: Fishbowl Sales Order Item data
         columns:
           - name: id
-            description: Primary key for vendor
-            tests:
-              - unique
-              - not_null
-      
-      - name: qtyonhand
-        description: Current on-hand quantity for parts by location
-        columns:
-          - name: partid
-            description: Foreign key to part
-          - name: locationgroupid
-            description: Foreign key to location group
-          - name: qty
-            description: Quantity on hand
-      
-      - name: qtyallocated
-        description: Quantity allocated for parts by location
-        columns:
-          - name: partid
-            description: Foreign key to part
-          - name: locationgroupid 
-            description: Foreign key to location group
-          - name: qty
-            description: Quantity allocated
-      
-      - name: qtycommitted
-        description: Quantity committed for parts by location
-        columns:
-          - name: partid
-            description: Foreign key to part
-          - name: locationgroupid
-            description: Foreign key to location group
-          - name: qty
-            description: Quantity committed
-      
-      - name: qtyonorder
-        description: Quantity on order for parts by location
-        columns:
-          - name: partid
-            description: Foreign key to part
-          - name: locationgroupid
-            description: Foreign key to location group
-          - name: qty
-            description: Quantity on order
-      
-      - name: location
-        description: Physical locations where inventory is stored
-        columns:
-          - name: id
-            description: Primary key for location
-            tests:
-              - unique
-              - not_null
-      
-      - name: locationgroup
-        description: Groups of locations (warehouses, facilities, etc.)
-        columns:
-          - name: id
-            description: Primary key for location group
-            tests:
-              - unique
-              - not_null
-      
-      - name: locationtype
-        description: Types of locations in the system
-        columns:
-          - name: id
-            description: Primary key for location type
             tests:
               - unique
               - not_null
 
       - name: so
-        description: Sales Order
+        description: Fishbowl Sales Order data
         columns:
           - name: id
-            description: Primary key for location type
+            tests:
+              - unique
+              - not_null
+
+      - name: product
+        description: Fishbowl Product data
+        columns:
+          - name: id
+            tests:
+              - unique
+              - not_null
+
+      - name: ship
+        description: Fishbowl Shipping data
+        columns:
+          - name: id
+            tests:
+              - unique
+              - not_null
+
+      - name: shipcarton
+        description: Fishbowl Shipping Carton data
+        columns:
+          - name: id
+            tests:
+              - unique
+              - not_null
+
+      - name: vendor
+        description: Fishbowl Vendor data
+        columns:
+          - name: id
             tests:
               - unique
               - not_null
 
       - name: plugininfo
-        description: ..
+        description: Fishbowl Plugin Info data
         columns:
           - name: id
-            description: Primary key for location type
             tests:
               - unique
               - not_null
