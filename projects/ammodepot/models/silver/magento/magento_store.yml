@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: magento_store
+    description: >
+      Silver layer table containing cleaned store view data from the Magento e-commerce platform.
+      Represents individual store views within a Magento installation, often linked to specific languages or presentations.
+    config:
+      schema: silver 
+      materialized: table
+    columns:
+      - name: store_id
+        description: "Unique identifier for the store view in Magento. This is the primary key for this table."
+        tests:
+          - unique
+          - not_null
+
+      - name: store_name
+        description: "The display name of the store view as shown in the admin panel and potentially used in store switchers."
+        tests:
+          - not_null
+      - name: store_code
+        description: "The unique code identifier for the store view, often used programmatically or in URLs."
+        tests:
+          - unique
+          - not_null
+      - name: group_id
+        description: "Foreign key reference to the store group this store view belongs to. A store group shares settings like root category."
+        tests:
+          - not_null
+
+      - name: website_id
+        description: "Foreign key reference to the website this store view belongs to. A website shares customer data and cart."
+        tests:
+          - not_null
+
+      - name: is_active
+        description: "Boolean flag indicating whether the store view is active (1/true) or inactive (0/false)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: sort_order
+        description: "Determines the display order of the store view, typically in lists or dropdowns in the admin or frontend."
+        tests:
+          - not_null

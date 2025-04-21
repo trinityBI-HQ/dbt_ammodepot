@@ -98,3 +98,21 @@ sources:
             tests:
               - unique
               - not_null
+
+      - name: so
+        description: Sales Order
+        columns:
+          - name: id
+            description: Primary key for location type
+            tests:
+              - unique
+              - not_null
+
+      - name: plugininfo
+        description: ..
+        columns:
+          - name: id
+            description: Primary key for location type
+            tests:
+              - unique
+              - not_null
