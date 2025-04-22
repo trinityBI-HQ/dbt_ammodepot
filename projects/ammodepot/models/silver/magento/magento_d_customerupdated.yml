@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: magento_d_customerupdated
+    description: "Tabela com e-mails únicos de clientes com identificador sequencial."
+    columns:
+      - name: customer_email
+        description: "Endereço de e-mail normalizado do cliente."
+        tests:
+          - unique
+          - not_null
+      
+      - name: rank_id
+        description: "Identificador sequencial atribuído ao e-mail do cliente."
+        tests:
+          - unique
+          - not_null

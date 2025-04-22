@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: fishbowl_objecttoobject
+    description: "Details of object-to-object relationships from Fishbowl."
+    columns:
+      - name: object_relationship_id
+        description: "Primary key for the object relationship."
+        tests:
+          - unique
+          - not_null
+
+      - name: relationship_type_id
+        description: "ID describing the type of relationship between objects."
+
+      - name: object1_table_id
+        description: "Table ID of the first object involved in the relationship."
+
+      - name: object1_record_id
+        description: "Record ID of the first object in the relationship."
+
+      - name: object2_table_id
+        description: "Table ID of the second object involved in the relationship."
+
+      - name: object2_record_id
+        description: "Record ID of the second object in the relationship."
+
+      - name: relationship_note
+        description: "Note describing the relationship between the two objects."

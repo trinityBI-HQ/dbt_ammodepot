@@ -1,0 +1,34 @@
+version: 2
+
+models:
+  - name: fishbowl_uomconversion
+    description: Unit of measure conversion details from Fishbowl.
+    columns:
+      - name: uom_conversion_id
+        description: Primary key for UOM conversion
+        tests:
+          - unique
+          - not_null
+
+      - name: from_uom_id
+        description: Source unit of measure identifier
+        tests:
+          - not_null
+
+      - name: to_uom_id
+        description: Target unit of measure identifier
+        tests:
+          - not_null
+
+      - name: multiply_factor
+        description: Factor used for converting from source to target unit
+        tests:
+          - not_null
+
+      - name: factor
+        description: Alternate conversion factor, typically reciprocal of multiply_factor
+        tests:
+          - not_null
+
+      - name: conversion_description
+        description: Description or notes about the UOM conversion
