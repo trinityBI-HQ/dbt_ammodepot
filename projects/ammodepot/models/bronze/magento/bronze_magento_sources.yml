@@ -121,3 +121,12 @@ sources:
             tests:
               - unique
               - not_null
+
+      - name: ups_invoice
+        description: UPS Invoice data from Magento
+        columns:
+          - name: tracking_number
+            description: Tracking number for shipment
+            tests:
+              - unique
+              - not_null

@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: fishbowl_partcost
+    description: "Cost details associated with parts from Fishbowl."
+    columns:
+      - name: part_cost_id
+        description: "Primary key for the part cost record."
+        tests:
+          - unique
+          - not_null
+
+      - name: part_id
+        description: "Foreign key linking to the PART table."
+
+      - name: average_cost
+        description: "Average cost of the part."
+
+      - name: total_cost
+        description: "Total cost accumulated for the part."
+
+      - name: quantity
+        description: "Quantity associated with the cost record."
+
+      - name: created_at
+        description: "Timestamp when the cost record was created."
+
+      - name: last_modified_at
+        description: "Timestamp when the cost record was last modified."

@@ -18,6 +18,7 @@ sources:
         description: Fishbowl Part data
         columns:
           - name: id
+            description: Primary key for Part
             tests:
               - unique
               - not_null
@@ -26,6 +27,7 @@ sources:
         description: Fishbowl Sales Order Item data
         columns:
           - name: id
+            description: Primary key for Sales Order Item
             tests:
               - unique
               - not_null
@@ -34,6 +36,7 @@ sources:
         description: Fishbowl Sales Order data
         columns:
           - name: id
+            description: Primary key for Sales Order
             tests:
               - unique
               - not_null
@@ -42,6 +45,7 @@ sources:
         description: Fishbowl Product data
         columns:
           - name: id
+            description: Primary key for Product
             tests:
               - unique
               - not_null
@@ -50,6 +54,7 @@ sources:
         description: Fishbowl Shipping data
         columns:
           - name: id
+            description: Primary key for Shipping
             tests:
               - unique
               - not_null
@@ -58,6 +63,7 @@ sources:
         description: Fishbowl Shipping Carton data
         columns:
           - name: id
+            description: Primary key for Shipping Carton
             tests:
               - unique
               - not_null
@@ -66,6 +72,7 @@ sources:
         description: Fishbowl Vendor data
         columns:
           - name: id
+            description: Primary key for Vendor
             tests:
               - unique
               - not_null
@@ -74,6 +81,33 @@ sources:
         description: Fishbowl Plugin Info data
         columns:
           - name: id
+            description: Primary key for Plugin Info
             tests:
               - unique
+              - not_null
+
+      - name: uomconversion
+        description: Fishbowl Unit of Measure Conversion data
+        columns:
+          - name: id
+            description: Primary key for UOM Conversion
+            tests:
+              - unique
+              - not_null
+
+      - name: objecttoobject
+        description: Fishbowl Object relationships data
+        columns:
+          - name: id
+            description: Primary key for ObjectToObject relationship
+            tests:
+              - unique
+              - not_null
+
+      - name: partcost
+        description: Fishbowl Part Cost details data
+        columns:
+          - name: partid
+            description: Foreign key related to Part
+            tests:
               - not_null

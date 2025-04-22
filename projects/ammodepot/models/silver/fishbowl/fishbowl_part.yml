@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: fishbowl_parts
+  - name: fishbowl_part
     description: >
       Silver layer table containing cleaned part data from Fishbowl inventory system.
       Contains part master data including dimensions, costs, and inventory settings.
