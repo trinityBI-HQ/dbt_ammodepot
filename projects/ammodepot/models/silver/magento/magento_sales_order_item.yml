@@ -2,168 +2,294 @@ version: 2
 
 models:
   - name: magento_sales_order_item
-    description: >-
-      Silver layer table containing cleaned sales order item data from Magento
-      e-commerce platform. Includes detailed product, pricing, quantity,
-      and financial information per sales order item.
+    description: >
+      Silver layer table containing cleaned sales order item data from Magento e-commerce platform.
+      Includes detailed product, pricing, quantity, and financial information per sales order item,
+      including breakdowns of invoiced/refunded amounts and fields from specific extensions.
     config:
-      materialized: table
       schema: silver
+      materialized: table
     columns:
       - name: order_item_id
-        description: Unique identifier for the sales order item
+        description: Unique identifier for the sales order item.
         tests:
           - unique
           - not_null
 
       - name: order_id
-        description: Identifier of the associated sales order
+        description: Identifier of the associated sales order.
         tests:
           - not_null
 
       - name: product_id
-        description: Identifier of the product sold
+        description: Identifier of the product sold. Can be null for custom items.
 
       - name: parent_item_id
-        description: Identifier of the parent item for configurable or bundled products
+        description: Identifier of the parent item for configurable or bundled products. Null for simple products.
 
       - name: quote_item_id
-        description: Identifier of the related quote item
+        description: Identifier of the related quote item.
 
       - name: store_id
-        description: Identifier of the store from which the order was placed
+        description: Identifier of the store from which the order was placed.
 
       - name: sku
-        description: Stock Keeping Unit for the product
+        description: Stock Keeping Unit for the product.
 
       - name: external_order_item_id
-        description: External identifier for the order item, if applicable
+        description: External identifier for the order item, if applicable (e.g., from another system).
 
+      # Product Details
       - name: product_name
-        description: Name of the product
+        description: Name of the product.
 
       - name: product_description
-        description: Description of the product
+        description: Description of the product.
 
       - name: product_type
-        description: Type of the product (e.g., simple, configurable)
-
-      - name: item_weight
-        description: Weight of the individual item
-
-      - name: row_weight
-        description: Total weight for the item row (quantity multiplied by item weight)
+        description: Type of the product (e.g., simple, configurable, bundle, virtual, downloadable).
 
       - name: product_options
-        description: JSON or serialized data of product options selected by the customer
+        description: JSON or serialized data of product options selected by the customer (e.g., size, color).
 
-      - name: qty_ordered
-        description: Quantity ordered
+      - name: item_weight
+        description: Weight of the individual item in the store's default weight unit.
 
-      - name: qty_shipped
-        description: Quantity shipped
+      - name: row_weight
+        description: Total weight for the item row (quantity multiplied by item weight).
 
-      - name: qty_invoiced
-        description: Quantity invoiced
+      - name: vendor_id
+        description: Identifier for the vendor associated with the product (if applicable).
 
-      - name: qty_refunded
-        description: Quantity refunded
+      # Quantities
+      - name: quantity_ordered
+        description: Quantity ordered by the customer.
 
-      - name: qty_canceled
-        description: Quantity canceled
+      - name: quantity_shipped
+        description: Quantity that has been shipped.
 
-      - name: qty_backordered
-        description: Quantity backordered
+      - name: quantity_invoiced
+        description: Quantity that has been invoiced.
 
-      - name: unit_price
-        description: Unit price in order currency
+      - name: quantity_refunded
+        description: Quantity that has been refunded.
 
-      - name: unit_original_price
-        description: Original unit price before discounts in order currency
+      - name: quantity_canceled
+        description: Quantity that has been canceled.
 
-      - name: row_total
-        description: Total price for the row (qty multiplied by unit price, excluding tax and discounts)
-
-      - name: unit_price_incl_tax
-        description: Unit price including tax in order currency
-
-      - name: row_total_incl_tax
-        description: Total price including tax for the row
-
-      - name: tax_amount
-        description: Total tax amount for the item
-
-      - name: tax_percent
-        description: Applicable tax percentage
-
-      - name: discount_amount
-        description: Discount amount applied to the item
-
-      - name: discount_percent
-        description: Discount percentage applied to the item
-
-      - name: amount_refunded
-        description: Amount refunded for the item
-
-      - name: base_unit_price
-        description: Unit price in base currency
-
-      - name: base_unit_original_price
-        description: Original unit price before discounts in base currency
-
-      - name: base_row_total
-        description: Row total price in base currency
-
-      - name: base_unit_price_incl_tax
-        description: Unit price including tax in base currency
-
-      - name: base_row_total_incl_tax
-        description: Row total including tax in base currency
-
-      - name: base_tax_amount
-        description: Tax amount in base currency
-
-      - name: base_discount_amount
-        description: Discount amount in base currency
-
-      - name: base_amount_refunded
-        description: Refunded amount in base currency
-
-      - name: base_cost
-        description: Cost of the item in base currency
-
-      - name: is_virtual_item
-        description: Flag indicating if the item is virtual
-
-      - name: is_discount_excluded
-        description: Flag indicating if discounts are excluded for this item
-
-      - name: has_free_shipping
-        description: Flag indicating if the item has free shipping
+      - name: quantity_backordered
+        description: Quantity currently on backorder.
 
       - name: is_quantity_decimal
-        description: Flag indicating if the quantity is decimal
+        description: Flag indicating if the quantity can be a decimal value (e.g., for weight-based items).
+
+      # Pricing & Financials (Order Currency)
+      - name: unit_price
+        description: Unit price of the item in the order currency.
+
+      - name: unit_original_price
+        description: Original unit price before discounts/rules in the order currency.
+
+      - name: row_total
+        description: Total price for the row (qty * unit price) in order currency, before tax/adjustments but potentially after item-specific discounts.
+
+      - name: unit_price_incl_tax
+        description: Unit price including tax in the order currency.
+
+      - name: row_total_incl_tax
+        description: Total price including tax for the row in the order currency.
+
+      - name: tax_amount
+        description: Total tax amount for this line item in the order currency.
+
+      - name: tax_percent
+        description: Applicable tax percentage for this line item.
+
+      - name: tax_canceled
+        description: Amount of tax canceled for this line item in the order currency.
+
+      - name: tax_invoiced
+        description: Amount of tax invoiced for this line item in the order currency.
+
+      - name: tax_refunded
+        description: Amount of tax refunded for this line item in the order currency.
+
+      - name: tax_before_discount
+        description: Tax amount calculated before any discount was applied, in order currency.
+
+      - name: discount_amount
+        description: Discount amount applied to this line item in the order currency.
+
+      - name: discount_percent
+        description: Discount percentage applied to this line item.
+
+      - name: discount_invoiced
+        description: Amount of discount invoiced for this line item in the order currency.
+
+      - name: discount_refunded
+        description: Amount of discount refunded for this line item in the order currency.
+
+      - name: amount_refunded
+        description: Total amount refunded for this line item in the order currency.
+
+      - name: row_invoiced
+        description: Total amount invoiced for this line item row in the order currency.
+
+      - name: discount_tax_compensation_amount
+        description: Amount of tax compensation related to discounts for this item in order currency.
+
+      - name: discount_tax_compensation_canceled
+        description: Canceled amount of tax compensation related to discounts for this item in order currency.
+
+      - name: discount_tax_compensation_invoiced
+        description: Invoiced amount of tax compensation related to discounts for this item in order currency.
+
+      - name: discount_tax_compensation_refunded
+        description: Refunded amount of tax compensation related to discounts for this item in order currency.
+
+      # Pricing & Financials (Base Currency)
+      - name: base_unit_price
+        description: Unit price of the item in the store's base currency.
+
+      - name: base_unit_original_price
+        description: Original unit price before discounts/rules in the base currency.
+
+      - name: base_row_total
+        description: Row total price in the base currency.
+
+      - name: base_unit_price_incl_tax
+        description: Unit price including tax in the base currency.
+
+      - name: base_row_total_incl_tax
+        description: Row total including tax in the base currency.
+
+      - name: base_tax_amount
+        description: Tax amount in the base currency.
+
+      - name: base_tax_invoiced
+        description: Amount of tax invoiced for this line item in the base currency.
+
+      - name: base_tax_refunded
+        description: Amount of tax refunded for this line item in the base currency.
+
+      - name: base_tax_before_discount
+        description: Tax amount calculated before any discount was applied, in base currency.
+
+      - name: base_discount_amount
+        description: Discount amount in the base currency.
+
+      - name: base_discount_invoiced
+        description: Amount of discount invoiced for this line item in the base currency.
+
+      - name: base_discount_refunded
+        description: Amount of discount refunded for this line item in the base currency.
+
+      - name: base_amount_refunded
+        description: Total amount refunded for this line item in the base currency.
+
+      - name: base_row_invoiced
+        description: Total amount invoiced for this line item row in the base currency.
+
+      - name: base_discount_tax_compensation_amount
+        description: Amount of tax compensation related to discounts for this item in base currency.
+
+      - name: base_discount_tax_compensation_invoiced
+        description: Invoiced amount of tax compensation related to discounts for this item in base currency.
+
+      - name: base_discount_tax_compensation_refunded
+        description: Refunded amount of tax compensation related to discounts for this item in base currency.
+
+      # Cost
+      - name: base_cost
+        description: Cost of the item in the store's base currency.
+
+      # Flags & Settings
+      - name: is_virtual_item
+        description: Flag indicating if the item is virtual (e.g., service, subscription).
+
+      - name: is_discount_excluded
+        description: 'Flag indicating if discounts are excluded for this item (original: no_discount).'
+
+      - name: has_free_shipping
+        description: Flag indicating if the item qualifies for free shipping.
 
       - name: is_locked_for_shipping
-        description: Flag indicating if shipping for this item is locked
+        description: 'Flag indicating if shipping for this item is currently locked (original: locked_do_ship).'
 
       - name: is_locked_for_invoicing
-        description: Flag indicating if invoicing for this item is locked
+        description: 'Flag indicating if invoicing for this item is currently locked (original: locked_do_invoice).'
 
       - name: is_gift_message_available
-        description: Flag indicating if a gift message is available for the item
+        description: Flag indicating if a gift message can be associated with this item.
 
-      - name: gift_message_id
-        description: Identifier of the gift message, if applicable
+      - name: requires_ffl
+        description: Flag indicating if the item requires a Federal Firearms License (FFL).
 
+      # Timestamps
       - name: item_created_at
-        description: Timestamp when the order item was created
+        description: Timestamp when the order item record was created.
 
       - name: item_updated_at
-        description: Timestamp when the order item was last updated
+        description: Timestamp when the order item record was last updated.
 
+      # Other Fields
       - name: applied_rule_ids
-        description: Comma-separated list of cart price rule IDs applied to the item
+        description: Comma-separated list of cart price rule IDs applied to the item.
 
-      - name: etl_loaded_at
-        description: Timestamp when this record was loaded into the silver layer
+      - name: gift_message_id
+        description: Identifier of the associated gift message, if any.
+
+      - name: additional_data
+        description: Serialized or JSON string containing additional data related to the item (often custom).
+
+      - name: ava_vatcode
+        description: VAT code potentially from Avalara AvaTax integration.
+
+      # Amasty Fields (Extension Specific - AFPTC likely related to promotions/points)
+      - name: aw_afptc_qty
+        description: Quantity related to Amasty AFPTC extension functionality.
+
+      - name: aw_afptc_amount
+        description: Amount related to Amasty AFPTC extension functionality (order currency).
+
+      - name: aw_afptc_percent
+        description: Percentage related to Amasty AFPTC extension functionality.
+
+      - name: aw_afptc_invoiced
+        description: Invoiced amount related to Amasty AFPTC extension functionality (order currency).
+
+      - name: is_aw_afptc_promo
+        description: Flag indicating if Amasty AFPTC promo rules apply.
+
+      - name: aw_afptc_refunded
+        description: Refunded amount related to Amasty AFPTC extension functionality (order currency).
+
+      - name: aw_afptc_rule_ids
+        description: Rule IDs applied by Amasty AFPTC extension.
+
+      - name: base_aw_afptc_amount
+        description: Amount related to Amasty AFPTC extension functionality (base currency).
+
+      - name: aw_afptc_qty_invoiced
+        description: Invoiced quantity related to Amasty AFPTC extension functionality.
+
+      - name: aw_afptc_qty_refunded
+        description: Refunded quantity related to Amasty AFPTC extension functionality.
+
+      - name: base_aw_afptc_invoiced
+        description: Invoiced amount related to Amasty AFPTC extension functionality (base currency).
+
+      - name: base_aw_afptc_refunded
+        description: Refunded amount related to Amasty AFPTC extension functionality (base currency).
+
+      # Carrier Group Fields
+      - name: carriergroup
+        description: Name or identifier of the carrier group associated with the item.
+
+      - name: carriergroup_id
+        description: ID of the carrier group associated with the item.
+
+      - name: carriergroup_shipping
+        description: Shipping details related to the carrier group.
+
+     
