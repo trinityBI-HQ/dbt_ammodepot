@@ -2,12 +2,13 @@ version: 2
 
 models:
   - name: magento_sales_order_item
-    description: >
-      Silver layer table containing cleaned sales order item data from Magento e-commerce platform.
-      Includes detailed product, pricing, quantity, and financial information per sales order item.
+    description: >-
+      Silver layer table containing cleaned sales order item data from Magento
+      e-commerce platform. Includes detailed product, pricing, quantity,
+      and financial information per sales order item.
     config:
-      schema: silver
       materialized: table
+      schema: silver
     columns:
       - name: order_item_id
         description: Unique identifier for the sales order item
@@ -99,7 +100,7 @@ models:
         description: Discount amount applied to the item
 
       - name: discount_percent
-        description: Discount percentage applied
+        description: Discount percentage applied to the item
 
       - name: amount_refunded
         description: Amount refunded for the item
