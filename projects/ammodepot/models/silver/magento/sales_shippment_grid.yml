@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: sales_shippment_grid
+    description: "Silver layer table for Magento shipment grid data, cleansed and enriched."
+    columns:
+      - name: shipment_grid_id
+        description: "Primary key of the shipment grid record (entity_id)."
+      - name: shipment_increment_id
+        description: "User-facing incremental shipment identifier."
+      - name: order_id
+        description: "Foreign key to the sales order."
+      - name: order_increment_id
+        description: "User-facing incremental sales order identifier."
+      - name: store_id
+        description: "Identifier of the store."
+      - name: total_quantity_shipped
+        description: "Total quantity shipped in the shipment record."
+      - name: shipment_status_code
+        description: "Status code for the shipment."
+      - name: shipping_name
+        description: "Name associated with the shipment (carrier or recipient name)."
+      - name: shipping_address_text
+        description: "Formatted shipping address text."
+      - name: shipping_information
+        description: "Additional shipping information, e.g., carrier/method details."
+      - name: order_status
+        description: "Status of the associated order."
+      - name: order_created_at
+        description: "Timestamp when the associated order was created."
+      - name: customer_name
+        description: "Name of the customer associated with the shipment."
+      - name: customer_email
+        description: "Email address of the customer."
+      - name: customer_group_id
+        description: "Identifier of the customer's group."
+      - name: billing_name
+        description: "Name for billing contact."
+      - name: billing_address_text
+        description: "Formatted billing address text."
+      - name: payment_method
+        description: "Payment method used for the order."
+      - name: shipment_created_at
+        description: "Timestamp when the shipment record was created."
+      - name: shipment_updated_at
+        description: "Timestamp when the shipment record was last updated."
