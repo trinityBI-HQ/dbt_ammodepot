@@ -4,198 +4,395 @@ models:
   - name: magento_sales_order
     description: >
       Silver layer table containing cleaned sales order data from Magento e-commerce platform.
-      Includes order identifiers, statuses, customer information, detailed financials, and shipping details.
+      Includes order identifiers, statuses, customer information, detailed financials, shipping details,
+      and system/extension specific fields.
     config:
       schema: silver
       materialized: table
     columns:
+      # Identifiers
       - name: order_id
-        description: Unique identifier for the sales order
+        description: Unique identifier for the sales order (entity_id)
         tests:
           - unique
           - not_null
-
       - name: order_increment_id
-        description: Customer-facing incremental order number
+        description: Customer-facing incremental order number (increment_id)
         tests:
           - not_null
-
       - name: store_id
         description: Identifier of the store associated with the order
-
       - name: customer_id
         description: Identifier of the customer who placed the order
-
       - name: quote_id
         description: Identifier of the associated quote
-
       - name: billing_address_id
-        description: Identifier for the billing address
-
+        description: Identifier for the billing address associated with the order
       - name: shipping_address_id
-        description: Identifier for the shipping address
-
+        description: Identifier for the shipping address associated with the order
       - name: external_order_id
-        description: External system order identifier, if applicable
-
+        description: External system order identifier, if applicable (ext_order_id)
       - name: external_customer_id
-        description: External system customer identifier, if applicable
+        description: External system customer identifier, if applicable (ext_customer_id)
+      - name: quote_address_id
+        description: Identifier for the quote address associated with the order
+      - name: relation_child_id
+        description: ID of the child order in a relationship (e.g., split orders)
+      - name: relation_parent_id
+        description: ID of the parent order in a relationship (e.g., split orders)
+      - name: relation_child_real_id
+        description: Real ID of the child order in a relationship
+      - name: relation_parent_real_id
+        description: Real ID of the parent order in a relationship
+      - name: gift_message_id
+        description: Identifier for the gift message associated with the order
+      - name: original_increment_id
+        description: Original increment ID if the order was edited
+      - name: edit_increment
+        description: Edit increment number if the order was modified
+      - name: location_id
+        description: Identifier for the location (e.g., inventory source) associated with the order
 
+      # Order Status & State
       - name: order_state
-        description: State of the order (e.g., processing, complete)
-
+        description: State of the order (e.g., new, processing, complete)
       - name: order_status
         description: Specific status of the order within its state
 
+      # Timestamps
       - name: created_at
         description: Timestamp when the order was created
-
       - name: updated_at
         description: Timestamp when the order was last updated
-
-      - name: customer_email
-        description: Email of the customer
-
-      - name: customer_firstname
-        description: Customer's first name
-
-      - name: customer_lastname
-        description: Customer's last name
-
-      - name: customer_prefix
-        description: Customer's name prefix
-
-      - name: customer_middlename
-        description: Customer's middle name
-
-      - name: customer_suffix
-        description: Customer's name suffix
-
       - name: customer_dob
         description: Customer's date of birth
+      - name: last_tracking_update
+        description: Timestamp of the last tracking information update
 
+      # Customer Information
+      - name: customer_email
+        description: Email of the customer
+      - name: customer_firstname
+        description: Customer's first name
+      - name: customer_lastname
+        description: Customer's last name
+      - name: customer_prefix
+        description: Customer's name prefix
+      - name: customer_middlename
+        description: Customer's middle name
+      - name: customer_suffix
+        description: Customer's name suffix
       - name: customer_gender
-        description: Gender of the customer
-
+        description: Gender of the customer (stored as number code)
       - name: customer_group_id
         description: Customer group identifier
-
       - name: is_customer_guest
         description: Flag indicating if the customer checked out as guest
-
       - name: customer_note
-        description: Additional note from the customer
-
+        description: Additional note provided by the customer for the order
       - name: should_notify_customer_note
-        description: Flag indicating if the customer should be notified about the note
-
+        description: Flag indicating if the customer should be notified about their note
       - name: customer_taxvat
         description: Customer's tax/VAT number
 
+      # Store Information
       - name: store_name
         description: Name of the store associated with the order
 
+      # Financials (Order Currency)
       - name: order_currency_code
         description: Currency code of the order
-
       - name: grand_total
-        description: Total amount of the order
-
+        description: Total amount of the order in order currency
       - name: subtotal
-        description: Subtotal amount before taxes and shipping
-
+        description: Subtotal amount before taxes and shipping in order currency
       - name: subtotal_incl_tax
-        description: Subtotal amount including taxes
-
+        description: Subtotal amount including taxes in order currency
       - name: shipping_amount
-        description: Shipping amount excluding taxes
-
+        description: Shipping amount excluding taxes in order currency
       - name: shipping_incl_tax
-        description: Shipping amount including taxes
-
+        description: Shipping amount including taxes in order currency
       - name: tax_amount
-        description: Total tax amount applied to the order
-
+        description: Total tax amount applied to the order in order currency
       - name: discount_amount
-        description: Total discount amount applied to the order
-
+        description: Total discount amount applied to the order in order currency
       - name: total_paid
-        description: Total amount paid
-
+        description: Total amount paid in order currency
       - name: total_refunded
-        description: Total amount refunded
-
+        description: Total amount refunded in order currency
       - name: total_due
-        description: Total amount due
-
+        description: Total amount due in order currency
       - name: total_canceled
-        description: Total amount canceled
+        description: Total amount canceled in order currency
+      - name: aw_giftcard_amount
+        description: Amount applied from AW Giftcard extension in order currency
+      - name: adjustment_positive
+        description: Positive adjustment amount in order currency
+      - name: adjustment_negative
+        description: Negative adjustment amount in order currency
+      - name: tax_canceled
+        description: Amount of tax canceled in order currency
+      - name: tax_invoiced
+        description: Amount of tax invoiced in order currency
+      - name: tax_refunded
+        description: Amount of tax refunded in order currency
+      - name: discount_canceled
+        description: Amount of discount canceled in order currency
+      - name: discount_invoiced
+        description: Amount of discount invoiced in order currency
+      - name: discount_refunded
+        description: Amount of discount refunded in order currency
+      - name: shipping_canceled
+        description: Amount of shipping canceled in order currency
+      - name: shipping_invoiced
+        description: Amount of shipping invoiced in order currency
+      - name: shipping_refunded
+        description: Amount of shipping refunded in order currency
+      - name: subtotal_canceled
+        description: Amount of subtotal canceled in order currency
+      - name: subtotal_invoiced
+        description: Amount of subtotal invoiced in order currency
+      - name: subtotal_refunded
+        description: Amount of subtotal refunded in order currency
+      - name: aw_afptc_amount
+        description: Amount applied from AW AFPTC extension in order currency
+      - name: aw_afptc_invoiced
+        description: Amount of AW AFPTC invoiced in order currency
+      - name: aw_afptc_refunded
+        description: Amount of AW AFPTC refunded in order currency
+      - name: aw_giftcard_invoiced
+        description: Amount of AW Giftcard invoiced in order currency
+      - name: aw_giftcard_refunded
+        description: Amount of AW Giftcard refunded in order currency
+      - name: total_online_refunded
+        description: Total amount refunded online in order currency
+      - name: total_offline_refunded
+        description: Total amount refunded offline in order currency
+      - name: shipping_tax_amount
+        description: Tax amount applied to shipping in order currency
+      - name: shipping_tax_refunded
+        description: Tax amount refunded for shipping in order currency
+      - name: shipping_discount_amount
+        description: Discount amount applied to shipping in order currency
+      - name: discount_tax_compensation_amount
+        description: Discount tax compensation amount in order currency
+      - name: discount_tax_compensation_invoiced
+        description: Discount tax compensation invoiced in order currency
+      - name: discount_tax_compensation_refunded
+        description: Discount tax compensation refunded in order currency
+      - name: shipping_discount_tax_compensation_amount
+        description: Shipping discount tax compensation amount in order currency
+      - name: payment_authorization_amount
+        description: Amount authorized by the payment gateway in order currency
 
+      # Financials (Base Currency)
       - name: base_currency_code
         description: Base currency code of the store
-
       - name: base_grand_total
         description: Grand total in base currency
-
       - name: base_subtotal
         description: Subtotal amount in base currency
-
       - name: base_subtotal_incl_tax
         description: Subtotal including tax in base currency
-
       - name: base_shipping_amount
         description: Shipping amount in base currency
-
       - name: base_shipping_incl_tax
         description: Shipping including tax in base currency
-
       - name: base_tax_amount
         description: Tax amount in base currency
-
       - name: base_discount_amount
         description: Discount amount in base currency
-
       - name: base_total_paid
         description: Total paid in base currency
-
       - name: base_total_refunded
         description: Total refunded in base currency
-
       - name: base_total_due
         description: Total due in base currency
-
       - name: base_total_canceled
         description: Total canceled in base currency
+      - name: base_aw_giftcard_amount
+        description: Amount applied from AW Giftcard extension in base currency
+      - name: base_adjustment_positive
+        description: Positive adjustment amount in base currency
+      - name: base_adjustment_negative
+        description: Negative adjustment amount in base currency
+      - name: base_tax_canceled
+        description: Amount of tax canceled in base currency
+      - name: base_tax_invoiced
+        description: Amount of tax invoiced in base currency
+      - name: base_tax_refunded
+        description: Amount of tax refunded in base currency
+      - name: base_discount_canceled
+        description: Amount of discount canceled in base currency
+      - name: base_discount_invoiced
+        description: Amount of discount invoiced in base currency
+      - name: base_discount_refunded
+        description: Amount of discount refunded in base currency
+      - name: base_shipping_canceled
+        description: Amount of shipping canceled in base currency
+      - name: base_shipping_invoiced
+        description: Amount of shipping invoiced in base currency
+      - name: base_shipping_refunded
+        description: Amount of shipping refunded in base currency
+      - name: base_subtotal_canceled
+        description: Amount of subtotal canceled in base currency
+      - name: base_subtotal_invoiced
+        description: Amount of subtotal invoiced in base currency
+      - name: base_subtotal_refunded
+        description: Amount of subtotal refunded in base currency
+      - name: base_aw_afptc_amount
+        description: Amount applied from AW AFPTC extension in base currency
+      - name: base_aw_afptc_invoiced
+        description: Amount of AW AFPTC invoiced in base currency
+      - name: base_aw_afptc_refunded
+        description: Amount of AW AFPTC refunded in base currency
+      - name: base_aw_giftcard_invoiced
+        description: Amount of AW Giftcard invoiced in base currency
+      - name: base_aw_giftcard_refunded
+        description: Amount of AW Giftcard refunded in base currency
+      - name: base_total_online_refunded
+        description: Total amount refunded online in base currency
+      - name: base_total_offline_refunded
+        description: Total amount refunded offline in base currency
+      - name: base_shipping_tax_amount
+        description: Tax amount applied to shipping in base currency
+      - name: base_shipping_tax_refunded
+        description: Tax amount refunded for shipping in base currency
+      - name: base_shipping_discount_amount
+        description: Discount amount applied to shipping in base currency
+      - name: base_total_invoiced_cost
+        description: Total invoiced cost in base currency
+      - name: base_discount_tax_compensation_amount
+        description: Discount tax compensation amount in base currency
+      - name: base_discount_tax_compensation_invoiced
+        description: Discount tax compensation invoiced in base currency
+      - name: base_discount_tax_compensation_refunded
+        description: Discount tax compensation refunded in base currency
+      - name: base_shipping_discount_tax_compensation_amnt
+        description: Shipping discount tax compensation amount in base currency
 
+      # Shipping Details
       - name: shipping_method
-        description: Shipping method selected for the order
-
+        description: Shipping method selected for the order (code)
       - name: shipping_description
         description: Description of the shipping method
-
       - name: weight
         description: Total weight of the order
-
       - name: total_qty_ordered
         description: Total quantity of items ordered
-
       - name: total_item_count
-        description: Total number of distinct items in the order
-
+        description: Total number of distinct line items in the order
       - name: can_ship_partially
         description: Flag indicating if the order can be partially shipped
+      - name: can_ship_partially_item
+        description: Flag indicating if individual items can be partially shipped
+      - name: carrier_id
+        description: Identifier for the shipping carrier
+      - name: carrier_type
+        description: Type of the shipping carrier
+      - name: destination_type
+        description: Destination type for shipping (e.g., commercial, residential)
+      - name: carriergroup_shipping_html
+        description: HTML representation of carrier group shipping details
+      - name: carriergroup_shipping_details
+        description: Text details of carrier group shipping
+      - name: has_forced_shipment_with_invoice
+        description: Flag indicating if shipment was forced with invoice
 
+      # Billing/Payment Details
       - name: coupon_code
         description: Coupon code applied to the order
-
+      - name: applied_rule_ids
+        description: Comma-separated IDs of cart price rules applied
+      - name: coupon_rule_name
+        description: Name of the coupon rule applied
       - name: discount_description
-        description: Description of discounts applied
+        description: Description of the discounts applied
+      - name: payment_auth_expiration
+        description: Timestamp when the payment authorization expires
+      - name: protect_code
+        description: Protect code related to payment or fraud protection
 
+      # Flags & Settings
       - name: is_virtual_order
-        description: Flag indicating if the order is virtual (no physical shipment)
-
+        description: Flag indicating if the order contains only virtual products
       - name: is_email_sent
-        description: Flag indicating if order email was sent to the customer
+        description: Flag indicating if the primary order confirmation email was sent
+      - name: should_send_email
+        description: Flag indicating if an email should be sent for this order action
+      - name: validation_status
+        description: Status related to order validation (e.g., address validation)
+      - name: is_sent_to_measurement
+        description: Flag indicating if order data was sent to a measurement system
+      - name: aw_afptc_uses_coupon
+        description: Flag indicating if AW AFPTC promotion used a coupon
 
-      - name: etl_loaded_at
-        description: Timestamp when this record was loaded into the silver layer
+      # Technical/Metadata
+      - name: remote_ip
+        description: Remote IP address of the customer placing the order
+      - name: x_forwarded_for
+        description: X-Forwarded-For header value, if present
+      - name: global_currency_code
+        description: Global currency code configured in Magento
+      - name: store_to_base_rate
+        description: Conversion rate from store currency to base currency
+      - name: store_to_order_rate
+        description: Conversion rate from store currency to order currency
+      - name: base_to_global_rate
+        description: Conversion rate from base currency to global currency
+      - name: base_to_order_rate
+        description: Conversion rate from base currency to order currency
+      - name: ga_cookie
+        description: Google Analytics cookie value
+      - name: ga_timestamp
+        description: Google Analytics timestamp
+      - name: ga_session_id
+        description: Google Analytics session ID
+      - name: _ab_cdc_cursor
+        description: Airbyte CDC cursor position for incremental updates
+      - name: _ab_cdc_log_pos
+        description: Airbyte CDC log position for incremental updates
+      - name: _ab_cdc_log_file
+        description: Airbyte CDC log file name for incremental updates
+      - name: _ab_cdc_updated_at
+        description: Airbyte CDC timestamp of the last update event
+
+      # Hold Status
+      - name: hold_before_state
+        description: Order state before it was put on hold
+      - name: hold_before_status
+        description: Order status before it was put on hold
+
+      # System Specific Fields
+      - name: route_fee
+        description: Fee associated with Route shipping insurance/protection
+      - name: route_tax_fee
+        description: Tax applied to the Route fee
+      - name: route_order_id
+        description: Order identifier from the Route system
+      - name: is_route_insured
+        description: Flag indicating if the order is insured by Route
+      - name: applied_restrictions
+        description: Information about applied restrictions (e.g., shipping restrictions)
+      - name: is_sportsouth_failed
+        description: Flag indicating failure related to Sports South integration
+      - name: is_sportssouth_order
+        description: Flag indicating if the order is related to Sports South integration
+      - name: sports_south_order_id
+        description: Order identifier from the Sports South system
+      - name: sports_south_accs_order_id
+        description: Accessories order identifier from the Sports South system
+      - name: sports_south_ship_order_id
+        description: Shipping order identifier from the Sports South system
+      - name: is_mp_smtp_email_marketing_synced
+        description: Flag from Mageplaza SMTP extension indicating sync status
+      - name: is_mp_smtp_email_marketing_order_created
+        description: Flag from Mageplaza SMTP extension indicating order creation event status
+
+      # Order Attributes
+      - name: order_size
+        description: Custom attribute related to order size (e.g., S, M, L)
+
+      # ETL Load Time (Optional - Add if you track this)
+      # - name: etl_loaded_at
+      #   description: Timestamp when this record was loaded into the silver layer
