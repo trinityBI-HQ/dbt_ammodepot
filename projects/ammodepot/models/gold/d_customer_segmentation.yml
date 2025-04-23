@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: d_customer_segmentation
+    description: "Customer RFM segmentation view, calculating frequency, recency, monetary value, margin, overall classification, and hard-coded customer group."
+    columns:
+      - name: rank_id
+        description: "Sequential identifier assigned to each unique customer."
+      - name: customer_email
+        description: "Normalized email address of the customer."
+      - name: number_of_purchases
+        description: "Count of distinct purchases by the customer in the last 12 months (up to end of prior month)."
+      - name: total_revenue
+        description: "Sum of row_total (gross revenue) for the customer in the last 12 months."
+      - name: margin
+        description: "Profit margin for the period, calculated as (total_revenue – total cost) / total_revenue."
+      - name: days_since_last_purchase
+        description: "Number of days between the most recent purchase and the end of the prior month."
+      - name: total_purchases_all_time
+        description: "Count of distinct purchases by the customer across all time."
+      - name: frequency
+        description: "Frequency bucket label (F1–F5) based on number_of_purchases."
+      - name: frequency_int
+        description: "Numeric representation of frequency bucket."
+      - name: recency
+        description: "Recency bucket label (R0–R5) based on days_since_last_purchase."
+      - name: recency_int
+        description: "Numeric representation of recency bucket."
+      - name: value
+        description: "Monetary bucket label (V0–V5) based on total_revenue."
+      - name: value_int
+        description: "Numeric representation of monetary bucket."
+      - name: margin_classification
+        description: "Margin bucket label (M0–M5) based on margin percentage."
+      - name: margin_int
+        description: "Numeric representation of margin bucket."
+      - name: monetary_value
+        description: "Combined monetary value bucket (MV0–MV5), the floor of the average of margin_int and value_int."
+      - name: customer_classification
+        description: "Overall customer segment (e.g. 'Super Engaged', 'Lapsed Buyer') determined by frequency and recency."
+      - name: customer_group
+        description: "Hard-coded customer group label (Law Enforcement, Wholesale, General, NOT LOGGED IN, Retailer)."
