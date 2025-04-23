@@ -229,18 +229,28 @@ status_processing_costs AS (
 -- First interaction: join Magento & Fishbowl costs
 interaction_base AS (
     SELECT
+        -- Data/hora convertida
         convert_timezone(
           'UTC',
           'America/New_York',
           z.item_created_at::timestamp
-        )                                           AS created_at,
+        )                                                   AS created_at,
+
+        -- IDs e quantidades
         z.product_id,
         z.order_id,
-        z.quantity_ordered                              AS qty_ordered,
+        z.quantity_ordered                                  AS qty_ordered,
+
+        -- descontos
         z.discount_amount,
+        z.discount_invoiced,  -- <--- adicionada
+
+        -- Chave única de item
         CAST(z.product_id AS VARCHAR)
           || '@'
-          || CAST(z.order_id    AS VARCHAR)        AS chave,
+          || CAST(z.order_id    AS VARCHAR)               AS chave,
+
+        -- Custo (Magento ou Fishbowl) e custo médio ponderado
         COALESCE(
           u.cost,
           d.cost,
@@ -248,18 +258,21 @@ interaction_base AS (
           u.averageweightedcost * z.quantity_ordered,
           d.averageweightedcost * z.quantity_ordered,
           a2.averageweightedcost * z.quantity_ordered
-        )                                           AS cost,
+        )                                                   AS cost,
         COALESCE(
           u.averageweightedcost,
           d.averageweightedcost,
           a2.averageweightedcost
-        )                                           AS averageweightedcost,
+        )                                                   AS averageweightedcost,
+
+        -- Tributação
         z.tax_amount,
-        (z.row_total
-          - COALESCE(z.amount_refunded,0)
-          - COALESCE(z.discount_amount,0)
-        )                                           AS row_total,
-        o.order_increment_id,
+        (z.row_total - COALESCE(z.discount_amount, 0))      AS row_total,
+
+        -- Alias padronizado de increment_id
+        o.order_increment_id                                 AS increment_id,
+
+        -- Endereço e cliente
         o.billing_address_id,
         o.customer_email,
         a.postcode,
@@ -268,40 +281,34 @@ interaction_base AS (
         a.city,
         a.street_address  AS street,
         a.phone_number    AS telephone,
-        o.customer_firstname
-          || ' '
-          || o.customer_lastname                AS customer_name,
-        z.base_cost       AS cost_magento,
-        z.order_item_id   AS id,
-        o.order_status    AS status,
-        sp.cost           AS fishbowl_registeredcost,
+        o.customer_firstname || ' ' || o.customer_lastname  AS customer_name,
+
+        -- Metadados adicionais
+        z.base_cost                                          AS cost_magento,
+        z.order_item_id                                      AS id,
+        o.order_status                                       AS status,
+        sp.cost                                              AS fishbowl_registeredcost,
         z.store_id,
         o.store_name,
-        z.item_weight     AS weight,
+        z.item_weight                                        AS weight,
         z.product_options,
         z.product_type,
         z.parent_item_id,
-        z.sku             AS testsku,
+        z.sku                                                AS testsku,
         z.applied_rule_ids,
         o.customer_id,
         z.vendor_id
     FROM {{ ref('magento_sales_order_item') }}        AS z
-    LEFT JOIN {{ ref('magento_sales_order') }}         AS o
-      ON z.order_id           = o.order_id
-    LEFT JOIN {{ ref('magento_sales_order_address') }} AS a
-      ON o.billing_address_id = a.order_id
-    LEFT JOIN cost_unique_magento_id                   AS u
-      ON z.order_item_id      = u.id_magento
-    LEFT JOIN cost_duplicate_magento_id_product        AS d
-      ON z.order_item_id      = d.id_magento
-      AND z.product_id        = d.id_produto_magento
-    LEFT JOIN cost_duplicate_magento_id_avg            AS a2
-      ON z.order_item_id      = a2.id_magento
-    LEFT JOIN status_processing_costs                  AS sp
-      ON z.order_id           = sp.order_id
+    LEFT JOIN {{ ref('magento_sales_order') }}         AS o ON z.order_id           = o.order_id
+    LEFT JOIN {{ ref('magento_sales_order_address') }} AS a ON o.billing_address_id = a.order_id
+    LEFT JOIN cost_unique_magento_id                   AS u ON z.order_item_id      = u.id_magento
+    LEFT JOIN cost_duplicate_magento_id_product        AS d ON z.order_item_id      = d.id_magento
+                                                         AND z.product_id        = d.id_produto_magento
+    LEFT JOIN cost_duplicate_magento_id_avg            AS a2 ON z.order_item_id      = a2.id_magento
+    LEFT JOIN status_processing_costs                  AS sp ON z.order_id           = sp.order_id
 ),
 
--- Last‐day cost across all interactions
+-- Pega a última data de custo por produto
 last_day_cost_all AS (
     SELECT
         ib.product_id,
@@ -312,51 +319,48 @@ last_day_cost_all AS (
     GROUP BY ib.product_id
 ),
 
+-- Filtra somente o custo daquele último dia
 filtered_cost_all_prep AS (
     SELECT
         ib.product_id,
         ib.cost,
-        ib.qty_ordered        AS qty,
+        ib.qty_ordered         AS qty,
         ib.created_at
     FROM interaction_base AS ib
     JOIN last_day_cost_all   AS ld
       ON ib.product_id = ld.product_id
      AND ib.created_at = ld.last_scheduled_date
-    WHERE ib.cost > 0
-      AND ib.qty_ordered > 0
 ),
 
 filtered_cost_all AS (
     SELECT
-        fcap.product_id,
-        SUM(fcap.cost)::numeric
-          / NULLIF(SUM(fcap.qty),0)         AS avg_unit_cost,
-        fcap.created_at
-    FROM filtered_cost_all_prep AS fcap
-    GROUP BY fcap.product_id, fcap.created_at
+        product_id,
+        cost,
+        qty
+    FROM filtered_cost_all_prep
 ),
-
--- UPS invoicing from Magento source
+-- UPS shipment costs (Magento source)
 ups_shipment_cost AS (
     SELECT
         tracking_number,
         SUM(net_amount)          AS net_amount
-    FROM {{ source('magento','ups_invoice') }}
+    FROM {{ source('magento', 'ups_invoice') }}
     GROUP BY tracking_number
 ),
 
 -- Fishbowl shipment costs enriched with UPS
 fishbowl_shipment_costs AS (
     SELECT
-        fs.sales_order_id         AS soid,
-        COALESCE(SUM(usc.net_amount), SUM(sc.freight_amount)) AS freight_amount,
-        SUM(sc.freight_weight)    AS freight_weight,
-        AVG(fs.carrier_service_id) AS carrier_service_id,
-        SUM(usc.net_amount)       AS amount_ups,
-        COUNT(sc.tracking_number) AS package_count
-    FROM {{ ref('fishbowl_ship') }}        AS fs
-    LEFT JOIN {{ ref('fishbowl_shipcarton') }} AS sc ON fs.shipment_id         = sc.shipment_id
-    LEFT JOIN ups_shipment_cost              AS usc ON sc.tracking_number = usc.tracking_number
+        fs.sales_order_id                                         AS soid,
+        COALESCE(SUM(usc.net_amount), SUM(sc.freight_amount))     AS freight_amount,
+        SUM(sc.freight_weight)                                    AS freight_weight,
+        AVG(fs.carrier_service_id)                                AS carrier_service_id,
+        SUM(usc.net_amount)                                       AS amount_ups
+    FROM {{ ref('fishbowl_ship') }}            AS fs
+    LEFT JOIN {{ ref('fishbowl_shipcarton') }} AS sc  
+      ON fs.shipment_id = sc.shipment_id
+    LEFT JOIN ups_shipment_cost               AS usc 
+      ON sc.tracking_number = usc.tracking_number
     GROUP BY fs.sales_order_id
 ),
 
@@ -364,8 +368,8 @@ fishbowl_shipment_costs AS (
 magento_freight_info AS (
     SELECT
         pc.produto_magento        AS order_magento,
-        AVG(fb2.freight_amount)    AS freight_amount,
-        AVG(fb2.freight_weight)    AS freight_weight,
+        AVG(fb2.freight_amount)   AS freight_amount,
+        AVG(fb2.freight_weight)   AS freight_weight,
         AVG(fb2.carrier_service_id) AS carrier_service_id
     FROM {{ ref('fishbowl_so') }}            AS fb
     LEFT JOIN fishbowl_shipment_costs       AS fb2 ON fb.sales_order_id = fb2.soid
@@ -376,50 +380,15 @@ magento_freight_info AS (
 -- Allocate freight by weight inside each Magento order
 magento_order_items_for_freight AS (
     SELECT
-        m.item_weight                                            AS weight,
-        m.order_id                                               AS order_id,
+        m.item_weight        AS weight,
+        m.order_id           AS order_id,
         m.sku,
         m.product_id,
-        m.quantity_ordered                                       AS qty_ordered,
-
-        -- evita divisão por zero e replica o div0 original
-        CASE
-            WHEN (m.row_total
-                  - COALESCE(m.amount_refunded, 0)
-                  - COALESCE(m.discount_amount, 0)
-                  + COALESCE(m.discount_refunded, 0)
-                 ) = 0
-            THEN 0
-            ELSE (m.quantity_ordered * m.row_total)
-                 / NULLIF(
-                     (m.row_total
-                      - COALESCE(m.amount_refunded, 0)
-                      - COALESCE(m.discount_amount, 0)
-                      + COALESCE(m.discount_refunded, 0)
-                     ), 0
-                   )
-        END                                                      AS test,
-
-        -- recalcula o row_total limpando reembolsos e descontos
-        (m.row_total
-           - COALESCE(m.amount_refunded, 0)
-           - COALESCE(m.discount_amount, 0)
-           + COALESCE(m.discount_refunded, 0)
-        )                                                         AS row_total
-    FROM {{ ref('magento_sales_order_item') }}    AS m
-    LEFT JOIN {{ ref('magento_catalog_product_entity') }} AS ct
-      ON m.product_id = ct.product_entity_id
-    WHERE 
-      -- garante que não haja divisão por zero
-      (m.row_total
-         - COALESCE(m.amount_refunded, 0)
-         - COALESCE(m.discount_amount, 0)
-         + COALESCE(m.discount_refunded, 0)
-      ) <> 0
-      -- filtra SKUs “parcel defender”
-      AND ct.sku NOT ILIKE '%parceldefender%'
+        m.quantity_ordered   AS qty_ordered
+    FROM {{ ref('magento_sales_order_item') }}  AS m
 ),
 
+-- Sum total weight per order
 magento_order_weight AS (
     SELECT
         order_id,
@@ -428,148 +397,143 @@ magento_order_weight AS (
     FROM magento_order_items_for_freight
     GROUP BY order_id
 ),
-skubase AS (
-  SELECT
-    -- dates & times
-    ib.created_at::date                                    AS created_at,
-    ib.created_at                                          AS timedate,
-    date_trunc('hour', ib.created_at)                      AS tiniciodahora_copiar,
 
-    -- identifiers
-    ib.product_id,
-    ib.order_id,
-
-    -- quantity ordered, safe‑guarding against divide‑by‑zero
-    CASE
-      WHEN (ib.row_total
-            - COALESCE(ib.amount_refunded,0)
-            - COALESCE(ib.discount_amount,0)
-            + COALESCE(ib.discount_refunded,0)
-           ) = 0
-      THEN 0
-      ELSE (ib.qty_ordered * ib.row_total)
-           / NULLIF(
-               (ib.row_total
-                - COALESCE(ib.amount_refunded,0)
-                - COALESCE(ib.discount_amount,0)
-                + COALESCE(ib.discount_refunded,0)
-               ), 0
-             )
-    END                                                     AS qty_ordered,
-    ib.qty_ordered                                         AS ordered,
-
-    -- discount & key
-    ib.discount_invoiced                                   AS discount_invoiced,
-    ib.product_id::varchar || '@' || ib.order_id::varchar AS chave,
-
-    -- cost fields
-    CASE WHEN ib.qty_ordered > 0 THEN ib.cost ELSE NULL END AS cost,
-    ib.averageweightedcost                                 AS average_weighted_cost,
-
-    -- financials
-    ib.tax_amount                                          AS tax_amount,
-    ib.row_total                                           AS row_total,
-
-    -- order metadata
-    ib.increment_id                                        AS increment_id,
-    ib.billing_address_id                                  AS billing_address_id,
-    ib.customer_email                                      AS customer_email,
-
-    -- address
-    ib.postcode                                            AS postcode,
-    ib.country                                             AS country,
-    ib.region                                              AS region,
-    ib.city                                                AS city,
-    ib.street                                              AS street,
-    ib.telephone                                           AS telephone,
-
-    -- customer
-    ib.customer_name                                       AS customer_name,
-
-    -- item/status
-    ib.id                                                  AS id,
-    UPPER(ib.status)                                       AS status,
-
-    -- order‑level costs
-    ib.cost                                                AS order_cost,
-    ib.fishbowl_registeredcost                             AS fishbowl_registered_cost,
-
-    -- store
-    ib.store_id                                            AS store_id,
-    ib.store_name                                          AS store_name,
-
-    -- weight & freight allocation
-    ib.weight                                              AS weight,
-    CASE
-      WHEN mow.total_weight = 0 THEN 0
-      ELSE ib.weight::numeric / mow.total_weight
-    END                                                     AS percentage,
-    mow.total_weight                                       AS weightorder,
-
-    -- freight revenue & cost by weight share
-    CASE
-      WHEN mow.total_weight = 0 THEN 0
-      ELSE (ib.weight::numeric / mow.total_weight) * mos.freight_amount
-    END                                                     AS freight_revenue,
-    CASE
-      WHEN mow.total_weight = 0 THEN 0
-      ELSE (ib.weight::numeric / mow.total_weight) * mos.freight_amount
-    END                                                     AS freight_cost,
-
-    -- part sales & conversion
-    ps.part_qty_sold                                       AS part_qty_sold,
-    COALESCE(ps.conversion,1)                              AS conversion,
-
-    -- hour‑of‑day
-    date_trunc('hour', ib.created_at)::time                AS tiniciodahora,
-    ib.created_at                                          AS trickat,
-
-    -- misc
-    ib.product_options,
-    ib.product_type,
-    ib.parent_item_id,
-    ib.testsku,
-    ib.vendor,
-    ib.customer_id
-
-  FROM interaction_base        AS ib
-  LEFT JOIN magento_order_shipping_agg  AS mos ON ib.order_id = mos.order_id
-  LEFT JOIN magento_order_weight        AS mow ON ib.order_id = mow.order_id
-  LEFT JOIN magento_product_sales_uom   AS ps  ON ib.id       = ps.order_item_id
+-- Allocate shipping cost per order
+magento_order_shipping_agg AS (
+    SELECT
+        ms.order_id,
+        SUM(ms.shipping_amount)               AS shipping_amount,
+        SUM(ms.base_shipping_amount)          AS base_shipping_amount,
+        SUM(ms.base_shipping_discount_amount) AS base_shipping_discount_amount,
+        SUM(ms.base_shipping_refunded)        AS base_shipping_refunded,
+        SUM(ms.base_shipping_tax_amount)      AS base_shipping_tax_amount,
+        SUM(ms.base_shipping_tax_refunded)    AS base_shipping_tax_refunded,
+        SUM(
+          COALESCE(ms.base_shipping_amount, 0)
+          - COALESCE(ms.base_shipping_tax_amount, 0)
+          - COALESCE(ms.base_shipping_refunded, 0)
+          + COALESCE(ms.base_shipping_tax_refunded, 0)
+        )                                      AS net_sales,
+        mfi.freight_amount
+    FROM {{ ref('magento_sales_order') }}     AS ms
+    LEFT JOIN magento_freight_info           AS mfi
+      ON ms.order_id = mfi.order_magento
+    GROUP BY ms.order_id, mfi.freight_amount
+),
+-- Agrega vendas de peça para cálculo de conversão
+product_sales AS (
+    SELECT
+        s.order_item_id                                                   AS item_id,
+        SUM(s.quantity_ordered * COALESCE(uom.multiply_factor, 1))         AS part_qty_sold,
+        AVG(COALESCE(uom.multiply_factor, 1))                              AS conversion
+    FROM {{ ref('magento_sales_order_item') }}       AS s
+    LEFT JOIN {{ ref('fishbowl_uomconversion') }}    AS uom
+      ON s.product_id = uom.from_uom_id
+     AND uom.to_uom_id = 1
+    WHERE s.product_type <> 'bundle'
+      AND s.row_total <> 0
+    GROUP BY s.order_item_id
 ),
 
+-- Base de fatos de SKU
+skubase AS (
+    SELECT
+        ib.created_at::date                                    AS created_at,
+        ib.created_at                                          AS timedate,
+        date_trunc('hour', ib.created_at)                      AS tiniciodahora_copiar,
+
+        ib.product_id,
+        ib.order_id,
+
+        CASE
+          WHEN ib.row_total = 0 THEN 0
+          ELSE ib.qty_ordered * ib.row_total
+        END                                                     AS qty_ordered,
+
+        ib.discount_invoiced                                   AS discount_invoiced,
+        ib.chave,
+
+        CASE WHEN ib.qty_ordered > 0 THEN ib.cost ELSE NULL END  AS cost,
+        ib.averageweightedcost                                 AS average_weighted_cost,
+
+        ib.tax_amount                                          AS tax_amount,
+        ib.row_total                                           AS row_total,
+
+        ib.increment_id                                        AS increment_id,
+        ib.billing_address_id                                  AS billing_address_id,
+        ib.customer_email                                      AS customer_email,
+
+        ib.postcode,
+        ib.country,
+        ib.region,
+        ib.city,
+        ib.street,
+        ib.telephone                                          AS phone_number,
+        ib.customer_name,
+
+        ib.cost_magento,
+        ib.id                                                AS order_item_id,
+        ib.status                                           AS order_status,
+        ib.fishbowl_registeredcost,
+        ib.store_id,
+        ib.store_name,
+        ib.weight,
+        ib.product_options,
+        ib.product_type,
+        ib.parent_item_id,
+        ib.testsku,
+        ib.applied_rule_ids,
+        ib.customer_id,
+
+        -- renomea vendor_id para vendor para casar com o final
+        ib.vendor_id                                         AS vendor
+    FROM interaction_base AS ib
+),
+
+
+-- Monta o fato final juntando custos históricos e vendas de peça
 final AS (
-  SELECT
-    sb.created_at,
-    sb.timedate,
-    sb.product_id,
-    sb.order_id,
-    sb.qty_ordered,
-    sb.row_total,
-    COALESCE(
-      NULLIF(sb.cost,0),
-      fca.avg_unit_cost * sb.qty_ordered
-    )                                                      AS calculated_cost,
-    sb.chave                                               AS chave,
-    sb.testsku                                             AS sku,
-    sb.customer_email,
-    sb.postcode,
-    sb.country,
-    sb.region,
-    sb.city,
-    sb.street                                              AS street_address,
-    sb.telephone                                           AS phone_number,
-    sb.customer_name,
-    sb.store_id,
-    sb.status                                              AS order_status,
-    sb.vendor,
-    sb.customer_id,
-    sb.part_qty_sold,
-    sb.conversion
-  FROM skubase                     AS sb
-  LEFT JOIN filtered_cost_all      AS fca
-    ON sb.product_id = fca.product_id
-  WHERE sb.product_type <> 'configurable'
+    SELECT
+        sb.created_at,
+        sb.timedate,
+        sb.tiniciodahora_copiar      AS tiniciodahora,
+        sb.product_id,
+        sb.order_id,
+        sb.qty_ordered,
+        sb.discount_invoiced,
+        sb.chave,
+        sb.cost,
+        sb.average_weighted_cost,
+        sb.tax_amount,
+        sb.row_total,
+        sb.increment_id,
+        sb.billing_address_id,
+        sb.customer_email,
+        sb.postcode,
+        sb.country,
+        sb.region,
+        sb.city,
+        sb.street,
+        sb.phone_number,
+        sb.customer_name,
+        sb.store_id,
+        sb.order_status,
+        sb.vendor,
+        sb.customer_id,
+
+        fca.cost                   AS last_cost,
+        fca.qty                    AS last_qty,
+
+        ps.part_qty_sold,
+        COALESCE(ps.conversion, 1) AS conversion
+
+    FROM skubase                AS sb
+    LEFT JOIN filtered_cost_all AS fca
+      ON sb.product_id = fca.product_id
+    LEFT JOIN product_sales    AS ps
+      ON sb.order_item_id = ps.item_id
+
+    WHERE sb.product_type <> 'configurable'
 )
 
 SELECT * FROM final

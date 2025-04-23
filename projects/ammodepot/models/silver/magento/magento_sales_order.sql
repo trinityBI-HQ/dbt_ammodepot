@@ -8,124 +8,195 @@
 WITH source_data AS (
 
     SELECT
-        -- Identifiers
-        entity_id,
-        increment_id,
-        store_id,
-        customer_id,
-        quote_id,
-        billing_address_id,
-        shipping_address_id,
-        ext_order_id, -- External Order ID if used
-        ext_customer_id, -- External Customer ID if used
-
-        -- Order Status & State
+        -- Select ALL columns from the source DDL
         state,
         status,
-
-        -- Timestamps
+        weight,
+        quote_id,
+        store_id,
+        subtotal,
+        entity_id,
+        ga_cookie,
+        remote_ip,
+        route_fee,
+        total_due,
+        carrier_id,
         created_at,
+        email_sent,
+        is_virtual,
+        order_size,
+        send_email,
+        store_name,
+        tax_amount,
+        total_paid,
         updated_at,
-
-        -- Customer Information
-        customer_email,
-        customer_firstname,
-        customer_lastname,
-        customer_prefix,
-        customer_middlename,
-        customer_suffix,
+        coupon_code,
+        customer_id,
+        grand_total,
+        location_id,
+        carrier_type,
         customer_dob,
+        ext_order_id,
+        ga_timestamp,
+        increment_id,
+        protect_code,
+        tax_canceled,
+        tax_invoiced,
+        tax_refunded,
+        base_subtotal,
+        customer_note,
+        ga_session_id,
+        route_tax_fee,
+        base_total_due,
+        customer_email,
+        edit_increment,
+        route_order_id,
+        total_canceled,
+        total_invoiced,
+        total_refunded,
+        aw_afptc_amount,
+        base_tax_amount,
+        base_total_paid,
         customer_gender,
+        customer_prefix,
+        customer_suffix,
+        customer_taxvat,
+        discount_amount,
+        ext_customer_id,
+        gift_message_id,
+        shipping_amount,
+        shipping_method,
+        x_forwarded_for,
+        applied_rule_ids,
+        base_grand_total,
+        coupon_rule_name,
+        destination_type,
+        quote_address_id,
+        route_is_insured,
+        total_item_count,
+        aw_afptc_invoiced,
+        aw_afptc_refunded,
+        base_tax_canceled,
+        base_tax_invoiced,
+        base_tax_refunded,
         customer_group_id,
         customer_is_guest,
-        customer_note,
-        customer_note_notify,
-        customer_taxvat,
-
-        -- Store Information
-        store_name, -- Already have store_id, but name is convenient
-
-        -- Financials (Order Currency)
-        order_currency_code,
-        grand_total,
-        subtotal,
-        subtotal_incl_tax,
-        shipping_amount,
+        customer_lastname,
+        discount_canceled,
+        discount_invoiced,
+        discount_refunded,
+        hold_before_state,
+        relation_child_id,
+        shipping_canceled,
         shipping_incl_tax,
-        tax_amount,
-        discount_amount,
-        total_paid,
-        total_refunded,
-        total_due,
-        total_canceled,
-        -- Add other specific financial fields if needed (e.g., giftcard, adjustment)
-        aw_giftcard_amount,
-        adjustment_positive,
-        adjustment_negative,
-
-        -- Financials (Base Currency) - Important for consistent reporting across currencies
-        base_currency_code,
-        base_grand_total,
-        base_subtotal,
-        base_subtotal_incl_tax,
-        base_shipping_amount,
-        base_shipping_incl_tax,
-        base_tax_amount,
-        base_discount_amount,
-        base_total_paid,
-        base_total_refunded,
-        base_total_due,
-        base_total_canceled,
-        -- Add other base financial fields if needed
-        base_aw_giftcard_amount,
-        base_adjustment_positive,
-        base_adjustment_negative,
-
-        -- Shipping Details
-        shipping_method,
-        shipping_description,
-        weight,
+        shipping_invoiced,
+        shipping_refunded,
+        subtotal_canceled,
+        subtotal_incl_tax,
+        subtotal_invoiced,
+        subtotal_refunded,
         total_qty_ordered,
-        total_item_count,
-        can_ship_partially,
-        can_ship_partially_item,
-
-        -- Billing/Payment Details
-        coupon_code,
-        applied_rule_ids,
-        coupon_rule_name,
-        discount_description,
-        payment_auth_expiration,
-        payment_authorization_amount,
-
-        -- Flags & Settings
-        is_virtual,
-        email_sent,
-        send_email, -- Often synonymous with email_sent, check Magento logic
-
-        -- Technical/Metadata (Use cautiously)
-        remote_ip,
-        x_forwarded_for,
-        global_currency_code,
-        store_to_base_rate,
-        store_to_order_rate,
-        base_to_global_rate,
+        validation_status,
+        aw_giftcard_amount,
+        base_currency_code,
         base_to_order_rate,
+        billing_address_id,
+        can_ship_partially,
+        customer_firstname,
+        hold_before_status,
+        relation_parent_id,
+        store_to_base_rate,
+        adjustment_negative,
+        adjustment_positive,
+        base_to_global_rate,
+        base_total_canceled,
+        base_total_invoiced,
+        base_total_refunded,
+        customer_middlename,
+        order_currency_code,
+        sent_to_measurement,
+        shipping_address_id,
+        shipping_tax_amount,
+        store_currency_code,
+        store_to_order_rate,
+        applied_restrictions,
+        aw_afptc_uses_coupon,
+        aw_giftcard_invoiced,
+        aw_giftcard_refunded,
+        base_aw_afptc_amount,
+        base_discount_amount,
+        base_shipping_amount,
+        customer_note_notify,
+        discount_description,
+        global_currency_code,
+        is_sportsouth_failed,
+        is_sportssouth_order,
+        last_tracking_update,
+        shipping_description,
+        original_increment_id,
+        shipping_tax_refunded,
+        sports_south_order_id,
+        total_online_refunded,
+        base_aw_afptc_invoiced,
+        base_aw_afptc_refunded,
+        base_discount_canceled,
+        base_discount_invoiced,
+        base_discount_refunded,
+        base_shipping_canceled,
+        base_shipping_incl_tax,
+        base_shipping_invoiced,
+        base_shipping_refunded,
+        base_subtotal_canceled,
+        base_subtotal_incl_tax,
+        base_subtotal_invoiced,
+        base_subtotal_refunded,
+        base_total_qty_ordered,
+        relation_child_real_id,
+        total_offline_refunded,
+        base_aw_giftcard_amount,
+        can_ship_partially_item,
+        payment_auth_expiration,
+        relation_parent_real_id,
+        base_adjustment_negative,
+        base_adjustment_positive,
+        base_shipping_tax_amount,
+        base_total_invoiced_cost,
+        shipping_discount_amount,
+        base_aw_giftcard_invoiced,
+        base_aw_giftcard_refunded,
+        base_shipping_tax_refunded,
+        base_total_online_refunded,
+        carriergroup_shipping_html,
+        sports_south_accs_order_id,
+        sports_south_ship_order_id,
+        base_total_offline_refunded,
+        forced_shipment_with_invoice,
+        payment_authorization_amount,
+        base_shipping_discount_amount,
+        carriergroup_shipping_details,
+        mp_smtp_email_marketing_synced,
+        discount_tax_compensation_amount,
+        discount_tax_compensation_invoiced,
+        discount_tax_compensation_refunded,
+        base_discount_tax_compensation_amount,
+        mp_smtp_email_marketing_order_created,
+        base_discount_tax_compensation_invoiced,
+        base_discount_tax_compensation_refunded,
+        shipping_discount_tax_compensation_amount,
+        base_shipping_discount_tax_compensation_amnt,
 
-        -- CDC Column for filtering
-        _ab_cdc_deleted_at
+        -- Airbyte CDC columns for filtering/metadata (kept for reference if needed)
+        _ab_cdc_cursor,
+        _ab_cdc_log_pos,
+        _ab_cdc_log_file,
+        _ab_cdc_deleted_at,
+        _ab_cdc_updated_at
 
-        -- Columns excluded (examples):
-        -- _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
-        -- _AB_CDC_CURSOR, _AB_CDC_LOG_POS, _AB_CDC_LOG_FILE, _AB_CDC_UPDATED_AT
-        -- Detailed invoiced/refunded/canceled amounts for each component (tax, shipping, subtotal, discount)
-        -- System-specific fields unless required (GA_*, ROUTE_*, AW_AFPTC_*, SPORTS_SOUTH_*, MP_SMTP_*, etc.)
-        -- Relation IDs (RELATION_*) - these might be useful but add complexity
+        -- Columns excluded: _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
 
     FROM
-        -- IMPORTANT: Use the correct source name ('magento') and table name ('sales_order')
-        -- Assuming the table name should be 'sales_order' based on the CREATE TABLE DDL provided,
-        -- even though the prompt mentioned {{ source('magento', 'store') }}
+        -- Source is defined in DDL as AD_AIRBYTE.TEST_DTO_2.SALES_ORDER
+        -- Assuming you have a dbt source named 'magento' pointing to AD_AIRBYTE.TEST_DTO_2
         {{ source('magento', 'sales_order') }}
     WHERE
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
@@ -135,9 +206,9 @@ WITH source_data AS (
 )
 
 SELECT
-    -- Identifiers
-    entity_id AS order_id, -- Renamed primary key
-    increment_id AS order_increment_id, -- User-facing order number
+    -- Renaming and Casting applied where appropriate
+    entity_id AS order_id,
+    increment_id AS order_increment_id,
     store_id,
     customer_id,
     quote_id,
@@ -146,30 +217,27 @@ SELECT
     ext_order_id AS external_order_id,
     ext_customer_id AS external_customer_id,
 
-    -- Order Status & State
     state AS order_state,
     status AS order_status,
 
-    -- Timestamps (assuming they are already appropriate TIMESTAMP types)
     created_at,
     updated_at,
+    customer_dob,
+    last_tracking_update,
 
-    -- Customer Information
     customer_email,
     customer_firstname,
     customer_lastname,
     customer_prefix,
     customer_middlename,
     customer_suffix,
-    customer_dob,
-    customer_gender, -- Consider mapping number to string if codes are known
+    customer_gender,
     customer_group_id,
     CAST(customer_is_guest AS BOOLEAN) AS is_customer_guest,
     customer_note,
     CAST(customer_note_notify AS BOOLEAN) AS should_notify_customer_note,
     customer_taxvat,
 
-    -- Store Information
     store_name,
 
     -- Financials (Order Currency)
@@ -188,6 +256,32 @@ SELECT
     aw_giftcard_amount,
     adjustment_positive,
     adjustment_negative,
+    tax_canceled,
+    tax_invoiced,
+    tax_refunded,
+    discount_canceled,
+    discount_invoiced,
+    discount_refunded,
+    shipping_canceled,
+    shipping_invoiced,
+    shipping_refunded,
+    subtotal_canceled,
+    subtotal_invoiced,
+    subtotal_refunded,
+    aw_afptc_amount,
+    aw_afptc_invoiced,
+    aw_afptc_refunded,
+    aw_giftcard_invoiced,
+    aw_giftcard_refunded,
+    total_online_refunded,
+    total_offline_refunded,
+    shipping_tax_amount,
+    shipping_tax_refunded,
+    shipping_discount_amount,
+    discount_tax_compensation_amount,
+    discount_tax_compensation_invoiced,
+    discount_tax_compensation_refunded,
+    shipping_discount_tax_compensation_amount,
 
     -- Financials (Base Currency)
     base_currency_code,
@@ -205,6 +299,33 @@ SELECT
     base_aw_giftcard_amount,
     base_adjustment_positive,
     base_adjustment_negative,
+    base_tax_canceled,
+    base_tax_invoiced,
+    base_tax_refunded,
+    base_discount_canceled,
+    base_discount_invoiced,
+    base_discount_refunded,
+    base_shipping_canceled,
+    base_shipping_invoiced,
+    base_shipping_refunded,
+    base_subtotal_canceled,
+    base_subtotal_invoiced,
+    base_subtotal_refunded,
+    base_aw_afptc_amount,
+    base_aw_afptc_invoiced,
+    base_aw_afptc_refunded,
+    base_aw_giftcard_invoiced,
+    base_aw_giftcard_refunded,
+    base_total_online_refunded,
+    base_total_offline_refunded,
+    base_shipping_tax_amount,
+    base_shipping_tax_refunded,
+    base_shipping_discount_amount,
+    base_total_invoiced_cost,
+    base_discount_tax_compensation_amount,
+    base_discount_tax_compensation_invoiced,
+    base_discount_tax_compensation_refunded,
+    base_shipping_discount_tax_compensation_amnt,
 
     -- Shipping Details
     shipping_method,
@@ -213,20 +334,30 @@ SELECT
     total_qty_ordered,
     total_item_count,
     CAST(can_ship_partially AS BOOLEAN) AS can_ship_partially,
-    CAST(can_ship_partially_item AS BOOLEAN) AS can_ship_partially_item, -- Check if this flag logic is correct
+    CAST(can_ship_partially_item AS BOOLEAN) AS can_ship_partially_item,
+    carrier_id,
+    carrier_type,
+    destination_type,
+    carriergroup_shipping_html,
+    carriergroup_shipping_details,
+    CAST(forced_shipment_with_invoice AS BOOLEAN) AS has_forced_shipment_with_invoice,
 
     -- Billing/Payment Details
     coupon_code,
-    applied_rule_ids, -- This might be a comma-separated string, consider parsing later if needed
+    applied_rule_ids,
     coupon_rule_name,
     discount_description,
-    payment_auth_expiration, -- Consider casting to TIMESTAMP if it's a Unix timestamp or similar
+    payment_auth_expiration, -- Assuming this NUMBER is a Unix timestamp or similar
     payment_authorization_amount,
+    protect_code,
 
     -- Flags & Settings
     CAST(is_virtual AS BOOLEAN) AS is_virtual_order,
     CAST(email_sent AS BOOLEAN) AS is_email_sent,
-    CAST(send_email AS BOOLEAN) AS should_send_email, -- Clarify difference vs is_email_sent if necessary
+    CAST(send_email AS BOOLEAN) AS should_send_email,
+    validation_status,
+    CAST(sent_to_measurement AS BOOLEAN) AS is_sent_to_measurement,
+    CAST(aw_afptc_uses_coupon AS BOOLEAN) AS aw_afptc_uses_coupon, -- Advanced Promotions extension flag
 
     -- Technical/Metadata
     remote_ip,
@@ -235,7 +366,48 @@ SELECT
     store_to_base_rate,
     store_to_order_rate,
     base_to_global_rate,
-    base_to_order_rate
+    base_to_order_rate,
+    ga_cookie,
+    ga_timestamp,
+    ga_session_id,
+    _ab_cdc_cursor,
+    _ab_cdc_log_pos,
+    _ab_cdc_log_file,
+    _ab_cdc_updated_at,
+
+    -- Relationship IDs
+    quote_address_id,
+    relation_child_id,
+    relation_parent_id,
+    relation_child_real_id,
+    relation_parent_real_id,
+    gift_message_id,
+
+    -- Order Attributes
+    order_size,
+    edit_increment,
+    original_increment_id,
+
+    -- Hold Status
+    hold_before_state,
+    hold_before_status,
+
+    -- System Specific Fields (kept as requested)
+    route_fee,
+    route_tax_fee,
+    route_order_id,
+    CAST(route_is_insured AS BOOLEAN) AS is_route_insured,
+    applied_restrictions,
+    CAST(is_sportsouth_failed AS BOOLEAN) AS is_sportsouth_failed,
+    CAST(is_sportssouth_order AS BOOLEAN) AS is_sportssouth_order,
+    sports_south_order_id,
+    sports_south_accs_order_id,
+    sports_south_ship_order_id,
+    CAST(mp_smtp_email_marketing_synced AS BOOLEAN) AS is_mp_smtp_email_marketing_synced,
+    CAST(mp_smtp_email_marketing_order_created AS BOOLEAN) AS is_mp_smtp_email_marketing_order_created,
+    location_id -- Often related to inventory source/location
+
+    -- Note: _AB_CDC_DELETED_AT is used in the WHERE clause and typically not selected in the final output.
 
 FROM
     source_data
