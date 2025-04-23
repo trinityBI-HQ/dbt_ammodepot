@@ -2,61 +2,65 @@ version: 2
 
 models:
   - name: f_sales
-    description: Gold layer table consolidating detailed sales data from Fishbowl and Magento integrations.
+    description: "Consolidated sales fact combining Magento and Fishbowl data, calculating costs, discounts, and conversions."
     columns:
-      - name: so_item_id
-        description: Unique identifier for the sales order item.
-        tests:
-          - unique
-          - not_null
-
-      - name: so_id
-        description: Identifier for the sales order from Fishbowl.
-
+      - name: created_at
+        description: "Interaction datetime converted from UTC to America/New_York."
+      - name: timedate
+        description: "Original interaction timestamp."
+      - name: tiniciodahora
+        description: "Hour of day truncated from created_at."
       - name: product_id
-        description: Identifier for the product sold.
-
-      - name: sku
-        description: Stock Keeping Unit of the product.
-
-      - name: product_description
-        description: Description of the product sold.
-
-      - name: product_price
-        description: Price of the product as listed in Fishbowl.
-
-      - name: quantity_ordered
-        description: Quantity of the product ordered.
-
-      - name: quantity_shipped
-        description: Quantity of the product shipped.
-
-      - name: unit_price
-        description: Unit selling price of the product in the order.
-
-      - name: total_price
-        description: Total selling price for the item line.
-
-      - name: total_cost
-        description: Total cost of the product in the order.
-
-      - name: ship_date
-        description: Date when the order was shipped.
-
-      - name: tracking_number
-        description: Shipping tracking number.
-
-      - name: carton_weight
-        description: Weight of the shipment carton.
-
-      - name: freight_amount
-        description: Freight cost associated with the shipment.
-
-      - name: magento_order_item_identity
-        description: Magento-specific identifier linking the Fishbowl order item to Magento.
-
-      - name: id_produto_magento
-        description: Magento product identifier linked to Fishbowl product.
-
-      - name: sales_order_item_magento
-        description: Magento sales order item identifier linked to Fishbowl.
+        description: "Product identifier."
+      - name: order_id
+        description: "Order identifier."
+      - name: qty_ordered
+        description: "Net quantity sold (quantity_ordered × row_total)."
+      - name: discount_invoiced
+        description: "Total discount amount invoiced for the item."
+      - name: chave
+        description: "Unique item key in the format product_id@order_id."
+      - name: cost
+        description: "Allocated cost for the item (Magento or Fishbowl)."
+      - name: average_weighted_cost
+        description: "Weighted average cost for the item."
+      - name: tax_amount
+        description: "Tax amount applied to the item."
+      - name: row_total
+        description: "Gross item amount minus discount."
+      - name: increment_id
+        description: "Magento order incremental identifier."
+      - name: billing_address_id
+        description: "Billing address identifier."
+      - name: customer_email
+        description: "Customer's email address."
+      - name: postcode
+        description: "Customer postal code."
+      - name: country
+        description: "Customer country code."
+      - name: region
+        description: "Customer region or state."
+      - name: city
+        description: "Customer city."
+      - name: street
+        description: "Customer street address."
+      - name: phone_number
+        description: "Customer phone number."
+      - name: customer_name
+        description: "Customer full name."
+      - name: store_id
+        description: "Store identifier."
+      - name: order_status
+        description: "Order status."
+      - name: vendor
+        description: "Vendor identifier."
+      - name: customer_id
+        description: "Customer identifier."
+      - name: last_cost
+        description: "Last known cost per product."
+      - name: last_qty
+        description: "Quantity used in the last cost calculation."
+      - name: part_qty_sold
+        description: "Total piece quantity sold adjusted by conversion factor."
+      - name: conversion
+        description: "Unit-of-measure conversion factor."
