@@ -130,3 +130,47 @@ sources:
             tests:
               - unique
               - not_null
+
+      - name: sales_shipment_grid
+        description: "Denormalized shipment grid data (shipment + order + customer + billing)"
+        columns:
+          - name: entity_id
+            description: "Primary key of the shipment grid record"
+            tests:
+              - unique
+              - not_null
+      - name: quote_shipping_rate
+        description: "Shipping rate options for Magento quotes"
+        columns:
+          - name: code
+            description: "Unique code for the shipping rate"
+            tests:
+              - not_null
+          - name: method
+            description: "Internal identifier of the shipping method"
+          - name: carrier_title
+            description: "Human-readable name of the carrier"
+          - name: method_title
+            description: "Display title for the shipping method"
+
+      - name: quote_address
+        description: "Addresses associated with Magento quotes"
+        columns:
+          - name: address_id
+            description: "Primary key for the quote address"
+            tests:
+              - unique
+              - not_null
+          - name: quote_id
+            description: "Foreign key back to the quote entity"
+
+      - name: quote
+        description: "Magento quote header data"
+        columns:
+          - name: entity_id
+            description: "Primary key for the quote"
+            tests:
+              - unique
+              - not_null
+          - name: ext_shipping_info
+            description: "Additional external shipping information"
