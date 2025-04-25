@@ -111,3 +111,12 @@ sources:
             description: Foreign key related to Part
             tests:
               - not_null
+
+      - name: carrierservice
+        description: Fishbowl carrier service lookup
+        columns:
+          - name: idcarrier
+            description: Primary key for the carrier service
+            tests:
+              - unique
+              - not_null

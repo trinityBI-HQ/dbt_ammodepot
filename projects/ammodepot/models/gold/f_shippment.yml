@@ -1,0 +1,82 @@
+version: 2
+
+models:
+  - name: f_shippment
+    description: "Gold-layer view combining Magento orders, shipment grid, quotes, UPS invoices, and Fishbowl shipments into a unified shipping fact."
+    columns:
+      - name: shipping_amount
+        description: "Shipping amount from Magento order, defaulting to 0."
+      - name: base_shipping_amount
+        description: "Base-currency shipping amount."
+      - name: base_shipping_canceled
+        description: "Base-currency amount of shipping that was canceled."
+      - name: base_shipping_discount_amount
+        description: "Base-currency shipping discount amount."
+      - name: base_shipping_refunded
+        description: "Base-currency shipping amount refunded."
+      - name: base_shipping_tax_amount
+        description: "Base-currency shipping tax amount."
+      - name: base_shipping_tax_refunded
+        description: "Base-currency shipping tax refunded."
+      - name: id
+        description: "Shipment identifier (Magento increment_id)."
+      - name: order_id
+        description: "Magento order ID."
+      - name: customer_email
+        description: "Customer email from the Magento order."
+      - name: carrier_type
+        description: "Type of carrier set on the order."
+      - name: created_at
+        description: "Shipment creation timestamp converted to America/New_York."
+      - name: customer_name
+        description: "Concatenation of customer first and last name."
+      - name: billing_address
+        description: "Foreign key to the shipping address record."
+      - name: shipping_information
+        description: "Shipping method code from the order."
+      - name: store_id
+        description: "Store identifier for the order."
+      - name: shipping_description
+        description: "Text description of the shipping method."
+      - name: shipment_status
+        description: "Shipment status from the sales_shipment_grid."
+      - name: shipping_address
+        description: "Formatted shipping address text."
+      - name: shipping_name
+        description: "Name on the shipping record."
+      - name: status
+        description: "Magento order status."
+      - name: shipping_information2
+        description: "Additional shipping info from the grid."
+      - name: method
+        description: "Shipping method code from quote_shipping_rate."
+      - name: carrier_title
+        description: "Human-readable carrier title from quote_shipping_rate."
+      - name: postcode
+        description: "Postal code of the shipping address."
+      - name: country
+        description: "Country code of the shipping address."
+      - name: region
+        description: "Region/state of the shipping address."
+      - name: city
+        description: "City of the shipping address."
+      - name: telephone
+        description: "Telephone number from the shipping address."
+      - name: freightamount
+        description: "Aggregated freight amount (UPS or Fishbowl)."
+      - name: net_amount
+        description: "Aggregated UPS net amount."
+      - name: packagenumb
+        description: "Number of packages shipped."
+      - name: freightweight
+        description: "Aggregated freight weight."
+      - name: ext_shipping_info
+        description: "External shipping info from the quote record."
+      - name: is_free
+        description: "'Yes' if base_subtotal ≥ 140, else 'No'."
+      - name: carrierserviceid
+        description: "Carrier service ID aggregated from Fishbowl shipments."
+      - name: is_free_auto
+        description: "'Yes' if a free shipping quote option was applied."
+      - name: carrierservice
+        description: "Carrier service name from the Fishbowl lookup."

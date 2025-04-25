@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: fishbowl_uomconversion
-    description: Unit of measure conversion details from Fishbowl.
+    description: "Unit of measure conversion details from Fishbowl."
     columns:
       - name: uom_conversion_id
         description: Primary key for UOM conversion

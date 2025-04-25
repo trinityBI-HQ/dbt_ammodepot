@@ -1,0 +1,132 @@
+version: 2
+
+models:
+  - name: magento_quote
+    description: "Silver-layer table for Magento quotes (via Fivetran), filtering out deleted rows."
+    columns:
+      - name: entity_id
+        description: "Primary key for the quote."
+      - name: route_fee
+        description: "Delivery route fee charged."
+      - name: base_aw_giftcard_amount
+        description: "Base gift-card amount applied."
+      - name: reserved_order_id
+        description: "Reserved order reference (if quoting an existing order)."
+      - name: is_active
+        description: "Flag (1/0) indicating active quote."
+      - name: updated_at
+        description: "Last update timestamp (with TZ)."
+      - name: customer_lastname
+        description: "Customer’s last name."
+      - name: gift_message_id
+        description: "ID of any gift message attached."
+      - name: customer_id
+        description: "FK to the Magento customer."
+      - name: credova_public_id
+        description: "External financing public ID (if used)."
+      - name: aw_giftcard_amount
+        description: "Gift-card amount applied at order level."
+      - name: customer_taxvat
+        description: "Customer’s VAT/tax registration number."
+      - name: aw_afptc_amount
+        description: "AFPTC (partial payment) amount applied."
+      - name: quote_currency_code
+        description: "Currency code of the quote."
+      - name: created_at
+        description: "Creation timestamp (with TZ)."
+      - name: base_aw_afptc_amount
+        description: "Base AFPTC amount before currency conversion."
+      - name: converted_at
+        description: "Timestamp when currency conversion occurred."
+      - name: route_is_insured
+        description: "Flag (1/0) if the route is insured."
+      - name: applied_rule_ids
+        description: "Promotion/coupon rule IDs applied."
+      - name: customer_prefix
+        description: "Customer’s name prefix (Mr/Ms/etc)."
+      - name: customer_dob
+        description: "Customer’s date of birth."
+      - name: store_to_base_rate
+        description: "FX rate from store currency to base currency."
+      - name: items_qty
+        description: "Total quantity of items in the quote."
+      - name: customer_note
+        description: "Free-form customer note text."
+      - name: customer_gender
+        description: "Customer’s gender."
+      - name: password_hash
+        description: "Hash of customer’s password (if persistent)."
+      - name: base_currency_code
+        description: "Base currency code for the store."
+      - name: is_virtual
+        description: "Flag (1/0) if quote contains only virtual products."
+      - name: ext_shipping_info
+        description: "External shipping information field."
+      - name: base_subtotal_with_discount
+        description: "Base subtotal after discounts."
+      - name: subtotal
+        description: "Quote subtotal in store currency."
+      - name: global_currency_code
+        description: "Global currency code (e.g. USD)."
+      - name: store_currency_code
+        description: "Currency code of the store."
+      - name: base_to_quote_rate
+        description: "FX rate from base currency to quote currency."
+      - name: remote_ip
+        description: "Customer’s IP address at quote time."
+      - name: orig_order_id
+        description: "Original order ID if this quote replaced one."
+      - name: customer_note_notify
+        description: "Flag (1/0) to notify customer of note changes."
+      - name: customer_firstname
+        description: "Customer’s first name."
+      - name: customer_group_id
+        description: "FK to the customer’s group."
+      - name: aw_afptc_uses_coupon
+        description: "Flag (1/0) if AFPTC uses a coupon."
+      - name: items_count
+        description: "Number of distinct line items."
+      - name: is_persistent
+        description: "Flag (1/0) if the quote is marked persistent."
+      - name: base_grand_total
+        description: "Grand total in base currency."
+      - name: is_changed
+        description: "Flag (1/0) if quote has been modified since creation."
+      - name: base_subtotal
+        description: "Base currency subtotal before discounts."
+      - name: customer_middlename
+        description: "Customer’s middle name."
+      - name: grand_total
+        description: "Grand total in store currency."
+      - name: base_to_global_rate
+        description: "FX rate from base to global currency."
+      - name: coupon_code
+        description: "Coupon code applied to the quote."
+      - name: customer_suffix
+        description: "Customer’s name suffix."
+      - name: customer_is_guest
+        description: "Flag (1/0) if customer checked out as guest."
+      - name: subtotal_with_discount
+        description: "Subtotal in store currency after discounts."
+      - name: trigger_recollect
+        description: "Flag (1/0) to trigger re‐collection of totals."
+      - name: checkout_method
+        description: "Checkout method (guest, register, etc.)."
+      - name: route_tax_fee
+        description: "Tax fee on the route."
+      - name: customer_tax_class_id
+        description: "FK to customer tax class."
+      - name: customer_email
+        description: "Customer’s email address."
+      - name: is_multi_shipping
+        description: "Flag (1/0) if multi‐shipping is enabled."
+      - name: store_id
+        description: "FK to the store."
+      - name: store_to_quote_rate
+        description: "FX rate from store to quote currency."
+      - name: _fivetran_deleted
+        description: "Fivetran soft-delete marker."
+      - name: _fivetran_synced
+        description: "Fivetran last sync timestamp."
+      - name: smsoptin_check
+        description: "Flag/text for SMS opt-in consent."

@@ -1,0 +1,111 @@
+
+version: 2
+
+models:
+  - name: magento_quote_address_item
+    description: "Silver-layer table for Magento quote address items, filtering out soft deletes and casting flags."
+    columns:
+      - name: quote_address_item_id
+        description: "Renamed primary key (originally address_item_id)."
+      - name: quote_address_id
+        description: "Foreign key to the quote_address record."
+      - name: quote_item_id
+        description: "Foreign key to the quote_item record."
+      - name: parent_item_id
+        description: "Parent item ID for bundle/configurable relationships."
+      - name: product_id
+        description: "Foreign key to the product entity."
+      - name: parent_product_id
+        description: "Parent product ID for variant relationships."
+      - name: super_product_id
+        description: "Super product ID for configurable products."
+      - name: store_id
+        description: "Identifier of the store where the quote was created."
+      - name: sku
+        description: "Stock-keeping unit of the product."
+      - name: product_name
+        description: "Name of the product."
+      - name: product_description
+        description: "Description of the product."
+      - name: image_url
+        description: "URL to the product image."
+      - name: item_weight
+        description: "Weight of a single item."
+      - name: row_weight
+        description: "Total weight for the quantity of items."
+      - name: additional_data
+        description: "Additional metadata or custom fields."
+      - name: gift_message_id
+        description: "Identifier for an associated gift message."
+      - name: quantity
+        description: "Quantity of the item ordered."
+      - name: is_quantity_decimal
+        description: "Boolean flag indicating if quantity can be fractional."
+      - name: unit_price
+        description: "Unit price in quote currency."
+      - name: base_price
+        description: "Unit price in base currency."
+      - name: unit_price_incl_tax
+        description: "Unit price including tax."
+      - name: row_total
+        description: "Line total in quote currency."
+      - name: row_total_incl_tax
+        description: "Line total including tax."
+      - name: row_total_with_discount
+        description: "Line total after discounts."
+      - name: tax_amount
+        description: "Tax amount for the line."
+      - name: tax_percent
+        description: "Tax percentage applied."
+      - name: discount_amount
+        description: "Discount amount applied to the line."
+      - name: discount_percent
+        description: "Discount percentage applied."
+      - name: is_discount_excluded
+        description: "Boolean flag indicating if the item is excluded from discounts."
+      - name: applied_rule_ids
+        description: "Promotion rule IDs applied to the item."
+      - name: discount_tax_compensation_amount
+        description: "Tax compensation amount for the discount."
+      - name: base_row_total
+        description: "Line total in base currency."
+      - name: base_unit_price_incl_tax
+        description: "Unit price including tax in base currency."
+      - name: base_row_total_incl_tax
+        description: "Line total including tax in base currency."
+      - name: base_tax_amount
+        description: "Tax amount in base currency."
+      - name: base_discount_amount
+        description: "Discount amount in base currency."
+      - name: base_discount_tax_compensation_amount
+        description: "Discount tax compensation in base currency."
+      - name: base_cost
+        description: "Base cost of the item."
+      - name: carriergroup
+        description: "Carrier group code."
+      - name: carriergroup_id
+        description: "Identifier for the carrier group."
+      - name: has_free_shipping
+        description: "Boolean flag indicating free shipping eligibility."
+      - name: carriergroup_shipping
+        description: "Carrier group shipping details."
+      - name: aw_afptc_amount
+        description: "Advanced promotion amount applied."
+      - name: aw_afptc_percent
+        description: "Advanced promotion percentage applied."
+      - name: aw_afptc_rule_ids
+        description: "Advanced promotion rule IDs."
+      - name: base_aw_afptc_amount
+        description: "Advanced promotion amount in base currency."
+      - name: created_at
+        description: "Record creation timestamp."
+      - name: updated_at
+        description: "Record last update timestamp."
+      - name: _ab_cdc_cursor
+        description: "Airbyte CDC cursor position."
+      - name: _ab_cdc_log_pos
+        description: "Airbyte CDC log position."
+      - name: _ab_cdc_log_file
+        description: "Airbyte CDC log file name."
+      - name: _ab_cdc_updated_at
+        description: "Airbyte CDC last updated timestamp."

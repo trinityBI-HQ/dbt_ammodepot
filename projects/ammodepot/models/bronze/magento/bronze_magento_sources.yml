@@ -174,3 +174,12 @@ sources:
               - not_null
           - name: ext_shipping_info
             description: "Additional external shipping information"
+      - name: quote_address_item
+        description: "Raw Magento quote address item data "
+        columns:
+          - name: address_item_id
+            description: "Primary key for the quote address item record"
+            tests:
+              - unique
+              - not_null
+

@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: fishbowl_plugininfo
-    description: >
+    description: 
       Silver layer table containing cleaned plugin information from the Fishbowl inventory system.
       Includes plugin metadata and associated context.
     config:

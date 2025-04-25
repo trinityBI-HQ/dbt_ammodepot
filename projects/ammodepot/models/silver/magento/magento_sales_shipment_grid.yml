@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: sales_shippment_grid
+  - name: magento_sales_shipment_grid
     description: "Silver layer table for Magento shipment grid data, cleansed and enriched."
     columns:
       - name: shipment_grid_id

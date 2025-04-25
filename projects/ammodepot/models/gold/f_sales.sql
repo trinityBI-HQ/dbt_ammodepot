@@ -435,105 +435,249 @@ product_sales AS (
     GROUP BY s.order_item_id
 ),
 
+
+
 -- Base de fatos de SKU
 skubase AS (
     SELECT
-        ib.created_at::date                                    AS created_at,
-        ib.created_at                                          AS timedate,
-        date_trunc('hour', ib.created_at)                      AS tiniciodahora_copiar,
-
+        ib.created_at::date                                AS created_at,
+        ib.created_at                                      AS timedate,
+        date_trunc('hour', ib.created_at)                  AS tiniciodahora_copiar,
+        cast(date_trunc('HOUR', ib.created_at) as time )   AS tiniciodaHora,
         ib.product_id,
         ib.order_id,
 
+        /* Quantidade usada pelo Snowflake (div0(qty_ordered*row_total,row_total))    */
+        /* aqui basta proteger contra 0, mas o resultado é sempre qty_ordered        */
         CASE
-          WHEN ib.row_total = 0 THEN 0
-          ELSE ib.qty_ordered * ib.row_total
-        END                                                     AS qty_ordered,
+            WHEN ib.row_total = 0 THEN 0
+            ELSE ib.qty_ordered
+        END                                               AS qty_ordered,
 
-        ib.discount_invoiced                                   AS discount_invoiced,
+        ib.qty_ordered                                     AS ordered,          -- novo
+
+        ib.discount_invoiced                               AS discount_invoiced,
         ib.chave,
 
-        CASE WHEN ib.qty_ordered > 0 THEN ib.cost ELSE NULL END  AS cost,
-        ib.averageweightedcost                                 AS average_weighted_cost,
+        CASE WHEN ib.qty_ordered > 0 THEN ib.cost ELSE NULL END AS cost,
+        ib.averageweightedcost                             AS average_weighted_cost,
 
-        ib.tax_amount                                          AS tax_amount,
-        ib.row_total                                           AS row_total,
+        ib.tax_amount                                      AS tax_amount,
+        ib.row_total                                       AS row_total,
 
-        ib.increment_id                                        AS increment_id,
-        ib.billing_address_id                                  AS billing_address_id,
-        ib.customer_email                                      AS customer_email,
+        ib.increment_id,
+        ib.billing_address_id,
+        ib.customer_email,
 
         ib.postcode,
         ib.country,
         ib.region,
         ib.city,
         ib.street,
-        ib.telephone                                          AS phone_number,
+        ib.telephone                                       AS phone_number,
         ib.customer_name,
 
+        ib.id                                              AS order_item_id,
+        UPPER(ib.status)                                   AS order_status,     -- idem Snowflake
         ib.cost_magento,
-        ib.id                                                AS order_item_id,
-        ib.status                                           AS order_status,
         ib.fishbowl_registeredcost,
         ib.store_id,
         ib.store_name,
         ib.weight,
+
+       
+        mo.net_sales                                        AS frsales,           -- vendas líquidas do pedido
+        mo.freight_amount                                  AS fcost,             -- custo total de frete do pedido
+        mow.total_weight                                   AS weightorder,
+        mow.product_count                                  AS products_in_order,
+
+        /* % do peso da linha em relação ao pedido */
+        ib.weight / NULLIF(mow.total_weight, 0)            AS percentage,
+
+        /* Receita de frete alocada à linha (mesma lógica do Snowflake) */
+        CASE
+            WHEN mow.total_weight IS NULL
+                 AND ib.testsku NOT ILIKE '%parceldefender%' THEN
+                 (ib.qty_ordered * mo.net_sales)
+                 / NULLIF(mow.product_count, 0)
+            ELSE
+                 (ib.weight * mo.net_sales)
+                 / NULLIF(mow.total_weight, 0)
+        END                                               AS freight_revenue,
+
+        
+        CASE
+            WHEN mow.total_weight IS NULL
+                 AND ib.testsku NOT ILIKE '%parceldefender%' THEN
+                 (ib.qty_ordered * mo.freight_amount)
+                 / NULLIF(mow.product_count, 0)
+            ELSE
+                 (ib.weight * mo.freight_amount)
+                 / NULLIF(mow.total_weight, 0)
+        END                                               AS freight_cost,
+
+                                
+        ps.part_qty_sold,
+        COALESCE(ps.conversion, 1)                        AS conversion,
+
         ib.product_options,
         ib.product_type,
         ib.parent_item_id,
         ib.testsku,
         ib.applied_rule_ids,
         ib.customer_id,
+        ib.vendor_id                                      AS vendor             -- renomeado
+    FROM interaction_base              AS ib
+    LEFT JOIN magento_order_shipping_agg AS mo
+           ON mo.order_id = ib.order_id
+   
+    LEFT JOIN product_sales            AS ps
+           ON ps.item_id = ib.id
+    LEFT JOIN magento_order_weight     AS mow
+           ON mow.order_id = ib.order_id
+),
+-- Itens “configurable” que servirão de transferência de métricas
+to_transfer AS (
+    SELECT
+        order_item_id as id,
+        row_total,
+        cost,
+        freight_revenue,
+        freight_cost,
+        qty_ordered,
+        part_qty_sold
+    FROM skubase
+    WHERE product_type = 'configurable'
+),
 
-        -- renomea vendor_id para vendor para casar com o final
-        ib.vendor_id                                         AS vendor
-    FROM interaction_base AS ib
+-- Ajusta o item-filho usando os valores do item configurável (pai), se existir
+last AS (
+    SELECT
+        z.created_at,
+        z.timedate,
+        z.order_item_id,
+        z.increment_id,
+        z.tiniciodahora_copiar,
+        z.product_id,
+        z.order_id,
+        z.timedate                       AS trickat,
+        z.product_options,
+        z.product_type,
+        z.parent_item_id,
+        z.testsku,
+        z.conversion,
+        z.tiniciodahora,
+        z.customer_email                 AS customer_email,
+        z.postcode,
+        z.country,
+        z.region,
+        z.city,
+        z.street,
+        z.phone_number                   AS telephone,
+        z.customer_name,
+        z.store_id,
+        z.order_status                   AS status,
+        z.vendor,
+        z.customer_id,
+
+        CASE WHEN ty.ID IS NOT NULL THEN Ty.Row_total ELSE z.row_total END AS row_total,
+        CASE WHEN ty.ID IS NOT NULL THEN Ty.COST ELSE z.COST END AS cost,
+        CASE WHEN ty.ID IS NOT NULL THEN Ty.qty_ordered ELSE z.qty_Ordered END AS qty_Ordered,
+        CASE WHEN ty.ID IS NOT NULL THEN Ty.Part_Qty_Sold ELSE z.Part_Qty_Sold END AS part_qty_sold,
+        CASE WHEN ty.ID IS NOT NULL THEN Ty.Freight_revenue ELSE z.freight_revenue END AS freight_revenue,
+        CASE WHEN ty.ID IS NOT NULL THEN Ty.Freight_cost ELSE z.freight_cost END AS freight_cost,
+        ty.cost            AS testc,
+        ty.row_total       AS testr,
+        ty.freight_revenue AS testfr,
+        ty.freight_cost    AS testfc
+     FROM skubase z
+    LEFT JOIN to_transfer ty
+           ON ty.id = z.parent_item_id
 ),
 
 
--- Monta o fato final juntando custos históricos e vendas de peça
-final AS (
+last_day_cost_last AS (
     SELECT
-        sb.created_at,
-        sb.timedate,
-        sb.tiniciodahora_copiar      AS tiniciodahora,
-        sb.product_id,
-        sb.order_id,
-        sb.qty_ordered,
-        sb.discount_invoiced,
-        sb.chave,
-        sb.cost,
-        sb.average_weighted_cost,
-        sb.tax_amount,
-        sb.row_total,
-        sb.increment_id,
-        sb.billing_address_id,
-        sb.customer_email,
-        sb.postcode,
-        sb.country,
-        sb.region,
-        sb.city,
-        sb.street,
-        sb.phone_number,
-        sb.customer_name,
-        sb.store_id,
-        sb.order_status,
-        sb.vendor,
-        sb.customer_id,
+        l.product_id,
+        MAX(l.trickat) AS last_scheduled_date
+    FROM last l
+    WHERE l.cost > 0
+      AND l.qty_ordered > 0
+    GROUP BY l.product_id
+),
 
-        fca.cost                   AS last_cost,
-        fca.qty                    AS last_qty,
+filtered_cost_prep AS (
+    SELECT
+        l.product_id,
+        l.cost,
+        l.qty_ordered AS qty,
+        l.trickat
+    FROM last l
+    JOIN last_day_cost_last ld
+      ON     l.product_id = ld.product_id
+         AND l.trickat    = ld.last_scheduled_date
+    WHERE l.cost > 0
+      AND l.qty_ordered > 0
+),
 
-        ps.part_qty_sold,
-        COALESCE(ps.conversion, 1) AS conversion
-
-    FROM skubase                AS sb
-    LEFT JOIN filtered_cost_all AS fca
-      ON sb.product_id = fca.product_id
-    LEFT JOIN product_sales    AS ps
-      ON sb.order_item_id = ps.item_id
-
-    WHERE sb.product_type <> 'configurable'
+filtered_cost_final AS (
+    SELECT
+        product_id,
+        SUM(cost) / NULLIF(SUM(qty), 0) AS cost,
+        SUM(qty)                        AS qty,
+        MAX(trickat)                    AS trickat      -- só informativo
+    FROM filtered_cost_prep
+    GROUP BY product_id
 )
 
-SELECT * FROM final
+SELECT
+    l.created_at,
+    l.timedate,
+    l.order_item_id,
+    l.increment_id,
+    l.tiniciodahora_copiar        AS "Inicio da Hora - Copiar",
+    l.product_id,
+    l.order_id,
+    l.trickat,
+    l.product_options,
+    l.product_type,
+    l.parent_item_id,
+    l.testsku,
+    l.conversion,
+    l.tiniciodahora               AS "Inicio da Hora",
+    l.customer_email,
+    l.postcode,
+    l.country,
+    l.region,
+    l.city,
+    l.street,
+    l.telephone,
+    l.customer_name,
+    l.store_id,
+    l.status,
+    l.row_total,
+    COALESCE(l.cost, fcf.cost * l.qty_ordered) AS cost,
+    l.qty_ordered,
+    l.freight_revenue,
+    l.freight_cost,
+    l.testc,
+    l.testr,
+    l.testfr,
+    l.testfc,
+    l.vendor,
+    l.customer_id,
+    cu.rank_id,
+    COALESCE(l.part_qty_sold, l.qty_ordered)   AS part_qty_sold
+FROM last l
+LEFT JOIN filtered_cost_final fcf
+       ON fcf.product_id = l.product_id
+LEFT JOIN {{ref ("magento_d_customerupdated")}} cu
+       ON LOWER(
+            COALESCE(
+                NULLIF(l.customer_email, ''),
+                'customer@nonidentified.com'
+            )
+          ) = cu.customer_email
+WHERE l.product_type <> 'configurable'
+
+
