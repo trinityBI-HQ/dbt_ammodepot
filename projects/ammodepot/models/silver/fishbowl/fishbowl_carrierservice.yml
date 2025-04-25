@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: fishbowl_carrierservice
+    description: "Silver-layer table for Fishbowl carrier services, casting flags to boolean and filtering out deleted records."
+    columns:
+      - name: carrier_service_id
+        description: "Renamed primary key (originally `id`)."
+      - name: carrier_id
+        description: "Renamed foreign key to the Fishbowl carrier definition (originally `carrierid`)."
+      - name: carrier_service_code
+        description: "Renamed business code for the carrier service (originally `code`)."
+      - name: carrier_service_name
+        description: "Renamed descriptive name of the carrier service (originally `name`)."
+      - name: is_active
+        description: "Boolean flag indicating if the carrier service is active (cast from `activeflag`)."
+      - name: is_readonly
+        description: "Boolean flag indicating if the carrier service is read-only (cast from `readonly`)."

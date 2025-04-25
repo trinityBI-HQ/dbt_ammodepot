@@ -1,0 +1,182 @@
+version: 2
+
+models:
+  - name: magento_quote_address
+    description: "Silver-layer table for Magento quote addresses, casting flags and filtering out deleted CDC records."
+    columns:
+      - name: quote_address_id
+        description: "Renamed primary key (originally address_id)."
+      - name: quote_id
+        description: "Foreign key to the quote."
+      - name: customer_id
+        description: "Foreign key to the customer."
+      - name: customer_address_id
+        description: "ID of the customer's address record."
+      - name: region_id
+        description: "Numeric identifier for the region/state."
+      - name: country_code
+        description: "Two-letter ISO country code."
+      - name: address_type
+        description: "Type of address: 'billing' or 'shipping'."
+      - name: name_prefix
+        description: "Name prefix (e.g., Mr, Ms) from prefix."
+      - name: first_name
+        description: "Customer's first name."
+      - name: middle_name
+        description: "Customer's middle name."
+      - name: last_name
+        description: "Customer's last name."
+      - name: name_suffix
+        description: "Name suffix (e.g., Jr, Sr) from suffix."
+      - name: company
+        description: "Company name for the address."
+      - name: street_address
+        description: "Street address."
+      - name: city
+        description: "City of the address."
+      - name: region
+        description: "Region or state of the address."
+      - name: postcode
+        description: "Postal or ZIP code."
+      - name: phone_number
+        description: "Telephone number."
+      - name: fax_number
+        description: "Fax number."
+      - name: email
+        description: "Email address."
+      - name: subtotal
+        description: "Quote subtotal in quote currency."
+      - name: subtotal_incl_tax
+        description: "Quote subtotal including tax."
+      - name: subtotal_with_discount
+        description: "Subtotal after discounts."
+      - name: grand_total
+        description: "Quote grand total."
+      - name: shipping_amount
+        description: "Shipping amount in quote currency."
+      - name: shipping_incl_tax
+        description: "Shipping amount including tax."
+      - name: shipping_tax_amount
+        description: "Shipping tax amount."
+      - name: tax_amount
+        description: "Total tax amount."
+      - name: discount_amount
+        description: "Total discount amount."
+      - name: discount_description
+        description: "Description of the discount applied."
+      - name: aw_giftcard_amount
+        description: "Gift card amount applied."
+      - name: aw_afptc_amount
+        description: "AFPTC amount applied."
+      - name: shipping_discount_amount
+        description: "Discount applied to shipping."
+      - name: discount_tax_compensation_amount
+        description: "Compensation amount for discount tax."
+      - name: shipping_discount_tax_compensation_amount
+        description: "Compensation amount for shipping discount tax."
+      - name: base_subtotal
+        description: "Base currency subtotal before tax."
+      - name: base_subtotal_total_incl_tax
+        description: "Base currency subtotal including tax."
+      - name: base_subtotal_with_discount
+        description: "Base currency subtotal after discounts."
+      - name: base_grand_total
+        description: "Base currency grand total."
+      - name: base_shipping_amount
+        description: "Shipping amount in base currency."
+      - name: base_shipping_incl_tax
+        description: "Shipping amount including tax in base currency."
+      - name: base_shipping_tax_amount
+        description: "Shipping tax in base currency."
+      - name: base_tax_amount
+        description: "Tax amount in base currency."
+      - name: base_discount_amount
+        description: "Discount amount in base currency."
+      - name: base_aw_giftcard_amount
+        description: "Gift card amount in base currency."
+      - name: base_aw_afptc_amount
+        description: "AFPTC amount in base currency."
+      - name: base_shipping_discount_amount
+        description: "Shipping discount in base currency."
+      - name: base_discount_tax_compensation_amount
+        description: "Discount tax compensation in base currency."
+      - name: base_shipping_discount_tax_compensation_amnt
+        description: "Shipping discount tax compensation in base currency."
+      - name: total_weight
+        description: "Total weight of items."
+      - name: shipping_method
+        description: "Shipping method code."
+      - name: shipping_description
+        description: "Text description of shipping."
+      - name: carrier_id
+        description: "Carrier identifier."
+      - name: carrier_type
+        description: "Type of carrier service."
+      - name: has_free_shipping
+        description: "Boolean flag indicating free shipping."
+      - name: should_collect_shipping_rates
+        description: "Boolean flag to collect shipping rates."
+      - name: applied_taxes
+        description: "Applied tax codes/amounts."
+      - name: destination_type
+        description: "Type of destination for shipping."
+      - name: carriergroup_shipping_html
+        description: "HTML details for carrier group shipping."
+      - name: carriergroup_shipping_details
+        description: "Text details for carrier group shipping."
+      - name: vat_id
+        description: "VAT identification number."
+      - name: is_vat_valid
+        description: "Boolean flag indicating valid VAT."
+      - name: vat_request_id
+        description: "Identifier for VAT request."
+      - name: vat_request_date
+        description: "Date of VAT request."
+      - name: was_vat_request_successful
+        description: "Boolean flag for VAT request success."
+      - name: validated_vat_number
+        description: "Validated VAT number."
+      - name: validated_country_code
+        description: "Country code from VAT validation."
+      - name: is_same_as_billing
+        description: "Boolean flag if shipping address equals billing."
+      - name: should_save_in_address_book
+        description: "Flag indicating if address should be saved."
+      - name: is_ffl_address
+        description: "Boolean flag for FFL address."
+      - name: is_checkout_address
+        description: "Boolean flag for checkout address."
+      - name: has_split_rates
+        description: "Boolean flag for split shipping rates."
+      - name: sms_optin_check
+        description: "Boolean flag for SMS opt-in."
+      - name: validation_status
+        description: "Status of address validation."
+      - name: address_created_at
+        description: "Timestamp when address was created."
+      - name: address_updated_at
+        description: "Timestamp when address was updated."
+      - name: customer_notes
+        description: "Notes provided by the customer."
+      - name: gift_message_id
+        description: "Gift message identifier."
+      - name: applied_restrictions
+        description: "Applied shipping restrictions."
+      - name: location_id
+        description: "Identifier for location."
+      - name: route_fee
+        description: "Routing fee amount."
+      - name: avatax_messages
+        description: "Avalara AvaTax extension messages."
+      - name: aw_afptc_uses_coupon
+        description: "Flag indicating AFPTC used a coupon."
+      - name: is_checkout_display_merged
+        description: "Flag for merged checkout display."
+      - name: _ab_cdc_cursor
+        description: "Airbyte CDC cursor."
+      - name: _ab_cdc_log_pos
+        description: "Airbyte CDC log position."
+      - name: _ab_cdc_log_file
+        description: "Airbyte CDC log file."
+      - name: _ab_cdc_updated_at
+        description: "Airbyte CDC updated timestamp."

@@ -1,0 +1,48 @@
+# models/silver/magento/quote_shipping_rate.yml
+version: 2
+
+models:
+  - name: magento_quote_shipping_rate
+    description: "Silver-layer table for Magento quote shipping rates, filtering out soft-deleted CDC records."
+    columns:
+      - name: quote_shipping_rate_code
+        description: "Business code for the shipping rate."
+      - name: price
+        description: "Price for this shipping rate."
+      - name: method
+        description: "Internal identifier of the shipping method."
+      - name: carrier
+        description: "Carrier code."
+      - name: quote_shipping_rate_id
+        description: "Unique identifier for the shipping rate (rate_id)."
+        tests:
+          - unique
+          - not_null
+      - name: quote_address_id
+        description: "Foreign key to the quote_address table (address_id)."
+      - name: carrier_service_id
+        description: "Foreign key to the carrier service lookup (carrier_id)."
+      - name: created_at
+        description: "Timestamp when the shipping rate was created."
+      - name: updated_at
+        description: "Timestamp when the shipping rate was last updated."
+      - name: carrier_type
+        description: "Type/category of carrier."
+      - name: carriergroup
+        description: "Carrier group identifier."
+      - name: method_title
+        description: "Display title for the shipping method."
+      - name: carrier_title
+        description: "Human-readable title of the carrier."
+      - name: error_message
+        description: "Error message if rate calculation failed."
+      - name: carriergroup_id
+        description: "Identifier for the carrier group."
+      - name: shq_delivery_date
+        description: "Scheduled delivery date for this rate."
+      - name: shq_dispatch_date
+        description: "Scheduled dispatch date for this rate."
+      - name: method_description
+        description: "Text description of the shipping method."
+      - name: carriergroup_shipping_details
+        description: "Detailed HTML or text for carrier group shipping."
