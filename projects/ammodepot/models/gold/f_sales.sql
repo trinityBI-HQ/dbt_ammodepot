@@ -241,7 +241,7 @@ interaction_base AS (
         z.order_id,
         CASE 
         WHEN z.row_total <> 0 
-            THEN (z.qty_ordered * z.row_total) / z.row_total 
+            THEN (z.quantity_ordered * z.row_total) / z.row_total 
         ELSE 0 
         END AS qty_ordered,
 

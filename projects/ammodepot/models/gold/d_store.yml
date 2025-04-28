@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: d_store
+    description: "View exposing raw Magento store data with CDC metadata"
+    columns:
+      - name: _ab_cdc_updated_at
+        description: "Timestamp of the last CDC update"
+        tests:
+          - not_null
+
+      - name: _airbyte_raw_id
+        description: "Raw record UUID from Airbyte"
+        tests:
+          - not_null
+          - unique
+
+      - name: _airbyte_extracted_at
+        description: "Extraction timestamp from Airbyte"
+        tests:
+          - not_null
+
+      - name: _airbyte_generation_id
+        description: "Airbyte generation run identifier"
+
+      - name: _airbyte_meta
+        description: "JSON metadata from Airbyte"

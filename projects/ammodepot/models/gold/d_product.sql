@@ -2,7 +2,7 @@
 
 with attribute_id_cte as (
     select attribute_id, attribute_code
-    from {{ ref('magento','magento_eav_attribute') }}
+    from {{ ref('magento_eav_attribute') }}
     where attribute_code in (
         'name', 'url_key', 'manufacturer_sku', 'upc', 'image', 'cost', 'price',
         'status', 'visibility', 'weight', 'manufacturer', 'attribute_set_name',
@@ -83,12 +83,12 @@ parent_sku_data as (
         parent.sku as parent_sku
     from {{ ref('magento_catalog_product_super_link') }} sl
     join {{ ref('magento_catalog_product_entity') }} parent
-      on sl.parent_id = parent.entity_id
+      on sl.parent_id = parent.product_entity_id
 ),
 
 discontinued_data as (
     select
-        entity_id,
+        product_entity_id,
         case when attribute_set_id = 50 then 'Yes' else 'No' end as discontinued
     from {{ ref('magento_catalog_product_entity') }}
 ),
@@ -224,7 +224,7 @@ material_data as (
 
 attribute_set_data as (
     select
-        cpe.entity_id,
+        cpe.product_entity_id,
         eas.attribute_set_name
     from {{ ref('magento_catalog_product_entity') }} cpe
     join {{ ref('magento_eav_attribute_set') }} eas
@@ -282,7 +282,7 @@ ddweapons_platform_data as (
 )
 
 select
-    e.entity_id    as product_id,
+    e.product_entity_id    as product_id,
     e.sku,
     max(case when va.attribute_code = 'name'           then va.value end) as product_name,
     max(case when va.attribute_code = 'suggested_use'  then va.value end) as general_purpose,
@@ -317,31 +317,31 @@ select
     max(case when va.attribute_code = 'thread_type'    then va.value end) as thread_type,
     max(case when va.attribute_code = 'model'          then va.value end) as model
 from {{ ref('magento_catalog_product_entity') }} e
-left join varchar_attributes va on e.entity_id = va.entity_id
-left join int_attributes ia    on e.entity_id = ia.entity_id
-left join decimal_attributes da on e.entity_id = da.entity_id
-left join text_attributes ta   on e.entity_id = ta.entity_id
-left join category_data cd     on e.entity_id = cd.product_id
-left join vendor_data vd       on e.entity_id = vd.entity_id
-left join parent_sku_data psd  on e.entity_id = psd.product_id
-left join discontinued_data dd on e.entity_id = dd.entity_id
-left join manufacturer_data md on e.entity_id = md.entity_id
-left join projectile_data pd   on e.entity_id = pd.entity_id
-left join unit_type_data utd   on e.entity_id = utd.entity_id
-left join ddcaliber_data ddc   on e.entity_id = ddc.entity_id
-left join ddaction_data ddact  on e.entity_id = ddact.entity_id
-left join ddcondition_data ddcond on e.entity_id = ddcond.entity_id
-left join ddgun_parts_data ddgp  on e.entity_id = ddgp.entity_id
-left join rounds_package_data rpd on e.entity_id = rpd.entity_id
-left join capacity_data capacity  on e.entity_id = capacity.entity_id
-left join material_data material  on e.entity_id = material.entity_id
-left join attribute_set_data asd  on e.entity_id = asd.entity_id
-left join primary_category_data pc on e.entity_id = pc.entity_id
-left join ddcolor_data dc     on e.entity_id = dc.entity_id
-left join optic_coating_data oc on e.entity_id = oc.entity_id
-left join ddweapons_platform_data dwp on e.entity_id = dwp.entity_id
+left join varchar_attributes va on e.product_entity_id = va.entity_id
+left join int_attributes ia    on e.product_entity_id = ia.entity_id
+left join decimal_attributes da on e.product_entity_id = da.entity_id
+left join text_attributes ta   on e.product_entity_id = ta.entity_id
+left join category_data cd     on e.product_entity_id = cd.product_id
+left join vendor_data vd       on e.product_entity_id = vd.entity_id
+left join parent_sku_data psd  on e.product_entity_id = psd.product_id
+left join discontinued_data dd on e.product_entity_id = dd.product_entity_id
+left join manufacturer_data md on e.product_entity_id = md.entity_id
+left join projectile_data pd   on e.product_entity_id = pd.entity_id
+left join unit_type_data utd   on e.product_entity_id = utd.entity_id
+left join ddcaliber_data ddc   on e.product_entity_id = ddc.entity_id
+left join ddaction_data ddact  on e.product_entity_id = ddact.entity_id
+left join ddcondition_data ddcond on e.product_entity_id = ddcond.entity_id
+left join ddgun_parts_data ddgp  on e.product_entity_id = ddgp.entity_id
+left join rounds_package_data rpd on e.product_entity_id = rpd.entity_id
+left join capacity_data capacity  on e.product_entity_id = capacity.entity_id
+left join material_data material  on e.product_entity_id = material.entity_id
+left join attribute_set_data asd  on e.product_entity_id = asd.product_entity_id
+left join primary_category_data pc on e.product_entity_id = pc.entity_id
+left join ddcolor_data dc     on e.product_entity_id = dc.entity_id
+left join optic_coating_data oc on e.product_entity_id = oc.entity_id
+left join ddweapons_platform_data dwp on e.product_entity_id = dwp.entity_id
 group by 
-    e.entity_id,
+    e.product_entity_id,
     e.sku,
     cd.categories,
     vd.vendor,

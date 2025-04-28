@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: magento_customer_entities
+  - name: magento_customer_entity
     description: >
       Silver layer table containing cleaned customer data from Magento e-commerce platform.
       Contains customer profile information and account details.
