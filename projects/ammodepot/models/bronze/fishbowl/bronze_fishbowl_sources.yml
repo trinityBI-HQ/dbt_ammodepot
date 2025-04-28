@@ -115,7 +115,7 @@ sources:
       - name: carrierservice
         description: Fishbowl carrier service lookup
         columns:
-          - name: idcarrier
+          - name: id
             description: Primary key for the carrier service
             tests:
               - unique
