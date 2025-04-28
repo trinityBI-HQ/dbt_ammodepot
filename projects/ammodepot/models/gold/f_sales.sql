@@ -239,7 +239,11 @@ interaction_base AS (
         -- IDs e quantidades
         z.product_id,
         z.order_id,
-        z.quantity_ordered                                  AS qty_ordered,
+        CASE 
+        WHEN z.row_total <> 0 
+            THEN (z.qty_ordered * z.row_total) / z.row_total 
+        ELSE 0 
+        END AS qty_ordered,
 
         -- descontos
         z.discount_amount,
@@ -267,7 +271,10 @@ interaction_base AS (
 
         -- Tributação
         z.tax_amount,
-        (z.row_total - COALESCE(z.discount_amount, 0))      AS row_total,
+        z.row_total
+        - COALESCE(z.amount_refunded, 0)
+        - COALESCE(z.discount_amount, 0)
+        + COALESCE(z.discount_refunded, 0) AS row_total,
 
         -- Alias padronizado de increment_id
         o.order_increment_id                                 AS increment_id,

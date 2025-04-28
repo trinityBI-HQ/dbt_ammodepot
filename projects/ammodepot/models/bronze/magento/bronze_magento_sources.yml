@@ -67,15 +67,7 @@ sources:
             tests:
               - unique
               - not_null
-              
-      - name: eav_attribute_option_value
-        description: Values for attribute options
-        columns:
-          - name: value_id
-            description: Primary key for option value
-            tests:
-              - unique
-              - not_null
+
               
       - name: store
         description: List of stores
@@ -182,4 +174,87 @@ sources:
             tests:
               - unique
               - not_null
+      - name: catalog_product_entity_varchar
+        description: Raw varchar attributes for products
+        columns:
+          - name: value_id
+            description: PK for the varchar attribute
+            tests:
+              - unique
+              - not_null
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: catalog_product_entity_decimal
+        description: Raw decimal attributes for products
+        columns:
+          - name: value_id
+            description: PK for the decimal attribute
+            tests:
+              - unique
+              - not_null
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: catalog_product_entity_int
+        description: Raw int attributes for products
+        columns:
+          - name: value_id
+            description: PK for the int attribute
+            tests:
+              - unique
+              - not_null
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: catalog_product_entity_text
+        description: Raw text attributes for products
+        columns:
+          - name: value_id
+            description: PK for the text attribute
+            tests:
+              - unique
+              - not_null
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: eav_attribute_option_value
+        description: Valores de opções de atributo
+        columns:
+          - name: option_id
+            description: PK do option_value
+            tests:
+              - unique
+              - not_null
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: eav_attribute_set
+        description: Conjuntos de atributos (attribute sets)
+        columns:
+          - name: attribute_set_id
+            description: PK do attribute_set
+            tests:
+              - unique
+              - not_null
+          - name: attribute_set_name
+
+      - name: eav_attribute
+        description: Conjuntos de atributos (attribute sets)
+        columns:
+          - name: attribute_id
+            description: PK do attribute_set
+            tests:
+              - unique
+              - not_null
+          - name: attribute_name          
 
