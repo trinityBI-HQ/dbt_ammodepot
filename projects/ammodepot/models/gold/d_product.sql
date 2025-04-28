@@ -1,5 +1,7 @@
-{{ config(materialized='table') }}
-
+{{ config(
+    materialized = 'table',
+    schema       = 'gold'
+) }}
 with attribute_id_cte as (
     select attribute_id, attribute_code
     from {{ ref('magento_eav_attribute') }}
