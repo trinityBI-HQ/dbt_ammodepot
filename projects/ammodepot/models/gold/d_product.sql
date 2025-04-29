@@ -281,6 +281,45 @@ ddweapons_platform_data as (
 
     where cpi.attribute_id = 756
       and cpi.store_id = 0
+),
+vendorpartscost AS (
+    select
+        datelastmodified,
+        partid,
+        lastcost,
+        ROW_NUMBER() OVER (PARTITION BY partid ORDER BY datelastmodified DESC) AS rn
+    FROM
+        {{ ref('fishbowl_vendor_parts') }}
+),
+
+vendorlast AS ( 
+    SELECT
+        datelastmodified,
+        partid,
+        lastcost
+    FROM
+        vendorpartscost
+    WHERE
+        rn = 1
+),
+
+Fishbowl_Conversion AS (
+    SELECT 
+        pr.product_number, 
+        AVG(uom.multiply_factor) AS CONVERT,
+        AVG(pc.average_cost) AS AVGCOST,
+        AVG(vp.lastcost) AS LASTVENDORCOST
+    FROM
+        {{ ref('fishbowl_product') }} pr
+    LEFT JOIN
+        {{ ref('fishbowl_uomconversion') }} uom ON pr.uom_id = uom.from_uom_id AND uom.to_uom_id = 1
+    LEFT JOIN
+        {{ ref('fishbowl_partcost') }} pc ON pr.part_id = pc.part_id
+    LEFT JOIN
+        vendorlast vp ON pr.part_id = vp.partid
+
+    group by
+     pr.product_number
 )
 
 SELECT
@@ -317,7 +356,10 @@ SELECT
     MAX(dwp.ddweapons_platform)                       AS "DD Weapons Platform",
     MAX(CASE WHEN va.attribute_code = 'thread_pattern' THEN va.value END) AS "Thread Pattern",
     MAX(CASE WHEN va.attribute_code = 'thread_type'    THEN va.value END) AS "Thread Type",
-    MAX(CASE WHEN va.attribute_code = 'model'          THEN va.value END) AS "Model"
+    MAX(CASE WHEN va.attribute_code = 'model'          THEN va.value END) AS "Model",
+    Coalesce(MAX(fbc.CONVERT),1) AS CONVERT,
+    MAX(fbc.avgcost) AS AVGCOST,
+    MAX(fbc.LASTVENDORCOST) AS LASTVENDORCOST
 FROM {{ ref('magento_catalog_product_entity') }} e
 LEFT JOIN varchar_attributes            va   ON e.product_entity_id = va.entity_id
 LEFT JOIN int_attributes                ia   ON e.product_entity_id = ia.entity_id
@@ -342,6 +384,7 @@ LEFT JOIN ddgun_parts_data              ddgp ON e.product_entity_id = ddgp.entit
 LEFT JOIN ddcolor_data                  dc   ON e.product_entity_id = dc.entity_id
 LEFT JOIN optic_coating_data            oc   ON e.product_entity_id = oc.entity_id
 LEFT JOIN ddweapons_platform_data       dwp  ON e.product_entity_id = dwp.entity_id
+LEFT JOIN Fishbowl_Conversion           fbc  ON e.sku = fbc.product_number
 GROUP BY
     e.product_entity_id,
     e.sku,
