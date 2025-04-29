@@ -120,3 +120,12 @@ sources:
             tests:
               - unique
               - not_null
+
+      - name: vendorparts
+        description: Fishbowl Vendorparts data
+        columns:
+          - name: id
+            description: Primary key for Vendor Parts
+            tests:
+              - unique
+              - not_null
