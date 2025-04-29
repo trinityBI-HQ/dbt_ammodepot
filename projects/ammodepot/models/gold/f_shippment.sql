@@ -94,58 +94,58 @@ service AS (
 
 f_ship AS (
     SELECT
-        COALESCE(so.shipping_amount, 0)              AS shipping_amount,
-        COALESCE(so.base_shipping_amount, 0)         AS base_shipping_amount,
-        COALESCE(so.base_shipping_canceled, 0)       AS base_shipping_canceled,
-        COALESCE(so.base_shipping_discount_amount, 0) AS base_shipping_discount_amount,
-        COALESCE(so.base_shipping_refunded, 0)       AS base_shipping_refunded,
-        COALESCE(so.base_shipping_tax_amount, 0)     AS base_shipping_tax_amount,
-        COALESCE(so.base_shipping_tax_refunded, 0)   AS base_shipping_tax_refunded,
-        so.order_increment_id                             AS id,
-        so.order_id                                AS order_id,
-        so.customer_email                           AS customer_email,
-        so.carrier_type                             AS carrier_type,
+        COALESCE(so.shipping_amount, 0)              AS SHIPPING_AMOUNT,
+        COALESCE(so.base_shipping_amount, 0)         AS BASE_SHIPPING_AMOUNT,
+        COALESCE(so.base_shipping_canceled, 0)       AS BASE_SHIPPING_CANCELED,
+        COALESCE(so.base_shipping_discount_amount, 0) AS BASE_SHIPPING_DISCOUNT_AMOUNT,
+        COALESCE(so.base_shipping_refunded, 0)       AS BASE_SHIPPING_REFUNDED,
+        COALESCE(so.base_shipping_tax_amount, 0)     AS BASE_SHIPPING_TAX_AMOUNT,
+        COALESCE(so.base_shipping_tax_refunded, 0)   AS BASE_SHIPPING_TAX_REFUNDED,
+        so.order_increment_id                       AS ID,
+        so.order_id                                 AS ORDER_ID,
+        so.customer_email                           AS CUSTOMER_EMAIL,
+        so.carrier_type                             AS CARRIER_TYPE,
         CONVERT_TIMEZONE(
-        'UTC',
-        'America/New_York',
-        CAST(so.created_at AS timestamp)
-        )                                           AS created_at,
+            'UTC',
+            'America/New_York',
+            CAST(so.created_at AS timestamp)
+        )                                           AS CREATED_AT,
         so.customer_firstname
         || ' '
-        || so.customer_lastname          AS customer_name,
-        so.shipping_address_id                     AS billing_address,
-        so.shipping_method                         AS shipping_information,
-        so.store_id                                AS store_id,
-        so.shipping_description                    AS shipping_description,
-        sg.shipment_status_code                         AS shipment_status,
-        sg.shipping_address_text                        AS shipping_address,
-        sg.shipping_name                           AS shipping_name,
-        so.order_status                                  AS status,
-        sg.shipping_information                    AS shipping_information2,
-        c.method                                   AS method,
-        c.carrier_title                            AS carrier_title,
-        addr.postcode                              AS postcode,
-        addr.country_code                            AS country,
-        addr.region                                AS region,
-        addr.city                                  AS city,
-        addr.phone_number                             AS telephone,
-        fi.freightamount                           AS freightamount,
-        fi.net_amount                              AS net_amount,
-        fi.packagenumb                             AS packagenumb,
-        fi.freightweight                           AS freightweight,
-        q.ext_shipping_info                        AS ext_shipping_info,
+        || so.customer_lastname                     AS CUSTOMER_NAME,
+        so.shipping_address_id                      AS BILLING_ADDRESS,
+        so.shipping_method                          AS SHIPPING_INFORMATION,
+        so.store_id                                 AS STORE_ID,
+        so.shipping_description                     AS SHIPPING_DESCRIPTION,
+        sg.shipment_status_code                     AS SHIPMENT_STATUS,
+        sg.shipping_address_text                    AS SHIPPING_ADDRESS,
+        sg.shipping_name                            AS SHIPPING_NAME,
+        so.order_status                             AS STATUS,
+        sg.shipping_information                     AS SHIPPING_INFORMATION2,
+        c.method                                    AS METHOD,
+        c.carrier_title                             AS CARRIER_TITLE,
+        addr.postcode                               AS POSTCODE,
+        addr.country_code                           AS COUNTRY,
+        addr.region                                 AS REGION,
+        addr.city                                   AS CITY,
+        addr.phone_number                           AS TELEPHONE,
+        fi.freightamount                            AS FREIGHTAMOUNT,
+        fi.net_amount                               AS NET_AMOUNT,
+        fi.packagenumb                              AS PACKAGENUMB,
+        fi.freightweight                            AS FREIGHTWEIGHT,
+        q.ext_shipping_info                         AS EXT_SHIPPING_INFO,
         CASE WHEN so.base_subtotal >= 140 THEN 'Yes' ELSE 'No' END
-                                                  AS is_free,
-        fi.carrierserviceid                        AS carrierserviceid,
+                                                   AS ISFREE,
+        fi.carrierserviceid                         AS CARRIERSERVICEID,
         CASE WHEN fo.quote_id IS NOT NULL THEN 'Yes' ELSE 'No' END
-                                                  AS is_free_auto
+                                                   AS ISFREEAUTO
     FROM {{ ref('magento_sales_order') }}               AS so
     LEFT JOIN {{ ref('magento_sales_shipment_grid') }}  AS sg
       ON CAST(so.order_id           AS VARCHAR) = CAST(sg.order_id           AS VARCHAR)
     LEFT JOIN codes                                   AS c
       ON CAST(so.shipping_method     AS VARCHAR) = CAST(c.code                 AS VARCHAR)
     LEFT JOIN address                                AS addr
-      ON CAST(so.shipping_address_id AS VARCHAR) = CAST(addr.order_address_id         AS VARCHAR)
+      ON CAST(so.shipping_address_id AS VARCHAR) = CAST(addr.order_address_id AS VARCHAR)
     LEFT JOIN freightinfo                            AS fi
       ON CAST(so.order_id           AS VARCHAR) = CAST(fi.order_magento       AS VARCHAR)
     LEFT JOIN {{ ref('magento_quote') }}              AS q
@@ -155,8 +155,45 @@ f_ship AS (
 )
 
 SELECT
-    fs.*,
-    svc.carrierservice
+    fs.SHIPPING_AMOUNT,
+    fs.BASE_SHIPPING_AMOUNT,
+    fs.BASE_SHIPPING_CANCELED,
+    fs.BASE_SHIPPING_DISCOUNT_AMOUNT,
+    fs.BASE_SHIPPING_REFUNDED,
+    fs.BASE_SHIPPING_TAX_AMOUNT,
+    fs.BASE_SHIPPING_TAX_REFUNDED,
+    fs.ID,
+    fs.ORDER_ID,
+    fs.CUSTOMER_EMAIL,
+    fs.CARRIER_TYPE,
+    fs.CREATED_AT,
+    fs.CUSTOMER_NAME,
+    fs.BILLING_ADDRESS,
+    fs.SHIPPING_INFORMATION,
+    fs.STORE_ID,
+    fs.SHIPPING_DESCRIPTION,
+    fs.SHIPMENT_STATUS,
+    fs.SHIPPING_ADDRESS,
+    fs.SHIPPING_NAME,
+    fs.STATUS,
+    fs.SHIPPING_INFORMATION2,
+    fs.METHOD,
+    fs.CARRIER_TITLE,
+    fs.POSTCODE,
+    fs.COUNTRY,
+    fs.REGION,
+    fs.CITY,
+    fs.TELEPHONE,
+    fs.FREIGHTAMOUNT,
+    fs.NET_AMOUNT,
+    fs.PACKAGENUMB,
+    fs.FREIGHTWEIGHT,
+    fs.EXT_SHIPPING_INFO,
+    fs.ISFREE,
+    fs.CARRIERSERVICEID,
+    fs.ISFREEAUTO,
+    svc.idcarrier   AS IDCARRIER,
+    svc.carrierservice AS CARRIERSERVICE
 FROM f_ship AS fs
 LEFT JOIN service AS svc
-  ON CAST(fs.carrierserviceid     AS VARCHAR) = CAST(svc.idcarrier          AS VARCHAR)
+  ON CAST(fs.CARRIERSERVICEID   AS VARCHAR) = CAST(svc.idcarrier      AS VARCHAR)

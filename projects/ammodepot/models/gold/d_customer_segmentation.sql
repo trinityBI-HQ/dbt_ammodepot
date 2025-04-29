@@ -21,7 +21,7 @@ total_purchases AS (
     FROM {{ ref('f_sales') }}           AS fs
     JOIN customer_base                 AS cb 
       ON fs.customer_email = cb.customer_email
-    WHERE fs.order_status IN ('PROCESSING','COMPLETE','UNVERIFIED')
+    WHERE fs.status IN ('PROCESSING','COMPLETE','UNVERIFIED')
     GROUP BY cb.rank_id
 ),
 
@@ -54,7 +54,7 @@ customer_sales AS (
         date_trunc('month', convert_timezone('UTC','America/New_York',current_date))
       )
       AND fs.created_at < date_trunc('month', convert_timezone('UTC','America/New_York',current_date))
-      AND fs.order_status IN ('PROCESSING','COMPLETE','UNVERIFIED')
+      AND fs.status IN ('PROCESSING','COMPLETE','UNVERIFIED')
     GROUP BY cb.rank_id
 ),
 
@@ -200,8 +200,24 @@ customer_entity_cte AS (
 
 -- Final join & filter
 SELECT
-    s.*,
-    COALESCE(cg.customer_group_code, 'Not Registered') AS customer_group
+    s.customer_email                  AS CUSTOMER_EMAIL,
+    s.rank_id                         AS RANK_ID,
+    s.number_of_purchases             AS NUMBER_OF_PURCHASES,
+    s.total_revenue                   AS TOTAL_REVENUE,
+    s.margin                          AS MARGIN,
+    s.days_since_last_purchase        AS DAYS_SINCE_LAST_PURCHASE,
+    s.total_purchases_all_time        AS TOTAL_PURCHASES_ALL_TIME,
+    s.frequency                       AS FREQUENCY,
+    s.frequency_int                   AS FREQUENCY_INT,
+    s.recency                         AS RECENCY,
+    s.recency_int                     AS RECENCY_INT,
+    s.value                           AS VALUE,
+    s.value_int                       AS VALUE_INT,
+    s.margin_classification           AS MARGIN_CLASSIFICATION,
+    s.margin_int                      AS MARGIN_INT,
+    s.monetary_value                  AS MONETARY_VALUE,
+    s.customer_classification         AS CUSTOMER_CLASSIFICATION,
+    COALESCE(cg.customer_group_code, 'Not Registered') AS CUSTOMER_GROUP
 FROM Segmentation            AS s
 LEFT JOIN customer_entity_cte AS ce 
   ON s.customer_email = ce.customer_email
