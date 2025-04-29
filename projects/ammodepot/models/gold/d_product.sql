@@ -283,70 +283,69 @@ ddweapons_platform_data as (
       and cpi.store_id = 0
 )
 
-select
-    e.product_entity_id    as product_id,
-    e.sku,
-    max(case when va.attribute_code = 'name'           then va.value end) as product_name,
-    max(case when va.attribute_code = 'suggested_use'  then va.value end) as general_purpose,
-    max(case when va.attribute_code = 'url_key'        then concat('https://www.ammunitiondepot.com/', va.value) end) as product_url,
-    max(case when va.attribute_code = 'image'          then concat('https://www.ammunitiondepot.com/media/catalog/product', va.value) end) as product_image_url,
-    vd.vendor    as vendor,
-    dd.discontinued as discontinued,
-    psd.parent_sku as parent_sku,
-    coalesce(psd.parent_sku, e.sku) as grouped_sku,
-    max(case when va.attribute_code = 'boxes_case'     then va.value end) as boxes_case,
-    max(case when va.attribute_code = 'caliber'        then va.value end) as caliber,
-    max(case when va.attribute_code = 'manufacturer_sku' then va.value end) as manufacturer_sku,
-    max(case when va.attribute_code = 'upc'            then va.value end) as upc,
-    max(md.manufacturer)   as manufacturer,
-    max(pd.projectile)     as projectile,
-    max(utd.unit_type)     as unit_type,
-    max(rpd.rounds_package) as rounds_package,
-    max(asd.attribute_set_name) as attribute_set,
-    cd.categories          as categories,
-    max(case when va.attribute_code = 'gun_type'      then va.value end) as gun_type,
-    max(ddc.ddcaliber)     as ddcaliber,
-    max(ddact.ddaction)    as ddaction,
-    max(ddcond.ddcondition) as ddcondition,
-    max(ddgp.ddgun_parts)  as ddgun_parts,
-    max(capacity.capacity) as capacity,
-    max(material.material) as material,
-    max(pc.primary_category) as primary_category,
-    max(dc.ddcolor)         as ddcolor,
-    max(oc.optic_coating)   as optic_coating,
-    max(dwp.ddweapons_platform) as ddweapons_platform,
-    max(case when va.attribute_code = 'thread_pattern' then va.value end) as thread_pattern,
-    max(case when va.attribute_code = 'thread_type'    then va.value end) as thread_type,
-    max(case when va.attribute_code = 'model'          then va.value end) as model
-from {{ ref('magento_catalog_product_entity') }} e
-left join varchar_attributes va on e.product_entity_id = va.entity_id
-left join int_attributes ia    on e.product_entity_id = ia.entity_id
-left join decimal_attributes da on e.product_entity_id = da.entity_id
-left join text_attributes ta   on e.product_entity_id = ta.entity_id
-left join category_data cd     on e.product_entity_id = cd.product_id
-left join vendor_data vd       on e.product_entity_id = vd.entity_id
-left join parent_sku_data psd  on e.product_entity_id = psd.product_id
-left join discontinued_data dd on e.product_entity_id = dd.product_entity_id
-left join manufacturer_data md on e.product_entity_id = md.entity_id
-left join projectile_data pd   on e.product_entity_id = pd.entity_id
-left join unit_type_data utd   on e.product_entity_id = utd.entity_id
-left join ddcaliber_data ddc   on e.product_entity_id = ddc.entity_id
-left join ddaction_data ddact  on e.product_entity_id = ddact.entity_id
-left join ddcondition_data ddcond on e.product_entity_id = ddcond.entity_id
-left join ddgun_parts_data ddgp  on e.product_entity_id = ddgp.entity_id
-left join rounds_package_data rpd on e.product_entity_id = rpd.entity_id
-left join capacity_data capacity  on e.product_entity_id = capacity.entity_id
-left join material_data material  on e.product_entity_id = material.entity_id
-left join attribute_set_data asd  on e.product_entity_id = asd.product_entity_id
-left join primary_category_data pc on e.product_entity_id = pc.entity_id
-left join ddcolor_data dc     on e.product_entity_id = dc.entity_id
-left join optic_coating_data oc on e.product_entity_id = oc.entity_id
-left join ddweapons_platform_data dwp on e.product_entity_id = dwp.entity_id
-group by 
+SELECT
+    e.product_entity_id                               AS "Product ID",
+    e.sku                                             AS SKU,
+    MAX(CASE WHEN va.attribute_code = 'name'            THEN va.value END) AS "Product Name",
+    MAX(CASE WHEN va.attribute_code = 'suggested_use'   THEN va.value END) AS "General Purpose",
+    MAX(CASE WHEN va.attribute_code = 'url_key'         THEN CONCAT('https://www.ammunitiondepot.com/', va.value) END) AS "Product URL",
+    MAX(CASE WHEN va.attribute_code = 'image'           THEN CONCAT('https://www.ammunitiondepot.com/media/catalog/product', va.value) END) AS "Product Image URL",
+    vd.vendor                                         AS "Vendor",
+    dd.discontinued                                   AS "Discontinued",
+    psd.parent_sku                                    AS "Parent SKU",
+    COALESCE(psd.parent_sku, e.sku)                   AS GROUPED_SKU,
+    MAX(CASE WHEN va.attribute_code = 'boxes_case'      THEN va.value END) AS "Boxes/Case",
+    MAX(CASE WHEN va.attribute_code = 'caliber'         THEN va.value END) AS "Caliber",
+    MAX(CASE WHEN va.attribute_code = 'manufacturer_sku' THEN va.value END) AS "Manufacturer SKU",
+    MAX(CASE WHEN va.attribute_code = 'upc'             THEN va.value END) AS UPC,
+    MAX(md.manufacturer)                              AS "Manufacturer",
+    MAX(pd.projectile)                                AS "Projectile",
+    MAX(utd.unit_type)                                AS "Unit Type",
+    MAX(rpd.rounds_package)                           AS "Rounds/Package",
+    MAX(asd.attribute_set_name)                       AS "Attribute Set",
+    cd.categories                                     AS "Categories",
+    MAX(CASE WHEN va.attribute_code = 'gun_type'       THEN va.value END) AS "Gun Type",
+    MAX(ddc.ddcaliber)                                AS "DD Caliber",
+    MAX(ddact.ddaction)                               AS "DD Gun Action",
+    MAX(ddcond.ddcondition)                           AS "DD Condition",
+    MAX(ddgp.ddgun_parts)                             AS "DD Gun Parts",
+    MAX(capacity.capacity)                            AS "Capacity",
+    MAX(material.material)                            AS "Material",
+    MAX(pc.primary_category)                          AS "Primary Category",
+    MAX(dc.ddcolor)                                   AS "DD Color",
+    MAX(oc.optic_coating)                             AS "Optic Coating",
+    MAX(dwp.ddweapons_platform)                       AS "DD Weapons Platform",
+    MAX(CASE WHEN va.attribute_code = 'thread_pattern' THEN va.value END) AS "Thread Pattern",
+    MAX(CASE WHEN va.attribute_code = 'thread_type'    THEN va.value END) AS "Thread Type",
+    MAX(CASE WHEN va.attribute_code = 'model'          THEN va.value END) AS "Model"
+FROM {{ ref('magento_catalog_product_entity') }} e
+LEFT JOIN varchar_attributes            va   ON e.product_entity_id = va.entity_id
+LEFT JOIN int_attributes                ia   ON e.product_entity_id = ia.entity_id
+LEFT JOIN decimal_attributes            da   ON e.product_entity_id = da.entity_id
+LEFT JOIN text_attributes               ta   ON e.product_entity_id = ta.entity_id
+LEFT JOIN category_data                 cd   ON e.product_entity_id = cd.product_id
+LEFT JOIN vendor_data                   vd   ON e.product_entity_id = vd.entity_id
+LEFT JOIN parent_sku_data               psd  ON e.product_entity_id = psd.product_id
+LEFT JOIN discontinued_data             dd   ON e.product_entity_id = dd.product_entity_id
+LEFT JOIN manufacturer_data             md   ON e.product_entity_id = md.entity_id
+LEFT JOIN projectile_data               pd   ON e.product_entity_id = pd.entity_id
+LEFT JOIN unit_type_data                utd  ON e.product_entity_id = utd.entity_id
+LEFT JOIN rounds_package_data           rpd  ON e.product_entity_id = rpd.entity_id
+LEFT JOIN capacity_data                 capacity ON e.product_entity_id = capacity.entity_id
+LEFT JOIN material_data                 material ON e.product_entity_id = material.entity_id
+LEFT JOIN attribute_set_data            asd  ON e.product_entity_id = asd.product_entity_id
+LEFT JOIN primary_category_data         pc   ON e.product_entity_id = pc.entity_id
+LEFT JOIN ddcaliber_data                ddc  ON e.product_entity_id = ddc.entity_id
+LEFT JOIN ddaction_data                 ddact ON e.product_entity_id = ddact.entity_id
+LEFT JOIN ddcondition_data              ddcond ON e.product_entity_id = ddcond.entity_id
+LEFT JOIN ddgun_parts_data              ddgp ON e.product_entity_id = ddgp.entity_id
+LEFT JOIN ddcolor_data                  dc   ON e.product_entity_id = dc.entity_id
+LEFT JOIN optic_coating_data            oc   ON e.product_entity_id = oc.entity_id
+LEFT JOIN ddweapons_platform_data       dwp  ON e.product_entity_id = dwp.entity_id
+GROUP BY
     e.product_entity_id,
     e.sku,
     cd.categories,
     vd.vendor,
     dd.discontinued,
     psd.parent_sku
-

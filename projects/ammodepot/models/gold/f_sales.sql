@@ -638,53 +638,54 @@ filtered_cost_final AS (
 )
 
 SELECT
-    l.created_at,
-    l.timedate,
-    l.order_item_id,
-    l.increment_id,
-    l.tiniciodahora_copiar        AS "Inicio da Hora - Copiar",
-    l.product_id,
-    l.order_id,
-    l.trickat,
-    l.product_options,
-    l.product_type,
-    l.parent_item_id,
-    l.testsku,
-    l.conversion,
-    l.tiniciodahora               AS "Inicio da Hora",
-    l.customer_email,
-    l.postcode,
-    l.country,
-    l.region,
-    l.city,
-    l.street,
-    l.telephone,
-    l.customer_name,
-    l.store_id,
-    l.status,
-    l.row_total,
-    COALESCE(l.cost, fcf.cost * l.qty_ordered) AS cost,
-    l.qty_ordered,
-    l.freight_revenue,
-    l.freight_cost,
-    l.testc,
-    l.testr,
-    l.testfr,
-    l.testfc,
-    l.vendor,
-    l.customer_id,
-    cu.rank_id,
-    COALESCE(l.part_qty_sold, l.qty_ordered)   AS part_qty_sold
+    l.created_at                            AS CREATED_AT,
+    l.timedate                              AS TIMEDATE,
+    l.order_item_id                         AS ID,
+    l.increment_id                          AS INCREMENT_ID,
+    l.tiniciodahora_copiar                  AS "Início da Hora - Copiar",
+    l.product_id                            AS PRODUCT_ID,
+    l.order_id                              AS ORDER_ID,
+    l.trickat                               AS TRICKAT,
+    l.product_options                       AS PRODUCT_OPTIONS,
+    l.product_type                          AS PRODUCT_TYPE,
+    l.parent_item_id                        AS PARENT_ITEM_ID,
+    l.testsku                               AS TESTSKU,
+    l.conversion                            AS CONVERSION,
+    l.tiniciodahora                         AS "Início da Hora",
+    l.customer_email                        AS CUSTOMER_EMAIL,
+    l.postcode                              AS POSTCODE,
+    l.country                               AS COUNTRY,
+    l.region                                AS REGION,
+    l.city                                  AS CITY,
+    l.street                                AS STREET,
+    l.telephone                             AS TELEPHONE,
+    l.customer_name                         AS CUSTOMER_NAME,
+    l.store_id                              AS STORE_ID,
+    l.status                                AS STATUS,
+    l.row_total                             AS ROW_TOTAL,
+    COALESCE(l.cost, fcf.cost * l.qty_ordered) AS COST,
+    l.qty_ordered                           AS QTY_ORDERED,
+    l.freight_revenue                       AS FREIGHT_REVENUE,
+    l.freight_cost                          AS FREIGHT_COST,
+    l.testc                                 AS TESTC,
+    l.testr                                 AS TESTR,
+    l.testfr                                AS TESTFR,
+    l.testfc                                AS TESTFC,
+    l.vendor                                AS VENDOR,
+    l.customer_id                           AS CUSTOMER_ID,
+    cu.rank_id                              AS RANK_ID,
+    COALESCE(l.part_qty_sold, l.qty_ordered) AS PART_QTY_SOLD
 FROM last l
 LEFT JOIN filtered_cost_final fcf
-       ON fcf.product_id = l.product_id
-LEFT JOIN {{ref ("magento_d_customerupdated")}} cu
-       ON LOWER(
-            COALESCE(
-                NULLIF(l.customer_email, ''),
-                'customer@nonidentified.com'
-            )
-          ) = cu.customer_email
+  ON fcf.product_id = l.product_id
+LEFT JOIN {{ ref("magento_d_customerupdated") }} cu
+  ON LOWER(
+        COALESCE(
+          NULLIF(l.customer_email, ''),
+          'customer@nonidentified.com'
+        )
+     ) = cu.customer_email
 WHERE l.product_type <> 'configurable'
+
 
 
