@@ -642,7 +642,7 @@ filtered_cost_final AS (
         SUM(qty)                        AS qty,
         MAX(trickat)                    AS trickat      -- só informativo
     FROM filtered_cost_prep
-    GROUP BY product_id
+    GROUP BY product_id, trickat
 )
 
 SELECT
