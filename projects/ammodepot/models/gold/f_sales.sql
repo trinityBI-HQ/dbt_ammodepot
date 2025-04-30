@@ -307,7 +307,7 @@ interaction_base AS (
         z.vendor_id
     FROM {{ ref('magento_sales_order_item') }}        AS z
     LEFT JOIN {{ ref('magento_sales_order') }}         AS o ON z.order_id           = o.order_id
-    LEFT JOIN {{ ref('magento_sales_order_address') }} AS a ON o.billing_address_id = a.order_id
+    LEFT JOIN {{ ref('magento_sales_order_address') }} AS a ON o.billing_address_id = a.order_address_id
     LEFT JOIN cost_unique_magento_id                   AS u ON z.order_item_id      = u.id_magento
     LEFT JOIN cost_duplicate_magento_id_product        AS d ON z.order_item_id      = d.id_magento
                                                          AND z.product_id        = d.id_produto_magento
@@ -318,8 +318,8 @@ interaction_base AS (
 -- Pega a última data de custo por produto
 last_day_cost_all AS (
     SELECT
-        ib.product_id,
-        MAX(ib.created_at)     AS last_scheduled_date
+        CAST(ib.product_id AS VARCHAR) AS product_id,
+        MAX(ib.created_at) AS last_scheduled_date
     FROM interaction_base AS ib
     WHERE ib.cost > 0
       AND ib.qty_ordered > 0
@@ -331,20 +331,24 @@ filtered_cost_all_prep AS (
     SELECT
         ib.product_id,
         ib.cost,
-        ib.qty_ordered         AS qty,
+        ib.qty_ordered AS qty,
         ib.created_at
     FROM interaction_base AS ib
-    JOIN last_day_cost_all   AS ld
-      ON ib.product_id = ld.product_id
+    JOIN last_day_cost_all AS ld
+      ON CAST(ib.product_id AS VARCHAR) = ld.product_id
      AND ib.created_at = ld.last_scheduled_date
+    WHERE ib.cost > 0
+      AND ib.qty_ordered > 0
 ),
 
 filtered_cost_all AS (
     SELECT
         product_id,
-        cost,
-        qty
+        SUM(cost) AS cost,
+        SUM(qty) AS qty,
+        created_at
     FROM filtered_cost_all_prep
+    GROUP BY product_id, created_at
 ),
 -- UPS shipment costs (Magento source)
 ups_shipment_cost AS (
@@ -501,29 +505,25 @@ skubase AS (
         /* % do peso da linha em relação ao pedido */
         ib.weight / NULLIF(mow.total_weight, 0)            AS percentage,
 
-        /* Receita de frete alocada à linha (mesma lógica do Snowflake) */
         CASE
             WHEN mow.total_weight IS NULL
-                 AND ib.testsku NOT ILIKE '%parceldefender%' THEN
-                 (ib.qty_ordered * mo.net_sales)
-                 / NULLIF(mow.product_count, 0)
+                AND ib.testsku NOT ILIKE '%parceldefender%' THEN
+                (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0) * mo.net_sales)
+                / NULLIF(mow.product_count * (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0)), 0)
             ELSE
-                 (ib.weight * mo.net_sales)
-                 / NULLIF(mow.total_weight, 0)
-        END                                               AS freight_revenue,
+                (ib.weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0) * mo.net_sales)
+                / NULLIF(mow.total_weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0), 0)
+        END AS freight_revenue,
 
-        
         CASE
             WHEN mow.total_weight IS NULL
-                 AND ib.testsku NOT ILIKE '%parceldefender%' THEN
-                 (ib.qty_ordered * mo.freight_amount)
-                 / NULLIF(mow.product_count, 0)
+                AND ib.testsku NOT ILIKE '%parceldefender%' THEN
+                (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0))
+                / NULLIF(mow.product_count * (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0)), 0) * mo.freight_amount
             ELSE
-                 (ib.weight * mo.freight_amount)
-                 / NULLIF(mow.total_weight, 0)
-        END                                               AS freight_cost,
-
-                                
+                (ib.weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0))
+                / NULLIF(mow.total_weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0), 0) * mo.freight_amount
+        END AS freight_cost,                                
         ps.part_qty_sold,
         COALESCE(ps.conversion, 1)                        AS conversion,
 
@@ -636,6 +636,7 @@ filtered_cost_final AS (
     FROM filtered_cost_prep
     GROUP BY product_id
 )
+
 
 SELECT
     l.created_at                            AS CREATED_AT,
