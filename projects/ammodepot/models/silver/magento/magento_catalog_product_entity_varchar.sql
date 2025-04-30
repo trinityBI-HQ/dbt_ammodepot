@@ -5,4 +5,4 @@
   )
 }}
 select * 
-from {{ source('magento','catalog_product_entity_text') }}
+from {{ source('magento','catalog_product_entity_varchar') }}
