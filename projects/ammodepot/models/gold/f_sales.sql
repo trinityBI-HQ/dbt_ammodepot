@@ -160,13 +160,13 @@ filtered_cost_fishbowl AS (
 -- Final Fishbowl cost
 cost_fishbowl_final AS (
     SELECT
-        COALESCE(NULLIF(b.cost,0), NULLIF(k.cost,0), fc.cost * b.qty) AS cost,
-        b.totalcost AS totalcost
+        COALESCE(NULLIF(b.total_cost,0), NULLIF(k.cost,0), fc.cost * b.quantity_ordered) AS cost,
+        b.total_cost AS totalcost,
         k.cost                            AS costbundle,
         m.magento_order_item_identity     AS magento_order,
         fc.cost                           AS costfiltered,
         pr.produto_magento                AS id_produto_magento,
-        child.mgntid                      AS id_magento,,
+        child.mgntid                      AS id_magento,
         b.so_item_id,
         b.sales_order_id,
         ca.count_of_id_magento,
@@ -181,9 +181,9 @@ cost_fishbowl_final AS (
     LEFT JOIN conversion_product        AS pr    ON b.product_id       = pr.produtofish
     LEFT JOIN magento_identities        AS m     ON b.sales_order_id   = m.code
     LEFT JOIN cost_aggregation          AS ca    ON child.mgntid       = ca.id
-    FROM {{ ref('fishbowl_product') }}      AS p     ON b.product_id       = p.product_id
+    LEFT JOIN {{ ref('fishbowl_product') }}      AS p     ON b.product_id       = p.product_id
     LEFT JOIN kit_cost_aggregation AS k ON b.so_item_id        = k.kitid
-    LEFT JOIN filtered_cost_fishbowl AS fc ON b.id_produto_fishbowl = fc.product_id
+    LEFT JOIN filtered_cost_fishbowl AS fc ON b.product_id = fc.product_id
 ),
 
 -- Costs where Magento ID is unique
@@ -374,7 +374,8 @@ fishbowl_shipment_costs AS (
         COALESCE(SUM(usc.net_amount), SUM(sc.freight_amount))     AS freight_amount,
         SUM(sc.freight_weight)                                    AS freight_weight,
         AVG(fs.carrier_service_id)                                AS carrier_service_id,
-        SUM(usc.net_amount)                                       AS amount_ups
+        SUM(usc.net_amount)                                       AS amount_ups,
+        COUNT(sc.tracking_number)    AS packagenumb
     FROM {{ ref('fishbowl_ship') }}            AS fs
     LEFT JOIN {{ ref('fishbowl_shipcarton') }} AS sc  
       ON fs.shipment_id = sc.shipment_id
@@ -396,15 +397,32 @@ magento_freight_info AS (
     GROUP BY pc.produto_magento
 ),
 
--- Allocate freight by weight inside each Magento order
+-- Allocate freight by weight inside each Magento order (Simplified)
 magento_order_items_for_freight AS (
-    SELECT
-        m.item_weight        AS weight,
-        m.order_id           AS order_id,
-        m.sku,
-        m.product_id,
-        m.quantity_ordered   AS qty_ordered
-    FROM {{ ref('magento_sales_order_item') }}  AS m
+    SELECT 
+         m.item_weight                         AS weight
+        ,m.order_id                            AS order_id
+        ,m.sku
+        ,m.product_id
+        ,m.quantity_ordered                    AS qty_ordered
+        ,CASE
+            WHEN m.row_total = 0 THEN 0
+            ELSE m.quantity_ordered            -- Simplificado: (qty * row_total)/row_total = qty
+         END                                   AS test
+        ,m.row_total
+            - COALESCE(m.amount_refunded, 0)
+            - COALESCE(m.discount_amount, 0)
+            + COALESCE(m.discount_refunded, 0)
+         AS row_total
+    FROM {{ ref('magento_sales_order_item') }} AS m
+    LEFT JOIN {{ ref('magento_catalog_product_entity') }} AS ct
+        ON m.product_id = ct.product_entity_id
+    WHERE (m.row_total 
+            - COALESCE(m.amount_refunded, 0) 
+            - COALESCE(m.discount_amount, 0) 
+            + COALESCE(m.discount_refunded, 0)) <> 0
+        AND m.quantity_ordered <> 0
+        AND ct.sku NOT ILIKE '%parceldefender%'
 ),
 
 -- Sum total weight per order
@@ -417,12 +435,13 @@ magento_order_weight AS (
     GROUP BY order_id
 ),
 
--- Allocate shipping cost per order
+-- Allocate shipping cost per order (Fixed operator issue)
 magento_order_shipping_agg AS (
     SELECT
         ms.order_id,
         SUM(ms.shipping_amount)               AS shipping_amount,
         SUM(ms.base_shipping_amount)          AS base_shipping_amount,
+        SUM(ms.base_shipping_canceled)        AS base_shipping_canceled,
         SUM(ms.base_shipping_discount_amount) AS base_shipping_discount_amount,
         SUM(ms.base_shipping_refunded)        AS base_shipping_refunded,
         SUM(ms.base_shipping_tax_amount)      AS base_shipping_tax_amount,
@@ -432,13 +451,14 @@ magento_order_shipping_agg AS (
           - COALESCE(ms.base_shipping_tax_amount, 0)
           - COALESCE(ms.base_shipping_refunded, 0)
           + COALESCE(ms.base_shipping_tax_refunded, 0)
-        )                                      AS net_sales,
-        mfi.freight_amount
+        )   AS net_sales,
+        SUM(mfi.freight_amount) AS freight_amount
     FROM {{ ref('magento_sales_order') }}     AS ms
     LEFT JOIN magento_freight_info           AS mfi
       ON ms.order_id = mfi.order_magento
-    GROUP BY ms.order_id, mfi.freight_amount
+    GROUP BY ms.order_id
 ),
+
 -- Agrega vendas de peça para cálculo de conversão
 product_sales AS (
     SELECT
@@ -454,9 +474,17 @@ product_sales AS (
     GROUP BY s.order_item_id
 ),
 
+-- Calcular part_qty_sold em uma CTE separada
+product_qty_sold AS (
+    SELECT
+        ps.item_id,
+        s.quantity_ordered * ps.conversion AS part_qty_sold
+    FROM product_sales AS ps
+    JOIN {{ ref('magento_sales_order_item') }} AS s
+      ON ps.item_id = s.order_item_id
+),
 
-
--- Base de fatos de SKU
+-- Base de fatos de SKU (simplificada para evitar overflow, mantendo nomes originais)
 skubase AS (
     SELECT
         ib.created_at::date                                AS created_at,
@@ -513,25 +541,25 @@ skubase AS (
         /* % do peso da linha em relação ao pedido */
         ib.weight / NULLIF(mow.total_weight, 0)            AS percentage,
 
+        /* Cálculo de freight_revenue simplificado mas mantendo a lógica original */
         CASE
             WHEN mow.total_weight IS NULL
                 AND ib.testsku NOT ILIKE '%parceldefender%' THEN
-                (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0) * mo.net_sales)
-                / NULLIF(mow.product_count * (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0)), 0)
+                mo.net_sales / NULLIF(mow.product_count, 1)
             ELSE
-                (ib.weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0) * mo.net_sales)
-                / NULLIF(mow.total_weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0), 0)
+                (ib.weight / NULLIF(mow.total_weight, 0)) * mo.net_sales
         END AS freight_revenue,
 
+        /* Cálculo de freight_cost simplificado mas mantendo a lógica original */
         CASE
             WHEN mow.total_weight IS NULL
                 AND ib.testsku NOT ILIKE '%parceldefender%' THEN
-                (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0))
-                / NULLIF(mow.product_count * (ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0)), 0) * mo.freight_amount
+                mo.freight_amount / NULLIF(mow.product_count, 1)
             ELSE
-                (ib.weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0))
-                / NULLIF(mow.total_weight * ib.qty_ordered * ib.row_total / NULLIF(ib.row_total, 0), 0) * mo.freight_amount
+                (ib.weight / NULLIF(mow.total_weight, 0)) * mo.freight_amount
         END AS freight_cost,                                
+        
+        -- Mantendo referência original, precisamos garantir que seja incluído corretamente
         ps.part_qty_sold,
         COALESCE(ps.conversion, 1)                        AS conversion,
 
