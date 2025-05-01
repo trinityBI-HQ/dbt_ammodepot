@@ -161,7 +161,7 @@ filtered_cost_fishbowl AS (
 cost_fishbowl_final AS (
     SELECT
         COALESCE(NULLIF(b.total_cost,0), NULLIF(k.cost,0), fc.cost * b.quantity_ordered) AS cost,
-        b.total_cost AS totalcost,
+        b.total_cost as totalcost,
         k.cost                            AS costbundle,
         m.magento_order_item_identity     AS magento_order,
         fc.cost                           AS costfiltered,
