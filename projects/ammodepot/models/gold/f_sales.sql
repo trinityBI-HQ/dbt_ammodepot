@@ -141,7 +141,7 @@ last_day_cost_fishbowl AS (
         id_produto_fishbowl             AS product_id,
         MAX(scheduled_fulfillment_date) AS last_scheduled_date
     FROM cost_fishbowl_base
-    WHERE cost > 0
+    WHERE cost IS NOT NULL AND cost > 0
     GROUP BY id_produto_fishbowl
 ),
 
@@ -153,15 +153,20 @@ filtered_cost_fishbowl AS (
     JOIN last_day_cost_fishbowl     AS ld
       ON f.id_produto_fishbowl         = ld.product_id
      AND f.scheduled_fulfillment_date = ld.last_scheduled_date
-    WHERE f.cost > 0
+    WHERE f.cost IS NOT NULL AND f.cost > 0
     GROUP BY f.id_produto_fishbowl
 ),
 
 -- Final Fishbowl cost
 cost_fishbowl_final AS (
     SELECT
+<<<<<<< HEAD
         COALESCE(NULLIF(b.cost,0), NULLIF(k.cost,0), fc.cost * b.qty) AS cost,
         b.totalcost AS totalcost
+=======
+        COALESCE(NULLIF(b.total_cost,0), NULLIF(k.cost,0)) AS cost,
+        b.total_cost as totalcost,
+>>>>>>> b3cefdd (Fixing the costs)
         k.cost                            AS costbundle,
         m.magento_order_item_identity     AS magento_order,
         fc.cost                           AS costfiltered,
