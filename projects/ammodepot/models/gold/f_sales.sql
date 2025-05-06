@@ -467,24 +467,30 @@ product_sales AS (
     SELECT
         s.order_item_id                                                   AS item_id,
         SUM(s.quantity_ordered * COALESCE(uom.multiply_factor, 1))         AS part_qty_sold,
-        AVG(COALESCE(uom.multiply_factor, 1))                              AS conversion
-    FROM {{ ref('magento_sales_order_item') }}       AS s
-    LEFT JOIN {{ ref('fishbowl_uomconversion') }}    AS uom
+        AVG(COALESCE(uom.multiply_factor, 1))                              AS conversion,
+        cpe.sku
+
+    FROM {{ ref('magento_sales_order_item') }}       AS s   
+    JOIN {{ ref('magento_sales_order')}}             AS o       ON  s.order_id = o.order_id
+    JOIN {{ ref('magento_catalog_product_entity')}}  AS cpe     ON  s.product_id = cpe.product_entity_id
+    JOIN {{ ref('fishbowl_product')}}                AS pr      ON  cpe.sku = pr.product_number
+    JOIN {{ ref('fishbowl_part')}}                   AS p       ON  pr.part_id = p.part_id
+    LEFT JOIN {{ ref('fishbowl_uomconversion') }}    AS uom     
       ON s.product_id = uom.from_uom_id
      AND uom.to_uom_id = 1
     WHERE s.product_type <> 'bundle'
       AND s.row_total <> 0
-    GROUP BY s.order_item_id
+    GROUP BY s.order_item_id, cpe.sku
 ),
 
 -- Calcular part_qty_sold em uma CTE separada
 product_qty_sold AS (
     SELECT
         ps.item_id,
-        s.quantity_ordered * ps.conversion AS part_qty_sold
+        ps.part_qty_sold,
+        ps.item_id                                                   AS item_id,
+        ps.sku
     FROM product_sales AS ps
-    JOIN {{ ref('magento_sales_order_item') }} AS s
-      ON ps.item_id = s.order_item_id
 ),
 
 -- Base de fatos de SKU (simplificada para evitar overflow, mantendo nomes originais)
@@ -546,20 +552,34 @@ skubase AS (
 
         /* Cálculo de freight_revenue simplificado mas mantendo a lógica original */
         CASE
-            WHEN mow.total_weight IS NULL
-                AND ib.testsku NOT ILIKE '%parceldefender%' THEN
-                mo.net_sales / NULLIF(mow.product_count, 1)
+            WHEN mow.total_weight IS NULL AND ib.testsku NOT ILIKE '%parceldefender%' THEN
+                -- div0null( safe_qty_from_div0 * ty.netsales, ctm.products * safe_qty_from_div0 )
+                ( (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END) * mo.net_sales )
+                /
+                NULLIF( (mow.product_count * (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END)), 0)
             ELSE
-                (ib.weight / NULLIF(mow.total_weight, 0)) * mo.net_sales
+                -- div0null( z.weight * safe_qty_from_div0 * ty.netsales, mow.total_weight * safe_qty_from_div0 )
+                ( ib.weight * (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END) * mo.net_sales )
+                /
+                NULLIF( (mow.total_weight * (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END)), 0)
         END AS freight_revenue,
 
         /* Cálculo de freight_cost simplificado mas mantendo a lógica original */
         CASE
-            WHEN mow.total_weight IS NULL
-                AND ib.testsku NOT ILIKE '%parceldefender%' THEN
-                mo.freight_amount / NULLIF(mow.product_count, 1)
+            WHEN mow.total_weight IS NULL AND ib.testsku NOT ILIKE '%parceldefender%' THEN
+                -- div0null( safe_qty_from_div0, ctm.products * safe_qty_from_div0 ) * Freightamount
+                (
+                    (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END)
+                    /
+                    NULLIF( (mow.product_count * (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END)), 0)
+                ) * mo.freight_amount
             ELSE
-                (ib.weight / NULLIF(mow.total_weight, 0)) * mo.freight_amount
+                -- div0null( z.weight * safe_qty_from_div0, mow.total_weight * safe_qty_from_div0 ) * Freightamount
+                (
+                    (ib.weight * (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END) )
+                    /
+                    NULLIF( (mow.total_weight * (CASE WHEN ib.row_total = 0 THEN 0 ELSE ib.qty_ordered END)), 0)
+                ) * mo.freight_amount
         END AS freight_cost,                                
         
         -- Mantendo referência original, precisamos garantir que seja incluído corretamente
