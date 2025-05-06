@@ -98,7 +98,10 @@ object_kit AS (
 
 kit_cost_aggregation AS (
     SELECT
-        SUM(s.total_cost)       AS cost,
+        COALESCE(
+    NULLIF(SUM(CAST(s.total_cost AS DECIMAL(38,9))),0), 
+    SUM(CAST(s.quantity_ordered AS DECIMAL(38,9)) * CAST(a.averagecost AS DECIMAL(38,9)))
+) AS cost,
         k.recordid2             AS kitid,
         SUM(a.averagecost)      AS costprocessing,
         MAX(s.quantity_ordered) AS maxqtytest
