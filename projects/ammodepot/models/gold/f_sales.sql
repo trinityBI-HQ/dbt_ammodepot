@@ -668,7 +668,7 @@ filtered_cost_final AS (
         product_id,
         SUM(cost) / NULLIF(SUM(qty), 0) AS cost,
         SUM(qty)                        AS qty,
-        MAX(trickat)                    AS trickat      -- só informativo
+        trickat                         AS trickat      -- só informativo
     FROM filtered_cost_prep
     GROUP BY product_id, trickat
 )
