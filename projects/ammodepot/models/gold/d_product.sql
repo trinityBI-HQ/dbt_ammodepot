@@ -1,5 +1,5 @@
 {{ config(
-    materialized = 'table',
+    materialized = 'view',
     schema       = 'gold'
 ) }}
 with attribute_id_cte as (
