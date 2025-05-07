@@ -8,7 +8,7 @@ models:
       and system/extension specific fields.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       # Identifiers
       - name: order_id

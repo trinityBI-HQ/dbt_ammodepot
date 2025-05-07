@@ -7,7 +7,7 @@ models:
       Includes plugin metadata and associated context.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: plugin_info_id
         description: Unique identifier for the plugin information record

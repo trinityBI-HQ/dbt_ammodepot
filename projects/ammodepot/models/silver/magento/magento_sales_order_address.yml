@@ -7,7 +7,7 @@ models:
       Includes detailed billing and shipping addresses associated with sales orders.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: order_address_id
         description: Unique identifier for the sales order address

@@ -1,11 +1,9 @@
-{# esse é o meu modelo silver, ajuste o schema se quiser #}
-{{ 
+{{
   config(
-    materialized = 'table',
-    schema       = 'silver'
-  ) 
+    materialized = 'view',
+    schema = 'silver'
+  )
 }}
-
 WITH source_data AS (
 
     SELECT

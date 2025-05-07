@@ -7,7 +7,7 @@ models:
       Represents individual store views within a Magento installation, often linked to specific languages or presentations.
     config:
       schema: silver 
-      materialized: table
+      materialized: view
     columns:
       - name: store_id
         description: "Unique identifier for the store view in Magento. This is the primary key for this table."

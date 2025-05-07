@@ -7,7 +7,7 @@ models:
       Contains customer information, account details, and preferences for sales and shipping.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: customer_id
         description: Unique identifier for the customer

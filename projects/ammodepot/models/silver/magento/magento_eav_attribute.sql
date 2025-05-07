@@ -1,8 +1,9 @@
 {{
   config(
-    materialized = 'table',
+    materialized = 'view',
     schema = 'silver'
   )
 }}
+
 select * 
 from {{ source('magento','eav_attribute') }}

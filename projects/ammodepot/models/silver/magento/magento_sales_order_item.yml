@@ -8,7 +8,7 @@ models:
       including breakdowns of invoiced/refunded amounts and fields from specific extensions.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: order_item_id
         description: Unique identifier for the sales order item.

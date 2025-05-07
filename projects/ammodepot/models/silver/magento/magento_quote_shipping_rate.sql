@@ -1,8 +1,9 @@
--- models/silver/magento/quote_shipping_rate.sql
-{{ config(
-    materialized = 'table',
-    schema       = 'silver'
-) }}
+{{
+  config(
+    materialized = 'view',
+    schema = 'silver'
+  )
+}}
 
 WITH source_data AS (
 
