@@ -7,7 +7,7 @@ models:
       Contains supplier information, account details, and procurement settings.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: vendor_id
         description: Unique identifier for the vendor

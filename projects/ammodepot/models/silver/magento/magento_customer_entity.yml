@@ -7,7 +7,7 @@ models:
       Contains customer profile information and account details.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: customer_id
         description: Unique identifier for the customer in Magento

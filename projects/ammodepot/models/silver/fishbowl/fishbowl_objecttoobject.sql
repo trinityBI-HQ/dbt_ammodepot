@@ -12,8 +12,8 @@ WITH source_data AS (
         id,
         note,
         typeid,
-        viewid1,
-        viewid2,
+        tableid1,
+        tableid2,
         recordid1,
         recordid2,
 
@@ -40,11 +40,11 @@ SELECT
     typeid AS relationship_type_id,  -- ID describing the type of relationship
 
     -- Related Object 1 Info
-    viewid1 AS object1_view_id,    -- ID of the view for the first object
+    tableid1 AS object1_view_id,    -- ID of the view for the first object
     recordid1 AS object1_record_id,  -- Record ID of the first object (in viewid1)
 
     -- Related Object 2 Info
-    viewid2 AS object2_view_id,    -- ID of the view for the second object
+    tableid2 AS object2_view_id,    -- ID of the view for the second object
     recordid2 AS object2_record_id,  -- Record ID of the second object (in viewid2)
 
     -- Description

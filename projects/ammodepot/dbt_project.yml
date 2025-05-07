@@ -16,8 +16,8 @@ models:
   ammodepot:  
     silver:
       +schema: silver
-      +materialized: table
+      +materialized: view
       
     gold:
       +schema: gold
-      +materialized: table
+      +materialized: view

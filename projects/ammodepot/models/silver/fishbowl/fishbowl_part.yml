@@ -7,7 +7,7 @@ models:
       Contains part master data including dimensions, costs, and inventory settings.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: part_id
         description: Unique identifier for the part

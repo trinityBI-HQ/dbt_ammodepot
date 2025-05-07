@@ -7,7 +7,7 @@ models:
       Includes detailed order, financial, customer, and shipping information.
     config:
       schema: silver
-      materialized: table
+      materialized: view
     columns:
       - name: sales_order_id
         description: Unique identifier for the sales order

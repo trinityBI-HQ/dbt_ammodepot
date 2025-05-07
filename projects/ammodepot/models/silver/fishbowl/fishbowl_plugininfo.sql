@@ -17,7 +17,7 @@ WITH source_data AS (
         -- Core Info
         plugin,
         info,
-        viewname,        -- Name of the view recordid belongs to
+        tablename,        -- Name of the view recordid belongs to
 
         -- CDC Column for filtering
         _ab_cdc_deleted_at
@@ -47,7 +47,7 @@ SELECT
     -- Core Info
     plugin AS plugin_name,         -- Renamed for clarity
     info AS plugin_info_data,    -- Renamed for clarity
-    viewname AS related_view_name -- Renamed for clarity
+    tablename AS related_table_name -- Renamed for clarity
 
 FROM
     source_data
