@@ -1,6 +1,6 @@
 {{
   config(
-    materialized = 'table',
+    materialized = 'view',
     schema = 'silver'
   )
 }}
@@ -10,8 +10,8 @@ WITH source_data AS (
     SELECT
         -- Core Identifiers
         id,
-        soid,             -- Foreign Key to the Sales Order (SO) table
-        productid,        -- Foreign Key to the Product table
+        soid,             -- Foreign Key to the Sales Order (SO) view
+        productid,        -- Foreign Key to the Product view
         solineitem,       -- Line item number within the Sales Order
 
         -- Item Details

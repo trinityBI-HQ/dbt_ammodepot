@@ -1,6 +1,6 @@
 {{
   config(
-    materialized = 'table',
+    materialized = 'view',
     schema = 'silver' 
   )
 }}
@@ -12,8 +12,8 @@ WITH source_data AS (
         id,
         note,
         typeid,
-        tableid1,
-        tableid2,
+        viewid1,
+        viewid2,
         recordid1,
         recordid2,
 
@@ -40,12 +40,12 @@ SELECT
     typeid AS relationship_type_id,  -- ID describing the type of relationship
 
     -- Related Object 1 Info
-    tableid1 AS object1_table_id,    -- ID of the table for the first object
-    recordid1 AS object1_record_id,  -- Record ID of the first object (in tableid1)
+    viewid1 AS object1_view_id,    -- ID of the view for the first object
+    recordid1 AS object1_record_id,  -- Record ID of the first object (in viewid1)
 
     -- Related Object 2 Info
-    tableid2 AS object2_table_id,    -- ID of the table for the second object
-    recordid2 AS object2_record_id,  -- Record ID of the second object (in tableid2)
+    viewid2 AS object2_view_id,    -- ID of the view for the second object
+    recordid2 AS object2_record_id,  -- Record ID of the second object (in viewid2)
 
     -- Description
     note AS relationship_note        -- Note describing the relationship

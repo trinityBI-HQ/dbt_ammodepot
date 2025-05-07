@@ -1,6 +1,6 @@
 {{
   config(
-    materialized = 'table',
+    materialized = 'view',
     schema = 'silver'
   )
 }}
@@ -10,14 +10,14 @@ WITH source_data AS (
     SELECT
         -- Identifiers
         id,
-        recordid,         -- Foreign key to another table's record
+        recordid,         -- Foreign key to another view's record
         groupid,
         channelid,        -- Context specific ID
 
         -- Core Info
         plugin,
         info,
-        tablename,        -- Name of the table recordid belongs to
+        viewname,        -- Name of the view recordid belongs to
 
         -- CDC Column for filtering
         _ab_cdc_deleted_at
@@ -47,7 +47,7 @@ SELECT
     -- Core Info
     plugin AS plugin_name,         -- Renamed for clarity
     info AS plugin_info_data,    -- Renamed for clarity
-    tablename AS related_table_name -- Renamed for clarity
+    viewname AS related_view_name -- Renamed for clarity
 
 FROM
     source_data

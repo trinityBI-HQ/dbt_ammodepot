@@ -1,6 +1,6 @@
 {{
   config(
-    materialized = 'table',
+    materialized = 'view',
     schema = 'silver'
   )
 }}
@@ -39,7 +39,7 @@ WITH source_data AS (
 SELECT
     -- Identifiers
     id AS part_cost_id,     -- Renamed primary key for this cost record
-    partid AS part_id,      -- Renamed foreign key to the PART table
+    partid AS part_id,      -- Renamed foreign key to the PART view
 
     -- Cost & Quantity Info
     avgcost AS average_cost,-- Renamed for clarity
