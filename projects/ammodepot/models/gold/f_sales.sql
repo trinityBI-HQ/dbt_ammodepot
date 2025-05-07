@@ -1,6 +1,5 @@
 {{ config(
     materialized = 'view',
-    materialized = 'view',
     schema       = 'gold'
 ) }}
 
