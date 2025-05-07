@@ -1,5 +1,5 @@
 {{ config(
-    materialized = 'table',
+    materialized = 'view',
     schema       = 'gold'
 ) }}
 
@@ -20,7 +20,7 @@ conversion_soitem AS (
         f.record_id AS idfb,
         f.channel_id AS mgntid
     FROM {{ ref('fishbowl_plugininfo') }} AS f
-    WHERE f.related_table_name = 'SOItem'
+    WHERE f.related_view_name = 'SOItem'
 ),
 
 conversion_product AS (
@@ -28,7 +28,7 @@ conversion_product AS (
         f.record_id  AS produtofish,
         f.channel_id AS produto_magento
     FROM {{ ref('fishbowl_plugininfo') }} AS f
-    WHERE f.related_table_name = 'Product'
+    WHERE f.related_view_name = 'Product'
 ),
 
 conversion_so AS (
@@ -36,7 +36,7 @@ conversion_so AS (
         f.record_id  AS produtofish,
         f.channel_id AS produto_magento
     FROM {{ ref('fishbowl_plugininfo') }} AS f
-    WHERE f.related_table_name = 'SO'
+    WHERE f.related_view_name = 'SO'
 ),
 
 -- Real & Estimated Cost Segregation

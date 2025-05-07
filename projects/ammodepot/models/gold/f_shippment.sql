@@ -1,5 +1,5 @@
 {{ config(
-    materialized = 'table',
+    materialized = 'view',
     schema       = 'gold'
 ) }}
 
@@ -66,7 +66,7 @@ conversion AS (
         p.record_id              AS order_fishbowl,
         p.channel_id             AS order_magento
     FROM {{ ref('fishbowl_plugininfo') }} AS p
-    WHERE p.related_table_name = 'SO'
+    WHERE p.related_view_name = 'SO'
 ),
 
 freightinfo AS (
