@@ -157,11 +157,38 @@ sources:
               - unique
               - not_null
 
+      - name: parttracking
+        description: Fishbowl Part Tracking association
+        columns:
+          - name: id
+            description: Primary key for Part to Tracking
+            tests:
+              - unique
+              - not_null
+
       - name: parttotracking
         description: Fishbowl Part to Tracking association
         columns:
           - name: id
             description: Primary key for Part to Tracking
+            tests:
+              - unique
+              - not_null
+
+      - name: po
+        description: Fishbowl Purchase Order data
+        columns:
+          - name: id
+            description: Primary key for Purchase Order
+            tests:
+              - unique
+              - not_null
+
+      - name: poitem
+        description: Fishbowl Purchase Order Item data
+        columns:
+          - name: id
+            description: Primary key for Purchase Order
             tests:
               - unique
               - not_null
