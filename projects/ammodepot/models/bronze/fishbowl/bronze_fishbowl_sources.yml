@@ -129,3 +129,156 @@ sources:
             tests:
               - unique
               - not_null
+              
+      - name: inventorylog
+        description: Fishbowl Inventory Log data
+        columns:
+          - name: id
+            description: Primary key for Inventory Log
+            tests:
+              - unique
+              - not_null
+
+      - name: kititem
+        description: Fishbowl Kit Item data
+        columns:
+          - name: id
+            description: Primary key for Kit Item
+            tests:
+              - unique
+              - not_null
+
+      - name: location
+        description: Fishbowl Location data
+        columns:
+          - name: id
+            description: Primary key for Location
+            tests:
+              - unique
+              - not_null
+
+      - name: parttotracking
+        description: Fishbowl Part to Tracking association
+        columns:
+          - name: id
+            description: Primary key for Part to Tracking
+            tests:
+              - unique
+              - not_null
+
+      - name: post
+        description: Fishbowl Post data
+        columns:
+          - name: id
+            description: Primary key for Post
+            tests:
+              - unique
+              - not_null
+
+      - name: postpo
+        description: Fishbowl Post PO data
+        columns:
+          - name: id
+            description: Primary key for Post PO
+            tests:
+              - unique
+              - not_null
+
+      - name: postpoitem
+        description: Fishbowl Post PO Item data
+        columns:
+          - name: id
+            description: Primary key for Post PO Item
+            tests:
+              - unique
+              - not_null
+
+      - name: receipt
+        description: Fishbowl Receipt data
+        columns:
+          - name: id
+            description: Primary key for Receipt
+            tests:
+              - unique
+              - not_null
+
+      - name: receiptitem
+        description: Fishbowl Receipt Item data
+        columns:
+          - name: id
+            description: Primary key for Receipt Item
+            tests:
+              - unique
+              - not_null
+
+      - name: serial
+        description: Fishbowl Serial data
+        columns:
+          - name: id
+            description: Primary key for Serial
+            tests:
+              - unique
+              - not_null
+
+      - name: serialnum
+        description: Fishbowl Serial Number data
+        columns:
+          - name: id
+            description: Primary key for Serial Number
+            tests:
+              - unique
+              - not_null
+
+      - name: tag
+        description: Fishbowl Tag data
+        columns:
+          - name: id
+            description: Primary key for Tag
+            tests:
+              - unique
+              - not_null
+
+      - name: tagserialview
+        description: Fishbowl Tag Serial View data
+        columns:
+          - name: id
+            description: Primary key for Tag Serial View
+            tests:
+              - unique
+              - not_null
+
+      - name: wo
+        description: Fishbowl Work Order data
+        columns:
+          - name: id
+            description: Primary key for Work Order
+            tests:
+              - unique
+              - not_null
+
+      - name: woitem
+        description: Fishbowl Work Order Item data
+        columns:
+          - name: id
+            description: Primary key for Work Order Item
+            tests:
+              - unique
+              - not_null
+
+      - name: xo
+        description: Fishbowl XO data
+        columns:
+          - name: id
+            description: Primary key for XO
+            tests:
+              - unique
+              - not_null
+      
+      - name: xoitem
+        description: Fishbowl XO item data
+        columns:
+          - name: id
+            description: Primary key for XOitem
+            tests:
+              - unique
+              - not_null
