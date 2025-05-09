@@ -1,8 +1,12 @@
 {
   "servers": {
+<<<<<<< HEAD
     "datapilot": {
       "url": "http://localhost:7700/sse",
       "type": "sse"
     }
+=======
+    "datapilot": {}
+>>>>>>> 0ebbcd9bd8d294d88339d3fbfff3ed3ca5c364f9
   }
 }
