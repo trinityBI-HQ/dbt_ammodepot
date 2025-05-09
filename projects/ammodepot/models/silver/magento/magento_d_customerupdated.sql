@@ -1,10 +1,6 @@
 {{
   config(
-<<<<<<< HEAD
     materialized='table',
-=======
-    materialized='view',
->>>>>>> 0ebbcd9bd8d294d88339d3fbfff3ed3ca5c364f9
     schema='silver'
   )
 }}
