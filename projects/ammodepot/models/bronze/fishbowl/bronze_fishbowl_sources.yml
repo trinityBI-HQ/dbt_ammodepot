@@ -128,7 +128,6 @@ sources:
             description: Primary key for Vendor Parts
             tests:
               - unique
-<<<<<<< HEAD
               - not_null
               
       - name: inventorylog
@@ -309,6 +308,4 @@ sources:
             description: Primary key for XOitem
             tests:
               - unique
-=======
->>>>>>> 0ebbcd9bd8d294d88339d3fbfff3ed3ca5c364f9
               - not_null
