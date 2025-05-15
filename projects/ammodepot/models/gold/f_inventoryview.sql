@@ -75,7 +75,7 @@ inventory_totals AS (
     -- Pre-aggregate inventory totals by part_id
     SELECT
         part_id,
-        SUM(quantity_on_hand - quantity_allocated - quantity_not_available) AS part_qty_available,
+        SUM(quantity_on_hand  - quantity_not_available) AS part_qty_available,
         SUM(quantity_on_order) AS qty_on_order
     FROM
         {{ ref('inventory_qtyinventorytotals') }} -- Corrected ref name
