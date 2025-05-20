@@ -165,3 +165,4 @@ FROM
     main_aggregation ma
 LEFT JOIN part_weekly_sales_previous_period pws
     ON ma.part_number = pws.part_number
+
