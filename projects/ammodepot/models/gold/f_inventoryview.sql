@@ -20,4 +20,4 @@ Where
 inv.location_group_id = 8
 GROUP BY
   p.part_number
-;
+
