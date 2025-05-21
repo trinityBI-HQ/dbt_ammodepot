@@ -320,75 +320,139 @@ Fishbowl_Conversion AS (
 
     group by
      pr.product_number
+),
+CTEfinal AS (
+    SELECT
+        e.product_entity_id                               AS "Product ID",
+        e.sku                                             AS SKU,
+        MAX(CASE WHEN va.attribute_code = 'name'            THEN va.value END) AS "Product Name",
+        MAX(CASE WHEN va.attribute_code = 'suggested_use'   THEN va.value END) AS "General Purpose",
+        MAX(CASE WHEN va.attribute_code = 'url_key'         THEN CONCAT('https://www.ammunitiondepot.com/', va.value) END) AS "Product URL",
+        MAX(CASE WHEN va.attribute_code = 'image'           THEN CONCAT('https://www.ammunitiondepot.com/media/catalog/product', va.value) END) AS "Product Image URL",
+        vd.vendor                                         AS "Vendor",
+        dd.discontinued                                   AS "Discontinued",
+        psd.parent_sku                                    AS "Parent SKU",
+        COALESCE(psd.parent_sku, e.sku)                   AS GROUPED_SKU,
+        MAX(CASE WHEN va.attribute_code = 'boxes_case'      THEN va.value END) AS "Boxes/Case",
+        MAX(CASE WHEN va.attribute_code = 'caliber'         THEN va.value END) AS "Caliber",
+        MAX(CASE WHEN va.attribute_code = 'manufacturer_sku' THEN va.value END) AS "Manufacturer SKU",
+        MAX(CASE WHEN va.attribute_code = 'upc'             THEN va.value END) AS UPC,
+        MAX(md.manufacturer)                              AS "Manufacturer",
+        MAX(pd.projectile)                                AS "Projectile",
+        MAX(utd.unit_type)                                AS "Unit Type",
+        MAX(rpd.rounds_package)                           AS "Rounds/Package",
+        MAX(asd.attribute_set_name)                       AS "Attribute Set",
+        cd.categories                                     AS "Categories",
+        MAX(CASE WHEN va.attribute_code = 'gun_type'       THEN va.value END) AS "Gun Type",
+        MAX(ddc.ddcaliber)                                AS "DD Caliber",
+        MAX(ddact.ddaction)                               AS "DD Gun Action",
+        MAX(ddcond.ddcondition)                           AS "DD Condition",
+        MAX(ddgp.ddgun_parts)                             AS "DD Gun Parts",
+        MAX(capacity.capacity)                            AS "Capacity",
+        MAX(material.material)                            AS "Material",
+        MAX(pc.primary_category)                          AS "Primary Category",
+        MAX(dc.ddcolor)                                   AS "DD Color",
+        MAX(oc.optic_coating)                             AS "Optic Coating",
+        MAX(dwp.ddweapons_platform)                       AS "DD Weapons Platform",
+        MAX(CASE WHEN va.attribute_code = 'thread_pattern' THEN va.value END) AS "Thread Pattern",
+        MAX(CASE WHEN va.attribute_code = 'thread_type'    THEN va.value END) AS "Thread Type",
+        MAX(CASE WHEN va.attribute_code = 'model'          THEN va.value END) AS "Model",
+        Coalesce(MAX(fbc.CONVERT),1) AS CONVERT,
+        MAX(fbc.avgcost) AS AVGCOST,
+        MAX(fbc.LASTVENDORCOST) AS LASTVENDORCOST
+    FROM {{ ref('magento_catalog_product_entity') }} e
+    LEFT JOIN varchar_attributes            va   ON e.product_entity_id = va.entity_id
+    LEFT JOIN int_attributes                ia   ON e.product_entity_id = ia.entity_id
+    LEFT JOIN decimal_attributes            da   ON e.product_entity_id = da.entity_id
+    LEFT JOIN text_attributes               ta   ON e.product_entity_id = ta.entity_id
+    LEFT JOIN category_data                 cd   ON e.product_entity_id = cd.product_id
+    LEFT JOIN vendor_data                   vd   ON e.product_entity_id = vd.entity_id
+    LEFT JOIN parent_sku_data               psd  ON e.product_entity_id = psd.product_id
+    LEFT JOIN discontinued_data             dd   ON e.product_entity_id = dd.product_entity_id
+    LEFT JOIN manufacturer_data             md   ON e.product_entity_id = md.entity_id
+    LEFT JOIN projectile_data               pd   ON e.product_entity_id = pd.entity_id
+    LEFT JOIN unit_type_data                utd  ON e.product_entity_id = utd.entity_id
+    LEFT JOIN rounds_package_data           rpd  ON e.product_entity_id = rpd.entity_id
+    LEFT JOIN capacity_data                 capacity ON e.product_entity_id = capacity.entity_id
+    LEFT JOIN material_data                 material ON e.product_entity_id = material.entity_id
+    LEFT JOIN attribute_set_data            asd  ON e.product_entity_id = asd.product_entity_id
+    LEFT JOIN primary_category_data         pc   ON e.product_entity_id = pc.entity_id
+    LEFT JOIN ddcaliber_data                ddc  ON e.product_entity_id = ddc.entity_id
+    LEFT JOIN ddaction_data                 ddact ON e.product_entity_id = ddact.entity_id
+    LEFT JOIN ddcondition_data              ddcond ON e.product_entity_id = ddcond.entity_id
+    LEFT JOIN ddgun_parts_data              ddgp ON e.product_entity_id = ddgp.entity_id
+    LEFT JOIN ddcolor_data                  dc   ON e.product_entity_id = dc.entity_id
+    LEFT JOIN optic_coating_data            oc   ON e.product_entity_id = oc.entity_id
+    LEFT JOIN ddweapons_platform_data       dwp  ON e.product_entity_id = dwp.entity_id
+    LEFT JOIN Fishbowl_Conversion           fbc  ON e.sku = fbc.product_number
+    GROUP BY
+        e.product_entity_id,
+        e.sku,
+        cd.categories,
+        vd.vendor,
+        dd.discontinued,
+        psd.parent_sku
 )
 
-SELECT
-    e.product_entity_id                               AS "Product ID",
-    e.sku                                             AS SKU,
-    MAX(CASE WHEN va.attribute_code = 'name'            THEN va.value END) AS "Product Name",
-    MAX(CASE WHEN va.attribute_code = 'suggested_use'   THEN va.value END) AS "General Purpose",
-    MAX(CASE WHEN va.attribute_code = 'url_key'         THEN CONCAT('https://www.ammunitiondepot.com/', va.value) END) AS "Product URL",
-    MAX(CASE WHEN va.attribute_code = 'image'           THEN CONCAT('https://www.ammunitiondepot.com/media/catalog/product', va.value) END) AS "Product Image URL",
-    vd.vendor                                         AS "Vendor",
-    dd.discontinued                                   AS "Discontinued",
-    psd.parent_sku                                    AS "Parent SKU",
-    COALESCE(psd.parent_sku, e.sku)                   AS GROUPED_SKU,
-    MAX(CASE WHEN va.attribute_code = 'boxes_case'      THEN va.value END) AS "Boxes/Case",
-    MAX(CASE WHEN va.attribute_code = 'caliber'         THEN va.value END) AS "Caliber",
-    MAX(CASE WHEN va.attribute_code = 'manufacturer_sku' THEN va.value END) AS "Manufacturer SKU",
-    MAX(CASE WHEN va.attribute_code = 'upc'             THEN va.value END) AS UPC,
-    MAX(md.manufacturer)                              AS "Manufacturer",
-    MAX(pd.projectile)                                AS "Projectile",
-    MAX(utd.unit_type)                                AS "Unit Type",
-    MAX(rpd.rounds_package)                           AS "Rounds/Package",
-    MAX(asd.attribute_set_name)                       AS "Attribute Set",
-    cd.categories                                     AS "Categories",
-    MAX(CASE WHEN va.attribute_code = 'gun_type'       THEN va.value END) AS "Gun Type",
-    MAX(ddc.ddcaliber)                                AS "DD Caliber",
-    MAX(ddact.ddaction)                               AS "DD Gun Action",
-    MAX(ddcond.ddcondition)                           AS "DD Condition",
-    MAX(ddgp.ddgun_parts)                             AS "DD Gun Parts",
-    MAX(capacity.capacity)                            AS "Capacity",
-    MAX(material.material)                            AS "Material",
-    MAX(pc.primary_category)                          AS "Primary Category",
-    MAX(dc.ddcolor)                                   AS "DD Color",
-    MAX(oc.optic_coating)                             AS "Optic Coating",
-    MAX(dwp.ddweapons_platform)                       AS "DD Weapons Platform",
-    MAX(CASE WHEN va.attribute_code = 'thread_pattern' THEN va.value END) AS "Thread Pattern",
-    MAX(CASE WHEN va.attribute_code = 'thread_type'    THEN va.value END) AS "Thread Type",
-    MAX(CASE WHEN va.attribute_code = 'model'          THEN va.value END) AS "Model",
-    Coalesce(MAX(fbc.CONVERT),1) AS CONVERT,
-    MAX(fbc.avgcost) AS AVGCOST,
-    MAX(fbc.LASTVENDORCOST) AS LASTVENDORCOST
-FROM {{ ref('magento_catalog_product_entity') }} e
-LEFT JOIN varchar_attributes            va   ON e.product_entity_id = va.entity_id
-LEFT JOIN int_attributes                ia   ON e.product_entity_id = ia.entity_id
-LEFT JOIN decimal_attributes            da   ON e.product_entity_id = da.entity_id
-LEFT JOIN text_attributes               ta   ON e.product_entity_id = ta.entity_id
-LEFT JOIN category_data                 cd   ON e.product_entity_id = cd.product_id
-LEFT JOIN vendor_data                   vd   ON e.product_entity_id = vd.entity_id
-LEFT JOIN parent_sku_data               psd  ON e.product_entity_id = psd.product_id
-LEFT JOIN discontinued_data             dd   ON e.product_entity_id = dd.product_entity_id
-LEFT JOIN manufacturer_data             md   ON e.product_entity_id = md.entity_id
-LEFT JOIN projectile_data               pd   ON e.product_entity_id = pd.entity_id
-LEFT JOIN unit_type_data                utd  ON e.product_entity_id = utd.entity_id
-LEFT JOIN rounds_package_data           rpd  ON e.product_entity_id = rpd.entity_id
-LEFT JOIN capacity_data                 capacity ON e.product_entity_id = capacity.entity_id
-LEFT JOIN material_data                 material ON e.product_entity_id = material.entity_id
-LEFT JOIN attribute_set_data            asd  ON e.product_entity_id = asd.product_entity_id
-LEFT JOIN primary_category_data         pc   ON e.product_entity_id = pc.entity_id
-LEFT JOIN ddcaliber_data                ddc  ON e.product_entity_id = ddc.entity_id
-LEFT JOIN ddaction_data                 ddact ON e.product_entity_id = ddact.entity_id
-LEFT JOIN ddcondition_data              ddcond ON e.product_entity_id = ddcond.entity_id
-LEFT JOIN ddgun_parts_data              ddgp ON e.product_entity_id = ddgp.entity_id
-LEFT JOIN ddcolor_data                  dc   ON e.product_entity_id = dc.entity_id
-LEFT JOIN optic_coating_data            oc   ON e.product_entity_id = oc.entity_id
-LEFT JOIN ddweapons_platform_data       dwp  ON e.product_entity_id = dwp.entity_id
-LEFT JOIN Fishbowl_Conversion           fbc  ON e.sku = fbc.product_number
-GROUP BY
-    e.product_entity_id,
-    e.sku,
-    cd.categories,
-    vd.vendor,
-    dd.discontinued,
-    psd.parent_sku
+SELECT 
+    cf.*,
+    -- Use Type Category Logic
+    CASE 
+        WHEN cf."Categories" ILIKE '%hunting%' OR cf."General Purpose" ILIKE '%hunting%' OR 
+             cf."Product Name" ILIKE '%hunting%' OR
+             cf."Projectile" IN ('SP', 'JSP', 'TSX', 'TTSX', 'Partition', 'AccuBond', 'Nosler', 'SST', 'InterLock') OR
+             (cf."DD Caliber" IN ('.30-06', '.308 Win', '.270 Win', '.243 Win', '7mm Rem Mag', '6.5 Creedmoor', 
+                                  '30-06 Springfield', '308/7.62', '270 Win', '243 Win', '7mm Rem Mag', '6.5 Creedmoor',
+                                  '300 Win Mag', '7mm-08') AND
+              cf."Projectile" NOT IN ('FMJ', 'TMJ', 'RN', 'Frangible')) THEN 'Hunting'
+
+        WHEN cf."Categories" ILIKE '%defense%' OR cf."General Purpose" ILIKE '%defense%' OR 
+             cf."Product Name" ILIKE '%defense%' OR cf."Product Name" ILIKE '%personal%' OR
+             cf."Projectile" IN ('JHP', 'XTP', 'Gold Dot', 'HST', 'Critical Defense', 'Critical Duty') OR
+             (cf."Projectile" = 'HP' AND 
+              cf."DD Caliber" IN ('9mm', '.45 ACP', '.380 Auto', '.38 Special', '.40 S&W', '.357 Mag',
+                              '45 ACP', '380 ACP', '38 Special', '40 S&W', '357 Mag', '10mm', '44 Mag')) OR
+             (cf."DD Caliber" IN ('9mm', '.45 ACP', '.380 Auto', '.38 Special', '.40 S&W', '.357 Mag',
+                              '45 ACP', '380 ACP', '38 Special', '40 S&W', '357 Mag', '10mm', '44 Mag') AND
+              cf."Product Name" ILIKE '%carry%') OR
+             cf."Projectile" = '00 Buck' OR cf."Projectile" LIKE '%Buck%' THEN 'Self-Defense/Personal Protection'
+
+        WHEN cf."Categories" ILIKE '%tactical%' OR cf."Categories" ILIKE '%law enforcement%' OR 
+             cf."General Purpose" ILIKE '%tactical%' OR cf."Product Name" ILIKE '%tactical%' OR
+             cf."Product Name" ILIKE '%duty%' OR cf."Projectile" = 'SS109/Green Tip' OR
+             (cf."DD Caliber" IN ('5.56 NATO', '223/5.56', '300 Blackout') AND cf."Projectile" IN ('HP', 'OTM', 'BTHP')) OR
+             cf."Product Name" ILIKE '%law enforcement%' THEN 'Tactical/Law Enforcement'
+
+        WHEN cf."Categories" ILIKE '%sport%' OR cf."Categories" ILIKE '%target%' OR cf."Categories" ILIKE '%competition%' OR
+             cf."General Purpose" ILIKE '%sport%' OR cf."Product Name" ILIKE '%target%' OR
+             cf."Product Name" ILIKE '%competition%' OR cf."Product Name" ILIKE '%match%' OR
+             (cf."Projectile" IN ('FMJ', 'TMJ', 'FMJBT', 'LRN', 'LFN') AND 
+              NOT (cf."Product Name" ILIKE '%defense%' OR cf."Product Name" ILIKE '%tactical%')) OR
+             cf."Projectile" IN ('7.5 Shot', '8 Shot', '9 Shot', 'Clay & Target', 'Game & Target') OR
+             cf."Product Name" ILIKE '%practice%' OR cf."Product Name" ILIKE '%range%' OR
+             cf."DD Caliber" = '22 LR' THEN 'Sporting/Target'
+
+        WHEN cf."Categories" ILIKE '%collector%' OR cf."Product Name" ILIKE '%collector%' OR 
+             cf."Product Name" ILIKE '%limited%' OR cf."Product Name" ILIKE '%special edition%' THEN 'Collector/Specialty'
+
+        ELSE CASE
+            WHEN cf."DD Caliber" IN ('22 LR', '22 Mag/WMR', '17 HMR', '22-250', '6mm Creedmoor') THEN 'Sporting/Target'
+            WHEN cf."DD Caliber" IN ('30-06 Springfield', '308/7.62', '270 Win', '243 Win', '300 Win Mag',
+                                     '7mm Rem Mag', '6.5 Creedmoor', '7mm-08', '25-06', '280 Rem', '35 Rem') THEN 'Hunting'
+            WHEN cf."DD Caliber" IN ('9mm', '45 ACP', '380 ACP', '38 Special', '40 S&W', '357 Mag',
+                                     '10mm', '44 Mag', '45 LC') THEN 'Self-Defense/Personal Protection'
+            WHEN cf."DD Caliber" IN ('223/5.56', '300 Blackout', '308 Win Match', '338 Lapua') THEN 'Tactical/Law Enforcement'
+            WHEN cf."DD Caliber" IN ('12 Gauge', '20 Gauge', '410 Bore', '28 Gauge') THEN 
+                CASE
+                    WHEN cf."Projectile" IN ('7.5 Shot', '8 Shot', '9 Shot', '7 Shot', '6 Shot', '5 Shot', '4 Shot') THEN 'Sporting/Target'
+                    WHEN cf."Projectile" IN ('00 Buck', 'Slug', 'OO Buck', '000 Buck', '4 Buck', 'Buckshot', '1 Buck', '2 Buck', '3 Buck') THEN 'Self-Defense/Personal Protection'
+                    ELSE 'Sporting/Target'
+                END
+            WHEN cf."Projectile" IN ('FMJ', 'TMJ', 'Ball', 'LRN', 'LFN') THEN 'Sporting/Target'
+            WHEN cf."Projectile" IN ('JHP', 'HP', 'XTP') THEN 'Self-Defense/Personal Protection'
+            WHEN cf."Projectile" IN ('SP', 'JSP', 'BTSP') THEN 'Hunting'
+            ELSE 'Unclassified'
+        END
+    END AS use_type_category
+
+FROM CTEfinal cf;
