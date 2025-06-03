@@ -1,7 +1,10 @@
-.dbtenv/
+.dbt-env/
 target/
 dbt_packages/
 logs/
 .DS_Store
 ../../.DS_Store
 profiles.yml
+dbt-env/
+dbt/
+.dbt/
