@@ -104,7 +104,7 @@ f_ship AS (
         so.order_increment_id                       AS ID,
         so.order_id                                 AS ORDER_ID,
         so.customer_email                           AS CUSTOMER_EMAIL,
-        so.carrier_type                             AS CARRIER_TYPE,
+       -- so.carrier_type                             AS CARRIER_TYPE,
         CONVERT_TIMEZONE(
             'UTC',
             'America/New_York',
@@ -165,7 +165,7 @@ SELECT
     fs.ID,
     fs.ORDER_ID,
     fs.CUSTOMER_EMAIL,
-    fs.CARRIER_TYPE,
+    --fs.CARRIER_TYPE,
     fs.CREATED_AT,
     fs.CUSTOMER_NAME,
     fs.BILLING_ADDRESS,
