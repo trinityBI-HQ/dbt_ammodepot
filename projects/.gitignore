@@ -1,1 +1,4 @@
-.dbtenv
+.dbt-env
+dbt-env/
+dbt/
+.dbt/
