@@ -17,7 +17,7 @@ WITH attribute_id_cte AS (
         'boxes_case', 'rounds_package', 'suggested_use', 'gun_type', 'ddcaliber',
         'capacity', 'ddaction', 'ddcondition', 'material', 'ddgun_parts',
         'primary_category', 'ddcolor', 'optic_coating', 'ddweapons_platform',
-        'thread_pattern', 'thread_type', 'model'
+        'thread_pattern', 'thread_type', 'model', 'dd_suggested_use'
     )
 ),
 
@@ -82,7 +82,17 @@ category_data AS (
         AND ac.attribute_code = 'name'
     GROUP BY ccp.product_id
 ),
-
+dd_suggested_use_data AS (
+    SELECT
+        cpi.entity_id,
+        eov.value AS dd_suggested_use
+    FROM test1 cpi
+    JOIN {{ ref('magento_eav_attribute_option_value') }} eov
+        ON cpi.value = eov.option_id
+        AND eov.store_id = 0
+    WHERE cpi.attribute_id = 682 
+        AND cpi.store_id = 0
+),
 parent_sku_data AS (
     SELECT
         sl.product_id,
@@ -352,7 +362,8 @@ cte_final AS (
         MAX(CASE WHEN va.attribute_code = 'model'          THEN va.value END) AS "Model",
         COALESCE(MAX(fbc.convert), 1)                     AS "CONVERT",
         MAX(fbc.avgcost)                                  AS "AVGCOST",
-        MAX(fbc.lastvendorcost)                           AS "LASTVENDORCOST"
+        MAX(fbc.lastvendorcost)                           AS "LASTVENDORCOST",
+        MAX(dsud.dd_suggested_use)                        AS "DD Suggested Use"
     FROM {{ ref('magento_catalog_product_entity') }} e
     LEFT JOIN varchar_attributes            va   ON e.product_entity_id = va.entity_id
     LEFT JOIN int_attributes                ia   ON e.product_entity_id = ia.entity_id
@@ -378,6 +389,7 @@ cte_final AS (
     LEFT JOIN optic_coating_data            oc   ON e.product_entity_id = oc.entity_id
     LEFT JOIN ddweapons_platform_data       dwp  ON e.product_entity_id = dwp.entity_id
     LEFT JOIN fishbowl_conversion           fbc  ON e.sku = fbc.product_number
+    LEFT JOIN dd_suggested_use_data         dsud ON e.product_entity_id = dsud.entity_id
     GROUP BY
         e.product_entity_id,
         e.sku,
