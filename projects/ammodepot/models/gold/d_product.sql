@@ -82,17 +82,7 @@ category_data AS (
         AND ac.attribute_code = 'name'
     GROUP BY ccp.product_id
 ),
-dd_suggested_use_data AS (
-    SELECT
-        cpi.entity_id,
-        eov.value AS dd_suggested_use
-    FROM test1 cpi
-    JOIN {{ ref('magento_eav_attribute_option_value') }} eov
-        ON cpi.value = eov.option_id
-        AND eov.store_id = 0
-    WHERE cpi.attribute_id = 682 
-        AND cpi.store_id = 0
-),
+
 parent_sku_data AS (
     SELECT
         sl.product_id,
@@ -159,6 +149,51 @@ ddcaliber_data AS (
     WHERE cpi.attribute_id = 678
         AND cpi.store_id = 0
 ),
+dd_suggested_use_data AS (
+    WITH raw_text AS (
+        SELECT
+            cpt.entity_id,
+            cpt.value AS raw_value
+        FROM {{ ref('magento_catalog_product_entity_text') }} cpt
+        WHERE cpt.attribute_id = 682
+          AND cpt.store_id = 0
+    ),
+    counter AS (
+        SELECT 1 AS n
+        UNION ALL SELECT 2
+        UNION ALL SELECT 3
+        UNION ALL SELECT 4
+        UNION ALL SELECT 5
+        UNION ALL SELECT 6
+        UNION ALL SELECT 7
+        UNION ALL SELECT 8
+        UNION ALL SELECT 9
+        UNION ALL SELECT 10
+    ),
+    exploded AS (
+        SELECT
+            rt.entity_id,
+            CASE
+                WHEN TRIM(SPLIT_PART(rt.raw_value, ',', c.n)) ~ '^[0-9]+$'
+                THEN CAST(TRIM(SPLIT_PART(rt.raw_value, ',', c.n)) AS INT)
+                ELSE NULL
+            END AS option_id
+        FROM raw_text rt
+        JOIN counter c ON c.n <= 10
+        WHERE SPLIT_PART(rt.raw_value, ',', c.n) IS NOT NULL
+          AND TRIM(SPLIT_PART(rt.raw_value, ',', c.n)) ~ '^[0-9]+$'
+    )
+    SELECT
+        ex.entity_id,
+        LISTAGG(eov.value, ', ') AS dd_suggested_use
+    FROM exploded ex
+    JOIN {{ ref('magento_eav_attribute_option_value') }} eov
+        ON eov.option_id = ex.option_id
+        AND eov.store_id = 0
+    GROUP BY ex.entity_id
+),
+
+
 
 ddaction_data AS (
     SELECT
@@ -389,7 +424,7 @@ cte_final AS (
     LEFT JOIN optic_coating_data            oc   ON e.product_entity_id = oc.entity_id
     LEFT JOIN ddweapons_platform_data       dwp  ON e.product_entity_id = dwp.entity_id
     LEFT JOIN fishbowl_conversion           fbc  ON e.sku = fbc.product_number
-    LEFT JOIN dd_suggested_use_data         dsud ON e.product_entity_id = dsud.entity_id
+    LEFT JOIN dd_suggested_use_data dsud ON e.product_entity_id = dsud.entity_id
     GROUP BY
         e.product_entity_id,
         e.sku,
