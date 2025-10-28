@@ -48,6 +48,7 @@ newship AS (
 shiptransformation AS (
     SELECT
         s.shipment_id                   AS soid,
+        s.sales_order_id AS sales_order_id,
         COALESCE(SUM(ns.net_amount), SUM(sc.freight_weight)) AS freightamount,
         SUM(sc.freight_weight)    AS freightweight,
         AVG(s.carrier_service_id)  AS carrierserviceid,
@@ -58,7 +59,7 @@ shiptransformation AS (
       ON s.shipment_id = sc.shipment_id
     LEFT JOIN newship                              AS ns
       ON sc.tracking_number = ns.tracking_number
-    GROUP BY s.shipment_id
+    GROUP BY s.shipment_id, sales_order_id
 ),
 
 conversion AS (
@@ -79,7 +80,7 @@ freightinfo AS (
         AVG(st.packagenumb)     AS packagenumb
     FROM {{ ref('fishbowl_so') }} AS so
     LEFT JOIN shiptransformation AS st
-      ON CAST(so.sales_order_id   AS VARCHAR) = CAST(st.soid             AS VARCHAR)
+    ON CAST(so.sales_order_id AS VARCHAR) = CAST(st.sales_order_id AS VARCHAR)
     LEFT JOIN conversion        AS c
       ON CAST(so.sales_order_id   AS VARCHAR) = CAST(c.order_fishbowl   AS VARCHAR)
     GROUP BY c.order_magento
