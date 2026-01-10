@@ -16,11 +16,16 @@ WITH magento_identities AS (
 ),
 
 conversion_soitem AS (
-    SELECT
-        f.record_id AS idfb,
-        f.channel_id AS mgntid
-    FROM {{ ref('fishbowl_plugininfo') }} AS f
-    WHERE f.related_table_name = 'SOItem'
+    SELECT 
+        z.so_item_id AS idfb,
+        COALESCE(
+            NULLIF(JSON_EXTRACT_PATH_TEXT(z.custom_fields, '25', 'value'), ''),
+            p.channel_id
+        ) AS mgntid
+    FROM {{ ref('fishbowl_soitem') }} AS z
+    LEFT JOIN {{ ref('fishbowl_plugininfo') }} AS p 
+        ON p.record_id = z.so_item_id 
+        AND p.related_table_name = 'SOItem'
 ),
 
 conversion_product AS (
