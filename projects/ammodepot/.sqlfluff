@@ -1,5 +1,5 @@
 [sqlfluff]
-dialect = snowflake
+dialect = redshift
 templater = jinja
 max_line_length = 120
 large_file_skip_byte_limit = 0

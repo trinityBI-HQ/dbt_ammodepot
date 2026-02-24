@@ -5,5 +5,8 @@ logs/
 .DS_Store
 ../../.DS_Store
 profiles.yml
+.env
+*.p8
+*.pub
 *.zip
 __pycache__/

@@ -84,13 +84,15 @@ models:
         description: "'Yes' if base_subtotal >= free shipping threshold, else 'No'."
         tests:
           - accepted_values:
-              values: ['Yes', 'No']
+              arguments:
+                values: ['Yes', 'No']
       - name: carrierserviceid
         description: "Carrier service ID aggregated from Fishbowl shipments."
       - name: is_free_auto
         description: "'Yes' if a free shipping quote option was applied."
         tests:
           - accepted_values:
-              values: ['Yes', 'No']
+              arguments:
+                values: ['Yes', 'No']
       - name: carrierservice
         description: "Carrier service name from the Fishbowl lookup."
