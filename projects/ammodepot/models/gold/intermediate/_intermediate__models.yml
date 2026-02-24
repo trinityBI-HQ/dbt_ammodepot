@@ -1,0 +1,82 @@
+version: 2
+
+models:
+  - name: int_fishbowl_order_cost
+    description: >
+      Fishbowl-to-Magento cost resolution per order item. Contains all cost-related CTEs
+      from the original f_sales model including ID mapping, kit cost aggregation, product
+      average cost, and deduplication of costs when multiple Fishbowl records map to one
+      Magento order item.
+    columns:
+      - name: order_item_id
+        description: "Magento order item identifier (join key for f_sales)."
+        tests:
+          - not_null
+
+  - name: int_magento_order_freight
+    description: >
+      Freight cost allocation per Magento order. Combines UPS invoice data, Fishbowl
+      shipment costs, and Magento shipping amounts into net sales and freight figures
+      needed for weight-based freight allocation in f_sales.
+    columns:
+      - name: order_id
+        description: "Magento order identifier (join key for f_sales)."
+        tests:
+          - not_null
+
+  - name: int_magento_product_conversion
+    description: >
+      UOM conversion factors and piece-level quantity per order item. Calculates
+      part_qty_sold by multiplying order quantity by UOM conversion factor from
+      Fishbowl product/part data.
+    columns:
+      - name: item_id
+        description: "Magento order item identifier (join key for f_sales)."
+        tests:
+          - not_null
+
+  - name: int_magento_product_attributes
+    description: >
+      Pivoted Magento EAV varchar, text, and decimal product attributes. Resolves
+      attribute codes to values and presents one row per product entity with named
+      columns for each attribute (product_name, url_key, cost, price, etc.).
+    columns:
+      - name: entity_id
+        description: "Magento product entity identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: int_magento_product_eav_lookups
+    description: >
+      Resolved EAV integer attribute option values for products. Looks up 15 separate
+      int attributes (manufacturer, projectile, caliber, etc.) and resolves their
+      option_id values to human-readable labels.
+    columns:
+      - name: entity_id
+        description: "Magento product entity identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: int_magento_product_taxonomy
+    description: >
+      Product category hierarchy and parent SKU mapping. Aggregates category names
+      via LISTAGG and resolves configurable product parent SKUs via catalog_product_super_link.
+    columns:
+      - name: entity_id
+        description: "Magento product entity identifier."
+        tests:
+          - unique
+          - not_null
+
+  - name: int_fishbowl_product_enrichment
+    description: >
+      Fishbowl-sourced product enrichment data including vendor assignment, discontinued
+      status, attribute set name, UOM conversion factor, average cost, and last vendor cost.
+    columns:
+      - name: entity_id
+        description: "Magento product entity identifier."
+        tests:
+          - unique
+          - not_null

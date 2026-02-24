@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
     -- This CTE selects all relevant columns from the source
-    SELECT
+    select
         id,
         qty,
         stdcost,
@@ -34,39 +34,39 @@ WITH source_data AS (
 
         -- Columns to be excluded from final select:
         -- _airbyte_raw_id, _airbyte_extracted_at, _airbyte_generation_id, _airbyte_meta
-    FROM
+    from
         {{ source('fishbowl', 'postpoitem') }}
-    WHERE
+    where
         -- Filter out soft deletes. Assuming _ab_cdc_deleted_at follows previous patterns (VARCHAR).
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    id AS post_po_item_id,          -- Renamed primary key for this PO item posting record
-    postpoid AS post_po_id,         -- Foreign key to the POSTPO table
-    poitemid AS po_item_id,         -- Foreign key to the POITEM table (original PO line item)
-    receiptitemid AS receipt_item_id,-- Foreign key to the RECEIPTITEM table (if applicable)
-    shipitemid AS ship_item_id,     -- Foreign key to the SHIPITEM table (if related to a shipment)
+    id as post_po_item_id,          -- Renamed primary key for this PO item posting record
+    postpoid as post_po_id,         -- Foreign key to the POSTPO table
+    poitemid as po_item_id,         -- Foreign key to the POITEM table (original PO line item)
+    receiptitemid as receipt_item_id,-- Foreign key to the RECEIPTITEM table (if applicable)
+    shipitemid as ship_item_id,     -- Foreign key to the SHIPITEM table (if related to a shipment)
 
     -- Quantity & Cost
-    qty AS quantity_posted,
-    stdcost AS standard_cost_at_posting,
-    postedtotalcost AS posted_total_cost,
-    mcpostedtotalcost AS mc_posted_total_cost, -- Multi-currency posted total cost
-    receivedtotalcost AS received_total_cost, -- Cost from the receipt
+    qty as quantity_posted,
+    stdcost as standard_cost_at_posting,
+    postedtotalcost as posted_total_cost,
+    mcpostedtotalcost as mc_posted_total_cost, -- Multi-currency posted total cost
+    receivedtotalcost as received_total_cost, -- Cost from the receipt
 
     -- External Accounting System Integration (e.g., QuickBooks)
-    exttxnid AS external_transaction_id,
-    exttxnhash AS external_transaction_hash,
-    extrefnumber AS external_reference_number,
-    exttxnlineid AS external_transaction_line_id,
+    exttxnid as external_transaction_id,
+    exttxnhash as external_transaction_hash,
+    extrefnumber as external_reference_number,
+    exttxnlineid as external_transaction_line_id,
 
     -- Timestamps
-    datecreated AS record_created_at,
-    datelastmodified AS last_modified_at,
+    datecreated as record_created_at,
+    datelastmodified as last_modified_at,
 
     -- Airbyte CDC Metadata (kept as requested, adjust if not needed in final silver)
     _ab_cdc_cursor,
@@ -74,5 +74,5 @@ SELECT
     _ab_cdc_log_file,
     _ab_cdc_updated_at
 
-FROM
+from
     source_data

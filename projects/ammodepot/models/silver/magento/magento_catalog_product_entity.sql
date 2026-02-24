@@ -5,8 +5,8 @@
   )
 }}
 
-WITH source_data AS (
-    SELECT 
+with source_data as (
+    select 
         entity_id,
         attribute_set_id,
         type_id,
@@ -15,20 +15,20 @@ WITH source_data AS (
         required_options,
         created_at,
         updated_at
-    FROM 
+    from 
         {{ source('magento', 'catalog_product_entity') }}
-    WHERE 
-        _ab_cdc_deleted_at IS NULL
+    where 
+        _ab_cdc_deleted_at is null
 )
 
-SELECT 
-    entity_id AS product_entity_id,
+select 
+    entity_id as product_entity_id,
     attribute_set_id,
     type_id,
     sku,
-    CAST(has_options AS BOOLEAN) AS has_options,
-    CAST(required_options AS BOOLEAN) AS required_options,
+    CAST(has_options as BOOLEAN) as has_options,
+    CAST(required_options as BOOLEAN) as required_options,
     created_at,
     updated_at
-FROM 
+from 
     source_data

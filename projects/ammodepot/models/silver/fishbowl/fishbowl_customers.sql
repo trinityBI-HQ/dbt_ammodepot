@@ -5,8 +5,8 @@
   )
 }}
 
-WITH source_data AS (
-    SELECT 
+with source_data as (
+    select 
         id,
         name,
         number,
@@ -37,42 +37,42 @@ WITH source_data AS (
         note,
         url,
         lastchangeduser
-    FROM 
+    from 
         {{ source('fishbowl', 'customer') }}
-    WHERE 
-        _ab_cdc_deleted_at IS NULL
+    where 
+        _ab_cdc_deleted_at is null
 )
 
-SELECT 
-    id AS customer_id,
-    name AS customer_name,
-    number AS customer_number,
-    statusid AS status_id,
-    accountid AS account_id,
-    sysuserid AS sysuser_id,
-    taxexempt AS is_tax_exempt,
-    taxrateid AS tax_rate_id,
-    activeflag AS is_active,
-    currencyid AS currency_id,
-    creditlimit AS credit_limit,
-    datecreated AS date_created,
-    tobeemailed AS to_be_emailed,
-    tobeprinted AS to_be_printed,
-    accountingid AS accounting_id,
-    currencyrate AS currency_rate,
-    customfields AS custom_fields,
-    accountinghash AS accounting_hash,
-    taxexemptnumber AS tax_exempt_number,
-    carrierserviceid AS carrier_service_id,
-    datelastmodified AS date_last_modified,
-    defaultcarrierid AS default_carrier_id,
-    issuablestatusid AS issuable_status_id,
-    defaultpriorityid AS default_priority_id,
-    defaultsalesmanid AS default_salesman_id,
-    defaultshiptermsid AS default_ship_terms_id,
-    defaultpaymenttermsid AS default_payment_terms_id,
-    note AS customer_note,
-    url AS customer_url,
-    lastchangeduser AS last_changed_user
-FROM 
+select 
+    id as customer_id,
+    name as customer_name,
+    number as customer_number,
+    statusid as status_id,
+    accountid as account_id,
+    sysuserid as sysuser_id,
+    taxexempt as is_tax_exempt,
+    taxrateid as tax_rate_id,
+    activeflag as is_active,
+    currencyid as currency_id,
+    creditlimit as credit_limit,
+    datecreated as date_created,
+    tobeemailed as to_be_emailed,
+    tobeprinted as to_be_printed,
+    accountingid as accounting_id,
+    currencyrate as currency_rate,
+    customfields as custom_fields,
+    accountinghash as accounting_hash,
+    taxexemptnumber as tax_exempt_number,
+    carrierserviceid as carrier_service_id,
+    datelastmodified as date_last_modified,
+    defaultcarrierid as default_carrier_id,
+    issuablestatusid as issuable_status_id,
+    defaultpriorityid as default_priority_id,
+    defaultsalesmanid as default_salesman_id,
+    defaultshiptermsid as default_ship_terms_id,
+    defaultpaymenttermsid as default_payment_terms_id,
+    note as customer_note,
+    url as customer_url,
+    lastchangeduser as last_changed_user
+from 
     source_data

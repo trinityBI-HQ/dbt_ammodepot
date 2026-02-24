@@ -5,18 +5,18 @@
   )
 }}
 
-WITH CleanedEmails AS (
-    SELECT 
-        LOWER(COALESCE(NULLIF(CUSTOMER_EMAIL, ''), 'customer@nonidentified.com')) AS CUSTOMER_EMAIL
-    FROM {{ source('magento', 'sales_order') }}
+with cleaned_emails as (
+    select
+        LOWER(COALESCE(NULLIF(CUSTOMER_EMAIL, ''), 'customer@nonidentified.com')) as CUSTOMER_EMAIL
+    from {{ source('magento', 'sales_order') }}
 ),
 
-DistinctEmails AS (
-    SELECT DISTINCT CUSTOMER_EMAIL
-    FROM CleanedEmails
+distinct_emails as (
+    select distinct CUSTOMER_EMAIL
+    from cleaned_emails
 )
 
-SELECT 
+select 
     CUSTOMER_EMAIL,
-    ROW_NUMBER() OVER (ORDER BY CUSTOMER_EMAIL) AS RANK_ID
-FROM DistinctEmails
+    ROW_NUMBER() over (order by CUSTOMER_EMAIL) as RANK_ID
+from distinct_emails

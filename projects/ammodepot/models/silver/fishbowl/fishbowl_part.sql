@@ -5,8 +5,8 @@
   )
 }}
 
-WITH source_data AS (
-    SELECT 
+with source_data as (
+    select 
         id,
         num,
         upc,
@@ -52,57 +52,57 @@ WITH source_data AS (
         url,
         lastchangeduser,
         customfields
-    FROM 
+    from 
         {{ source('fishbowl', 'part') }}
-    WHERE 
-        _ab_cdc_deleted_at IS NULL
+    where 
+        _ab_cdc_deleted_at is null
 )
 
-SELECT 
-    id AS part_id,
-    num AS part_number,
-    upc AS upc_code,
-    description AS part_description,
-    typeid AS part_type_id,
-    activeflag AS is_active,
-    abccode AS abc_code,
-    len AS length,
-    width AS width,
-    height AS height,
-    weight AS weight,
-    sizeuomid AS size_uom_id,
-    weightuomid AS weight_uom_id,
-    uomid AS default_uom_id,
-    taxid AS tax_id,
-    details AS part_details,
-    stdcost AS standard_cost,
-    revision AS revision_number,
-    leadtime AS lead_time_days,
-    alertnote AS alert_note,
-    datecreated AS date_created,
-    partclassid AS part_class_id,
-    accountingid AS accounting_id,
-    configurable AS is_configurable,
-    defaultbomid AS default_bom_id,
-    receivingtol AS receiving_tolerance,
-    trackingflag AS has_tracking,
-    cogsaccountid AS cogs_account_id,
-    cyclecounttol AS cycle_count_tolerance,
-    controlledflag AS is_controlled,
-    scrapaccountid AS scrap_account_id,
-    serializedflag AS is_serialized,
-    consumptionrate AS consumption_rate,
-    pickinuomofpart AS pick_in_uom_of_part,
-    datelastmodified AS date_last_modified,
-    defaultproductid AS default_product_id,
-    alwaysmanufacture AS always_manufacture,
-    varianceaccountid AS variance_account_id,
-    inventoryaccountid AS inventory_account_id,
-    adjustmentaccountid AS adjustment_account_id,
-    defaultpoitemtypeid AS default_po_item_type_id,
-    defaultoutsourcedreturnitemid AS default_outsourced_return_item_id,
-    url AS part_url,
-    lastchangeduser AS last_changed_user,
-    customfields AS custom_fields
-FROM 
+select 
+    id as part_id,
+    num as part_number,
+    upc as upc_code,
+    description as part_description,
+    typeid as part_type_id,
+    activeflag as is_active,
+    abccode as abc_code,
+    len as length,
+    width as width,
+    height as height,
+    weight as weight,
+    sizeuomid as size_uom_id,
+    weightuomid as weight_uom_id,
+    uomid as default_uom_id,
+    taxid as tax_id,
+    details as part_details,
+    stdcost as standard_cost,
+    revision as revision_number,
+    leadtime as lead_time_days,
+    alertnote as alert_note,
+    datecreated as date_created,
+    partclassid as part_class_id,
+    accountingid as accounting_id,
+    configurable as is_configurable,
+    defaultbomid as default_bom_id,
+    receivingtol as receiving_tolerance,
+    trackingflag as has_tracking,
+    cogsaccountid as cogs_account_id,
+    cyclecounttol as cycle_count_tolerance,
+    controlledflag as is_controlled,
+    scrapaccountid as scrap_account_id,
+    serializedflag as is_serialized,
+    consumptionrate as consumption_rate,
+    pickinuomofpart as pick_in_uom_of_part,
+    datelastmodified as date_last_modified,
+    defaultproductid as default_product_id,
+    alwaysmanufacture as always_manufacture,
+    varianceaccountid as variance_account_id,
+    inventoryaccountid as inventory_account_id,
+    adjustmentaccountid as adjustment_account_id,
+    defaultpoitemtypeid as default_po_item_type_id,
+    defaultoutsourcedreturnitemid as default_outsourced_return_item_id,
+    url as part_url,
+    lastchangeduser as last_changed_user,
+    customfields as custom_fields
+from 
     source_data

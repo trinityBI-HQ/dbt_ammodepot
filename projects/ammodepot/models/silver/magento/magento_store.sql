@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         store_id,
         name,
         code,
@@ -17,20 +17,20 @@ WITH source_data AS (
         sort_order,
         _ab_cdc_deleted_at
 
-    FROM
+    from
         {{ source('magento', 'store') }}
-    WHERE
-        _ab_cdc_deleted_at IS NULL
+    where
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
-    store_id AS store_id,
-    name AS store_name,
-    code AS store_code,
-    group_id AS group_id,
-    website_id AS website_id,
-    CAST(is_active AS BOOLEAN) AS is_active,
-    sort_order AS sort_order
+select
+    store_id as store_id,
+    name as store_name,
+    code as store_code,
+    group_id as group_id,
+    website_id as website_id,
+    CAST(is_active as BOOLEAN) as is_active,
+    sort_order as sort_order
 
-FROM
+from
     source_data

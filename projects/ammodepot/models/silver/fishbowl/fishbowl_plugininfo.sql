@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- Identifiers
         id,
         recordid,         -- Foreign key to another view's record
@@ -26,28 +26,28 @@ WITH source_data AS (
         -- _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
         -- _AB_CDC_CURSOR, _AB_CDC_LOG_POS, _AB_CDC_LOG_FILE, _AB_CDC_UPDATED_AT
 
-    FROM
+    from
         -- Source is defined in DDL as AD_AIRBYTE.AIRBYTE_SCHEMA.PLUGININFO
         -- Assuming you have a dbt source named 'ad_airbyte' pointing to AD_AIRBYTE.AIRBYTE_SCHEMA
         {{ source('fishbowl', 'plugininfo') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    id AS plugin_info_id,        -- Renamed primary key
-    recordid AS record_id,            -- Renamed foreign key
-    groupid AS group_id,              -- Renamed foreign key/grouping ID
-    channelid AS channel_id,          -- Renamed, context-specific ID
+    id as plugin_info_id,        -- Renamed primary key
+    recordid as record_id,            -- Renamed foreign key
+    groupid as group_id,              -- Renamed foreign key/grouping ID
+    channelid as channel_id,          -- Renamed, context-specific ID
 
     -- Core Info
-    plugin AS plugin_name,         -- Renamed for clarity
-    info AS plugin_info_data,    -- Renamed for clarity
-    tablename AS related_table_name -- Renamed for clarity
+    plugin as plugin_name,         -- Renamed for clarity
+    info as plugin_info_data,    -- Renamed for clarity
+    tablename as related_table_name -- Renamed for clarity
 
-FROM
+from
     source_data

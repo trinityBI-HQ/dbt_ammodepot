@@ -1,161 +1,156 @@
-{{ config(
-    materialized = 'table',
-    schema       = 'gold'
-) }}
+with
 
-WITH 
-
-codes AS (
-    SELECT
-        z.quote_shipping_rate_code                   AS code,
-        MAX(z.method)            AS method,
-        MAX(z.carrier_title)     AS carrier_title
-    FROM {{ ref('magento_quote_shipping_rate') }} AS z
-    GROUP BY z.quote_shipping_rate_code
+codes as (
+    select
+        z.quote_shipping_rate_code                   as code,
+        MAX(z.method)            as method,
+        MAX(z.carrier_title)     as carrier_title
+    from {{ ref('magento_quote_shipping_rate') }} as z
+    group by z.quote_shipping_rate_code
 ),
 
-quotefree AS (
-    SELECT
-        z.quote_address_id             AS address_id
-    FROM {{ ref('magento_quote_shipping_rate') }} AS z
-    WHERE z.method_title ILIKE '%Free%'
-    GROUP BY z.quote_address_id
+quotefree as (
+    select
+        z.quote_address_id             as address_id
+    from {{ ref('magento_quote_shipping_rate') }} as z
+    where z.method_title ilike '%Free%'
+    group by z.quote_address_id
 ),
 
-freeoptions AS (
-    SELECT
-        a.quote_id               AS quote_id
-    FROM {{ ref('magento_quote_address') }} AS a
-    JOIN quotefree              AS qf
-      ON a.quote_address_id = qf.address_id
-    GROUP BY a.quote_id
+freeoptions as (
+    select
+        a.quote_id               as quote_id
+    from {{ ref('magento_quote_address') }} as a
+    inner join quotefree              as qf
+      on a.quote_address_id = qf.address_id
+    group by a.quote_id
 ),
 
-address AS (
-    SELECT *
-    FROM {{ ref('magento_sales_order_address') }}
-    WHERE address_type = 'shipping'
+address as (
+    select *
+    from {{ ref('magento_sales_order_address') }}
+    where address_type = 'shipping'
 ),
 
-newship AS (
-    SELECT
-        tracking_number          AS tracking_number,
-        SUM(net_amount)          AS net_amount
-    FROM {{ source('magento','ups_invoice') }}
-    GROUP BY tracking_number
+newship as (
+    select
+        tracking_number          as tracking_number,
+        SUM(net_amount)          as net_amount
+    from {{ source('magento','ups_invoice') }}
+    group by tracking_number
 ),
 
-shiptransformation AS (
-    SELECT
-        s.shipment_id                   AS soid,
-        s.sales_order_id AS sales_order_id,
-        COALESCE(SUM(ns.net_amount), SUM(sc.freight_weight)) AS freightamount,
-        SUM(sc.freight_weight)    AS freightweight,
-        AVG(s.carrier_service_id)  AS carrierserviceid,
-        SUM(ns.net_amount)       AS net_amount,
-        COUNT(sc.tracking_number)    AS packagenumb
-    FROM {{ ref('fishbowl_ship') }}            AS s
-    LEFT JOIN {{ ref('fishbowl_shipcarton') }} AS sc
-      ON s.shipment_id = sc.shipment_id
-    LEFT JOIN newship                              AS ns
-      ON sc.tracking_number = ns.tracking_number
-    GROUP BY s.shipment_id, sales_order_id
+shiptransformation as (
+    select
+        s.shipment_id                   as soid,
+        s.sales_order_id as sales_order_id,
+        COALESCE(SUM(ns.net_amount), SUM(sc.freight_weight)) as freightamount,
+        SUM(sc.freight_weight)    as freightweight,
+        AVG(s.carrier_service_id)  as carrierserviceid,
+        SUM(ns.net_amount)       as net_amount,
+        COUNT(sc.tracking_number)    as packagenumb
+    from {{ ref('fishbowl_ship') }}            as s
+    left join {{ ref('fishbowl_shipcarton') }} as sc
+      on s.shipment_id = sc.shipment_id
+    left join newship                              as ns
+      on sc.tracking_number = ns.tracking_number
+    group by s.shipment_id, sales_order_id
 ),
 
-conversion AS (
-    SELECT
-        p.record_id              AS order_fishbowl,
-        p.channel_id             AS order_magento
-    FROM {{ ref('fishbowl_plugininfo') }} AS p
-    WHERE p.related_table_name = 'SO'
+conversion as (
+    select
+        p.record_id              as order_fishbowl,
+        p.channel_id             as order_magento
+    from {{ ref('fishbowl_plugininfo') }} as p
+    where p.related_table_name = 'SO'
 ),
 
-freightinfo AS (
-    SELECT
-        c.order_magento         AS order_magento,
-        AVG(st.freightamount)   AS freightamount,
-        AVG(st.freightweight)   AS freightweight,
-        AVG(st.carrierserviceid) AS carrierserviceid,
-        AVG(st.net_amount)      AS net_amount,
-        AVG(st.packagenumb)     AS packagenumb
-    FROM {{ ref('fishbowl_so') }} AS so
-    LEFT JOIN shiptransformation AS st
-    ON CAST(so.sales_order_id AS VARCHAR) = CAST(st.sales_order_id AS VARCHAR)
-    LEFT JOIN conversion        AS c
-      ON CAST(so.sales_order_id   AS VARCHAR) = CAST(c.order_fishbowl   AS VARCHAR)
-    GROUP BY c.order_magento
+freightinfo as (
+    select
+        c.order_magento         as order_magento,
+        AVG(st.freightamount)   as freightamount,
+        AVG(st.freightweight)   as freightweight,
+        AVG(st.carrierserviceid) as carrierserviceid,
+        AVG(st.net_amount)      as net_amount,
+        AVG(st.packagenumb)     as packagenumb
+    from {{ ref('fishbowl_so') }} as so
+    left join shiptransformation as st
+    on CAST(so.sales_order_id as VARCHAR) = CAST(st.sales_order_id as VARCHAR)
+    left join conversion        as c
+      on CAST(so.sales_order_id   as VARCHAR) = CAST(c.order_fishbowl   as VARCHAR)
+    group by c.order_magento
 ),
 
-service AS (
-    SELECT
-        cs.carrier_id            AS idcarrier,
-        cs.carrier_service_name       AS carrierservice
-    FROM {{ ref('fishbowl_carrierservice') }} AS cs
+service as (
+    select
+        cs.carrier_id            as idcarrier,
+        cs.carrier_service_name       as carrierservice
+    from {{ ref('fishbowl_carrierservice') }} as cs
 ),
 
-f_ship AS (
-    SELECT
-        COALESCE(so.shipping_amount, 0)              AS SHIPPING_AMOUNT,
-        COALESCE(so.base_shipping_amount, 0)         AS BASE_SHIPPING_AMOUNT,
-        COALESCE(so.base_shipping_canceled, 0)       AS BASE_SHIPPING_CANCELED,
-        COALESCE(so.base_shipping_discount_amount, 0) AS BASE_SHIPPING_DISCOUNT_AMOUNT,
-        COALESCE(so.base_shipping_refunded, 0)       AS BASE_SHIPPING_REFUNDED,
-        COALESCE(so.base_shipping_tax_amount, 0)     AS BASE_SHIPPING_TAX_AMOUNT,
-        COALESCE(so.base_shipping_tax_refunded, 0)   AS BASE_SHIPPING_TAX_REFUNDED,
-        so.order_increment_id                       AS ID,
-        so.order_id                                 AS ORDER_ID,
-        so.customer_email                           AS CUSTOMER_EMAIL,
+f_ship as (
+    select
+        COALESCE(so.shipping_amount, 0)              as SHIPPING_AMOUNT,
+        COALESCE(so.base_shipping_amount, 0)         as BASE_SHIPPING_AMOUNT,
+        COALESCE(so.base_shipping_canceled, 0)       as BASE_SHIPPING_CANCELED,
+        COALESCE(so.base_shipping_discount_amount, 0) as BASE_SHIPPING_DISCOUNT_AMOUNT,
+        COALESCE(so.base_shipping_refunded, 0)       as BASE_SHIPPING_REFUNDED,
+        COALESCE(so.base_shipping_tax_amount, 0)     as BASE_SHIPPING_TAX_AMOUNT,
+        COALESCE(so.base_shipping_tax_refunded, 0)   as BASE_SHIPPING_TAX_REFUNDED,
+        so.order_increment_id                       as ID,
+        so.order_id                                 as ORDER_ID,
+        so.customer_email                           as CUSTOMER_EMAIL,
        -- so.carrier_type                             AS CARRIER_TYPE,
         CONVERT_TIMEZONE(
             'UTC',
-            'America/New_York',
-            CAST(so.created_at AS timestamp)
-        )                                           AS CREATED_AT,
+            '{{ var("ammodepot_timezone") }}',
+            CAST(so.created_at as TIMESTAMP)
+        )                                           as CREATED_AT,
         so.customer_firstname
         || ' '
-        || so.customer_lastname                     AS CUSTOMER_NAME,
-        so.shipping_address_id                      AS BILLING_ADDRESS,
-        so.shipping_method                          AS SHIPPING_INFORMATION,
-        so.store_id                                 AS STORE_ID,
-        so.shipping_description                     AS SHIPPING_DESCRIPTION,
-        sg.shipment_status_code                     AS SHIPMENT_STATUS,
-        sg.shipping_address_text                    AS SHIPPING_ADDRESS,
-        sg.shipping_name                            AS SHIPPING_NAME,
-        so.order_status                             AS STATUS,
-        sg.shipping_information                     AS SHIPPING_INFORMATION2,
-        c.method                                    AS METHOD,
-        c.carrier_title                             AS CARRIER_TITLE,
-        addr.postcode                               AS POSTCODE,
-        addr.country_code                           AS COUNTRY,
-        addr.region                                 AS REGION,
-        addr.city                                   AS CITY,
-        addr.phone_number                           AS TELEPHONE,
-        fi.freightamount                            AS FREIGHTAMOUNT,
-        fi.net_amount                               AS NET_AMOUNT,
-        fi.packagenumb                              AS PACKAGENUMB,
-        fi.freightweight                            AS FREIGHTWEIGHT,
-        q.ext_shipping_info                         AS EXT_SHIPPING_INFO,
-        CASE WHEN so.base_subtotal >= 140 THEN 'Yes' ELSE 'No' END
-                                                   AS ISFREE,
-        fi.carrierserviceid                         AS CARRIERSERVICEID,
-        CASE WHEN fo.quote_id IS NOT NULL THEN 'Yes' ELSE 'No' END
-                                                   AS ISFREEAUTO
-    FROM {{ ref('magento_sales_order') }}               AS so
-    LEFT JOIN {{ ref('magento_sales_shipment_grid') }}  AS sg
-      ON CAST(so.order_id           AS VARCHAR) = CAST(sg.order_id           AS VARCHAR)
-    LEFT JOIN codes                                   AS c
-      ON CAST(so.shipping_method     AS VARCHAR) = CAST(c.code                 AS VARCHAR)
-    LEFT JOIN address                                AS addr
-      ON CAST(so.shipping_address_id AS VARCHAR) = CAST(addr.order_address_id AS VARCHAR)
-    LEFT JOIN freightinfo                            AS fi
-      ON CAST(so.order_id           AS VARCHAR) = CAST(fi.order_magento       AS VARCHAR)
-    LEFT JOIN {{ ref('magento_quote') }}              AS q
-      ON CAST(so.quote_id            AS VARCHAR) = CAST(q.entity_id            AS VARCHAR)
-    LEFT JOIN freeoptions                             AS fo
-      ON so.quote_id = fo.quote_id
+        || so.customer_lastname                     as CUSTOMER_NAME,
+        so.shipping_address_id                      as BILLING_ADDRESS,
+        so.shipping_method                          as SHIPPING_INFORMATION,
+        so.store_id                                 as STORE_ID,
+        so.shipping_description                     as SHIPPING_DESCRIPTION,
+        sg.shipment_status_code                     as SHIPMENT_STATUS,
+        sg.shipping_address_text                    as SHIPPING_ADDRESS,
+        sg.shipping_name                            as SHIPPING_NAME,
+        so.order_status                             as STATUS,
+        sg.shipping_information                     as SHIPPING_INFORMATION2,
+        c.method                                    as METHOD,
+        c.carrier_title                             as CARRIER_TITLE,
+        addr.postcode                               as POSTCODE,
+        addr.country_code                           as COUNTRY,
+        addr.region                                 as REGION,
+        addr.city                                   as CITY,
+        addr.phone_number                           as TELEPHONE,
+        fi.freightamount                            as FREIGHTAMOUNT,
+        fi.net_amount                               as NET_AMOUNT,
+        fi.packagenumb                              as PACKAGENUMB,
+        fi.freightweight                            as FREIGHTWEIGHT,
+        q.ext_shipping_info                         as EXT_SHIPPING_INFO,
+        case when so.base_subtotal >= {{ var('ammodepot_free_shipping_threshold') }} then 'Yes' else 'No' end
+                                                   as ISFREE,
+        fi.carrierserviceid                         as CARRIERSERVICEID,
+        case when fo.quote_id is not null then 'Yes' else 'No' end
+                                                   as ISFREEAUTO
+    from {{ ref('magento_sales_order') }}               as so
+    left join {{ ref('magento_sales_shipment_grid') }}  as sg
+      on CAST(so.order_id           as VARCHAR) = CAST(sg.order_id           as VARCHAR)
+    left join codes                                   as c
+      on CAST(so.shipping_method     as VARCHAR) = CAST(c.code                 as VARCHAR)
+    left join address                                as addr
+      on CAST(so.shipping_address_id as VARCHAR) = CAST(addr.order_address_id as VARCHAR)
+    left join freightinfo                            as fi
+      on CAST(so.order_id           as VARCHAR) = CAST(fi.order_magento       as VARCHAR)
+    left join {{ ref('magento_quote') }}              as q
+      on CAST(so.quote_id            as VARCHAR) = CAST(q.entity_id            as VARCHAR)
+    left join freeoptions                             as fo
+      on so.quote_id = fo.quote_id
 )
 
-SELECT
+select
     fs.SHIPPING_AMOUNT,
     fs.BASE_SHIPPING_AMOUNT,
     fs.BASE_SHIPPING_CANCELED,
@@ -193,8 +188,8 @@ SELECT
     fs.ISFREE,
     fs.CARRIERSERVICEID,
     fs.ISFREEAUTO,
-    svc.idcarrier   AS IDCARRIER,
-    svc.carrierservice AS CARRIERSERVICE
-FROM f_ship AS fs
-LEFT JOIN service AS svc
-  ON CAST(fs.CARRIERSERVICEID   AS VARCHAR) = CAST(svc.idcarrier      AS VARCHAR)
+    svc.idcarrier   as IDCARRIER,
+    svc.carrierservice as CARRIERSERVICE
+from f_ship as fs
+left join service as svc
+  on CAST(fs.CARRIERSERVICEID   as VARCHAR) = CAST(svc.idcarrier      as VARCHAR)
