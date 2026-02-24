@@ -4,10 +4,11 @@ sources:
   - name: magento
     description: Magento e-commerce platform raw data
     schema: magento
-    freshness:
-      warn_after: {count: 24, period: hour}
-      error_after: {count: 48, period: hour}
-    loaded_at_field: "_airbyte_extracted_at"
+    config:
+      freshness:
+        warn_after: {count: 24, period: hour}
+        error_after: {count: 48, period: hour}
+      loaded_at_field: "_airbyte_extracted_at"
     tables:
       - name: customer_entity
         description: Raw customer account data from Magento

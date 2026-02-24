@@ -25,8 +25,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('d_product')
-              field: '"Product ID"'
+              arguments:
+                to: ref('d_product')
+                field: '"Product ID"'
               severity: warn
       - name: ORDER_ID
         description: "Magento order entity identifier."
@@ -66,8 +67,9 @@ models:
         description: "Magento store identifier."
         tests:
           - relationships:
-              to: ref('d_store')
-              field: 'STORE_ID'
+              arguments:
+                to: ref('d_store')
+                field: 'STORE_ID'
               severity: warn
       - name: STATUS
         description: "Magento order status."
@@ -93,8 +95,9 @@ models:
         description: "Magento customer entity identifier."
         tests:
           - relationships:
-              to: ref('d_customer')
-              field: 'ENTITY_ID'
+              arguments:
+                to: ref('d_customer')
+                field: 'ENTITY_ID'
               severity: warn
       - name: RANK_ID
         description: "Customer rank identifier from customer deduplication."

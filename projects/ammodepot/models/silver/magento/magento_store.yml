@@ -39,7 +39,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
 
       - name: sort_order
         description: "Determines the display order of the store view, typically in lists or dropdowns in the admin or frontend."

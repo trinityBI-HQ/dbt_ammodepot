@@ -41,8 +41,9 @@ models:
         description: "Vendor identifier for the purchase order."
         tests:
           - relationships:
-              to: ref('d_vendor')
-              field: 'vendor_id'
+              arguments:
+                to: ref('d_vendor')
+                field: 'vendor_id'
               severity: warn
       - name: po_created_at
         description: "Timestamp when the purchase order was created."

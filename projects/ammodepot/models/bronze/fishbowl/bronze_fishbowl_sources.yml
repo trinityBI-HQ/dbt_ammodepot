@@ -4,10 +4,11 @@ sources:
   - name: fishbowl
     description: Fishbowl inventory management raw data
     schema: fishbowl
-    freshness:
-      warn_after: {count: 24, period: hour}
-      error_after: {count: 48, period: hour}
-    loaded_at_field: "_airbyte_extracted_at"
+    config:
+      freshness:
+        warn_after: {count: 24, period: hour}
+        error_after: {count: 48, period: hour}
+      loaded_at_field: "_airbyte_extracted_at"
     tables:
       - name: customer
         description: Fishbowl Customer data
