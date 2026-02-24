@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
     -- This CTE selects all relevant columns from the source
-    SELECT
+    select
         id,
         poid,
         soid,
@@ -27,28 +27,28 @@ WITH source_data AS (
 
         -- Columns to be excluded from final select:
         -- _airbyte_raw_id, _airbyte_extracted_at, _airbyte_generation_id, _airbyte_meta
-    FROM
+    from
         {{ source('fishbowl', 'receipt') }}
-    WHERE
+    where
         -- Filter out soft deletes. Assuming _ab_cdc_deleted_at follows previous patterns (VARCHAR).
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    id AS receipt_id,               -- Renamed primary key for this receipt record
-    poid AS purchase_order_id,      -- Foreign key to Purchase Order (if applicable)
-    soid AS sales_order_id,         -- Foreign key to Sales Order (if applicable, e.g., RMA)
-    xoid AS transfer_order_id,      -- Foreign key to Transfer Order (if applicable)
-    ordertypeid AS order_type_id,    -- Type of order this receipt is associated with
+    id as receipt_id,               -- Renamed primary key for this receipt record
+    poid as purchase_order_id,      -- Foreign key to Purchase Order (if applicable)
+    soid as sales_order_id,         -- Foreign key to Sales Order (if applicable, e.g., RMA)
+    xoid as transfer_order_id,      -- Foreign key to Transfer Order (if applicable)
+    ordertypeid as order_type_id,    -- Type of order this receipt is associated with
 
     -- Receipt Details
-    typeid AS receipt_type_id,      -- Type of receipt (e.g., PO receipt, RMA receipt)
-    statusid AS receipt_status_id,  -- Status of the receipt
-    userid AS user_id,              -- User who created/processed the receipt
-    locationgroupid AS location_group_id, -- Location group where items were received
+    typeid as receipt_type_id,      -- Type of receipt (e.g., PO receipt, RMA receipt)
+    statusid as receipt_status_id,  -- Status of the receipt
+    userid as user_id,              -- User who created/processed the receipt
+    locationgroupid as location_group_id, -- Location group where items were received
 
     -- Airbyte CDC Metadata (kept as requested, adjust if not needed in final silver)
     _ab_cdc_cursor,
@@ -56,5 +56,5 @@ SELECT
     _ab_cdc_log_file,
     _ab_cdc_updated_at
 
-FROM
+from
     source_data

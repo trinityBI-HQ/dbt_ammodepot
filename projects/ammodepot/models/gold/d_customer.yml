@@ -1,0 +1,75 @@
+version: 2
+
+models:
+  - name: d_customer
+    description: "Customer dimension from Magento, containing customer profile and account details."
+    columns:
+      - name: DOB
+        description: "Customer date of birth."
+      - name: EMAIL
+        description: "Customer email address."
+        tests:
+          - not_null
+      - name: GENDER
+        description: "Customer gender."
+      - name: PREFIX
+        description: "Customer name prefix."
+      - name: SUFFIX
+        description: "Customer name suffix."
+      - name: TAXVAT
+        description: "Customer tax/VAT number."
+      - name: GROUP_ID
+        description: "Customer group identifier."
+      - name: LASTNAME
+        description: "Customer last name."
+      - name: STORE_ID
+        description: "Store identifier associated with the customer."
+      - name: ENTITY_ID
+        description: "Primary key for the customer."
+        tests:
+          - unique
+          - not_null
+      - name: FIRSTNAME
+        description: "Customer first name."
+      - name: IS_ACTIVE
+        description: "Whether the customer account is active."
+      - name: CREATED_AT
+        description: "Timestamp when the customer account was created."
+      - name: CREATED_IN
+        description: "Store view where the customer account was created."
+      - name: MIDDLENAME
+        description: "Customer middle name."
+      - name: UPDATED_AT
+        description: "Timestamp when the customer record was last updated."
+      - name: WEBSITE_ID
+        description: "Website identifier associated with the customer."
+      - name: CONFIRMATION
+        description: "Account confirmation status or token."
+      - name: FAILURES_NUM
+        description: "Number of authentication failures."
+      - name: INCREMENT_ID
+        description: "Customer increment identifier."
+      - name: LOCK_EXPIRES
+        description: "Timestamp when the account lock expires."
+      - name: FIRST_FAILURE
+        description: "Timestamp of the first authentication failure."
+      - name: PASSWORD_HASH
+        description: "Hashed customer password."
+      - name: _AB_CDC_CURSOR
+        description: "Airbyte CDC cursor value."
+      - name: SESSION_CUTOFF
+        description: "Session cutoff timestamp."
+      - name: _AB_CDC_LOG_POS
+        description: "Airbyte CDC log position."
+      - name: DEFAULT_BILLING
+        description: "Default billing address identifier."
+      - name: IS_ZENDESK_USER
+        description: "Whether the customer is linked to a Zendesk user."
+      - name: DEFAULT_SHIPPING
+        description: "Default shipping address identifier."
+      - name: RP_TOKEN_CREATED_AT
+        description: "Timestamp when the reset password token was created."
+      - name: DISABLE_AUTO_GROUP_CHANGE
+        description: "Whether automatic customer group change is disabled."
+      - name: MP_SMTP_EMAIL_MARKETING_SYNCED
+        description: "Whether the customer email has been synced for SMTP marketing."

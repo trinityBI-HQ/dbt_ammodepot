@@ -5,8 +5,8 @@
   )
 }}
 
-WITH source_data AS (
-    SELECT 
+with source_data as (
+    select 
         id,
         name,
         note,
@@ -32,37 +32,37 @@ WITH source_data AS (
         defaultshiptermsid,
         defaultpaymenttermsid,
         defaultcarrierserviceid
-    FROM 
+    from 
         {{ source('fishbowl', 'vendor') }}
-    WHERE 
-        _ab_cdc_deleted_at IS NULL
+    where 
+        _ab_cdc_deleted_at is null
 )
 
-SELECT 
-    id AS vendor_id,
-    name AS vendor_name,
-    note AS vendor_note,
-    url AS vendor_url,
-    leadtime AS lead_time_days,
-    statusid AS status_id,
-    accountid AS account_id,
-    sysuserid AS sysuser_id,
-    taxrateid AS tax_rate_id,
-    accountnum AS account_number,
-    activeflag AS is_active,
-    currencyid AS currency_id,
-    creditlimit AS credit_limit,
-    dateentered AS date_entered,
-    accountingid AS accounting_id,
-    currencyrate AS currency_rate,
-    customfields AS custom_fields,
-    accountinghash AS accounting_hash,
-    minorderamount AS minimum_order_amount,
-    lastchangeduser AS last_changed_user,
-    datelastmodified AS date_last_modified,
-    defaultcarrierid AS default_carrier_id,
-    defaultshiptermsid AS default_ship_terms_id,
-    defaultpaymenttermsid AS default_payment_terms_id,
-    defaultcarrierserviceid AS default_carrier_service_id
-FROM 
+select 
+    id as vendor_id,
+    name as vendor_name,
+    note as vendor_note,
+    url as vendor_url,
+    leadtime as lead_time_days,
+    statusid as status_id,
+    accountid as account_id,
+    sysuserid as sysuser_id,
+    taxrateid as tax_rate_id,
+    accountnum as account_number,
+    activeflag as is_active,
+    currencyid as currency_id,
+    creditlimit as credit_limit,
+    dateentered as date_entered,
+    accountingid as accounting_id,
+    currencyrate as currency_rate,
+    customfields as custom_fields,
+    accountinghash as accounting_hash,
+    minorderamount as minimum_order_amount,
+    lastchangeduser as last_changed_user,
+    datelastmodified as date_last_modified,
+    defaultcarrierid as default_carrier_id,
+    defaultshiptermsid as default_ship_terms_id,
+    defaultpaymenttermsid as default_payment_terms_id,
+    defaultcarrierserviceid as default_carrier_service_id
+from 
     source_data

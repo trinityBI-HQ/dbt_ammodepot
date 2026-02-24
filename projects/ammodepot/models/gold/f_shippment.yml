@@ -6,6 +6,8 @@ models:
     columns:
       - name: shipping_amount
         description: "Shipping amount from Magento order, defaulting to 0."
+        tests:
+          - assert_non_negative_values
       - name: base_shipping_amount
         description: "Base-currency shipping amount."
       - name: base_shipping_canceled
@@ -20,14 +22,20 @@ models:
         description: "Base-currency shipping tax refunded."
       - name: id
         description: "Shipment identifier (Magento increment_id)."
+        tests:
+          - not_null
       - name: order_id
         description: "Magento order ID."
+        tests:
+          - not_null
       - name: customer_email
         description: "Customer email from the Magento order."
       - name: carrier_type
         description: "Type of carrier set on the order."
       - name: created_at
         description: "Shipment creation timestamp converted to America/New_York."
+        tests:
+          - not_null
       - name: customer_name
         description: "Concatenation of customer first and last name."
       - name: billing_address
@@ -73,10 +81,16 @@ models:
       - name: ext_shipping_info
         description: "External shipping info from the quote record."
       - name: is_free
-        description: "'Yes' if base_subtotal ≥ 140, else 'No'."
+        description: "'Yes' if base_subtotal >= free shipping threshold, else 'No'."
+        tests:
+          - accepted_values:
+              values: ['Yes', 'No']
       - name: carrierserviceid
         description: "Carrier service ID aggregated from Fishbowl shipments."
       - name: is_free_auto
         description: "'Yes' if a free shipping quote option was applied."
+        tests:
+          - accepted_values:
+              values: ['Yes', 'No']
       - name: carrierservice
         description: "Carrier service name from the Fishbowl lookup."

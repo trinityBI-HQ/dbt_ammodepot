@@ -4,9 +4,9 @@
     schema = 'silver'
   )
 }}
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         entity_id,
         route_fee,
         base_aw_giftcard_amount,
@@ -67,9 +67,8 @@ WITH source_data AS (
         is_multi_shipping,
         store_id,
         store_to_quote_rate
-    FROM {{ source('magento', 'quote') }}
-
+    from {{ source('magento', 'quote') }}
 
 )
 
-SELECT * FROM source_data
+select * from source_data

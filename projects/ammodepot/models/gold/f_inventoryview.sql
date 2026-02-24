@@ -1,23 +1,17 @@
-{{ config(
-    materialized = 'table',
-    schema       = 'gold'
-) }}
-
-SELECT
+select
   p.part_number,
-  SUM(  COALESCE(inv.quantity_on_hand,       0) ) AS qty_available,
-  SUM(  COALESCE(inv.quantity_not_available, 0) ) AS qty_not_available,
-  SUM(  COALESCE(inv.quantity_on_order,      0) ) AS qty_on_order,
-  MAX( COALESCE(pc.average_cost, 0) )         AS part_cost,
-  SUM(  COALESCE(inv.quantity_on_hand,       0) ) * MAX( COALESCE(pc.average_cost, 0) ) 
-                                              AS extended_cost
-FROM {{ ref('inventory_qtyinventorytotals') }} AS inv
-LEFT JOIN {{ ref('fishbowl_part') }}               AS p
-  ON inv.part_id = p.part_id
-LEFT JOIN {{ ref('fishbowl_partcost') }}      AS pc
-  ON p.part_id = pc.part_id
-Where 
-inv.location_group_id = 8
-GROUP BY
+  SUM(  COALESCE(inv.quantity_on_hand,       0) ) as qty_available,
+  SUM(  COALESCE(inv.quantity_not_available, 0) ) as qty_not_available,
+  SUM(  COALESCE(inv.quantity_on_order,      0) ) as qty_on_order,
+  MAX( COALESCE(pc.average_cost, 0) )         as part_cost,
+  SUM(  COALESCE(inv.quantity_on_hand,       0) ) * MAX( COALESCE(pc.average_cost, 0) )
+                                              as extended_cost
+from {{ ref('inventory_qtyinventorytotals') }} as inv
+left join {{ ref('fishbowl_part') }}               as p
+  on inv.part_id = p.part_id
+left join {{ ref('fishbowl_partcost') }}      as pc
+  on p.part_id = pc.part_id
+where
+inv.location_group_id = {{ var('ammodepot_default_location_group_id') }}
+group by
   p.part_number
-

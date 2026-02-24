@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         code,
         price,
         method,
@@ -27,19 +27,19 @@ WITH source_data AS (
         shq_dispatch_date,
         method_description,
         carriergroup_shipping_details
-    FROM {{ source('magento', 'quote_shipping_rate') }}
-    WHERE _ab_cdc_deleted_at IS NULL
+    from {{ source('magento', 'quote_shipping_rate') }}
+    where _ab_cdc_deleted_at is null
 
 )
 
-SELECT
-    code                             AS quote_shipping_rate_code,
+select
+    code                             as quote_shipping_rate_code,
     price,
     method,
     carrier,
-    rate_id                          AS quote_shipping_rate_id,
-    address_id                       AS quote_address_id,
-    carrier_id                       AS carrier_service_id,
+    rate_id                          as quote_shipping_rate_id,
+    address_id                       as quote_address_id,
+    carrier_id                       as carrier_service_id,
     created_at,
     updated_at,
     carrier_type,
@@ -52,4 +52,4 @@ SELECT
     shq_dispatch_date,
     method_description,
     carriergroup_shipping_details
-FROM source_data
+from source_data

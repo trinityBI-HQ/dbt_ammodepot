@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
     -- This CTE selects all relevant columns from the source
-    SELECT
+    select
         id,
         abbr,
         name,
@@ -26,29 +26,29 @@ WITH source_data AS (
 
         -- Columns to be excluded from final select:
         -- _airbyte_raw_id, _airbyte_extracted_at, _airbyte_generation_id, _airbyte_meta
-    FROM
+    from
         {{ source('fishbowl', 'parttracking') }}
-    WHERE
+    where
         -- Filter out soft deletes. Assuming _ab_cdc_deleted_at follows previous patterns (VARCHAR).
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    id AS part_tracking_id,         -- Renamed primary key for this part tracking type definition
-    typeid AS part_tracking_type_id,-- Further classification of the tracking type
+    id as part_tracking_id,         -- Renamed primary key for this part tracking type definition
+    typeid as part_tracking_type_id,-- Further classification of the tracking type
 
     -- Tracking Type Details
-    name AS part_tracking_name,
-    abbr AS part_tracking_abbreviation,
-    description AS part_tracking_description,
-    gs1code AS gs1_code,              -- GS1 standard code, if applicable
-    sortorder AS sort_order,
+    name as part_tracking_name,
+    abbr as part_tracking_abbreviation,
+    description as part_tracking_description,
+    gs1code as gs1_code,              -- GS1 standard code, if applicable
+    sortorder as sort_order,
 
     -- Status
-    CAST(activeflag AS BOOLEAN) AS is_active,
+    CAST(activeflag as BOOLEAN) as is_active,
 
     -- Airbyte CDC Metadata (kept as requested, adjust if not needed in final silver)
     _ab_cdc_cursor,
@@ -56,5 +56,5 @@ SELECT
     _ab_cdc_log_file,
     _ab_cdc_updated_at
 
-FROM
+from
     source_data

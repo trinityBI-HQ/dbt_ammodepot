@@ -4,5 +4,5 @@
     schema = 'silver'
   )
 }}
-select * 
-from {{ source('magento','catalog_product_entity_varchar') }}
+select *
+from {{ source('magento','catalog_category_entity_varchar') }}

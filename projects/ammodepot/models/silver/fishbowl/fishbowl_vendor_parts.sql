@@ -7,4 +7,4 @@
 
 
 select *
-FROM {{ source('fishbowl', 'vendorparts') }}
+from {{ source('fishbowl', 'vendorparts') }}

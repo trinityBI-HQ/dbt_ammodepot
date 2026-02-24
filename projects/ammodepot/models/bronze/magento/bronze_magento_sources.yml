@@ -4,6 +4,10 @@ sources:
   - name: magento
     description: Magento e-commerce platform raw data
     schema: magento
+    freshness:
+      warn_after: {count: 24, period: hour}
+      error_after: {count: 48, period: hour}
+    loaded_at_field: "_airbyte_extracted_at"
     tables:
       - name: customer_entity
         description: Raw customer account data from Magento
@@ -227,10 +231,10 @@ sources:
           - name: value
 
       - name: eav_attribute_option_value
-        description: Valores de opções de atributo
+        description: Attribute option values for EAV model lookups
         columns:
           - name: option_id
-            description: PK do option_value
+            description: Primary key for attribute option value
             tests:
               - unique
               - not_null
@@ -239,20 +243,20 @@ sources:
           - name: value
 
       - name: eav_attribute_set
-        description: Conjuntos de atributos (attribute sets)
+        description: Attribute sets defining product attribute groups
         columns:
           - name: attribute_set_id
-            description: PK do attribute_set
+            description: Primary key for attribute set
             tests:
               - unique
               - not_null
           - name: attribute_set_name
 
       - name: eav_attribute
-        description: Conjuntos de atributos (attribute sets)
+        description: EAV attribute definitions (codes, types, labels)
         columns:
           - name: attribute_id
-            description: PK do attribute_set
+            description: Primary key for attribute
             tests:
               - unique
               - not_null

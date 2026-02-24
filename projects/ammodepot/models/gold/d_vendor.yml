@@ -1,0 +1,59 @@
+version: 2
+
+models:
+  - name: d_vendor
+    description: "Vendor dimension containing supplier details, payment terms, and shipping defaults."
+    columns:
+      - name: vendor_id
+        description: "Primary key for the vendor."
+        tests:
+          - unique
+          - not_null
+      - name: vendor_name
+        description: "Name of the vendor."
+      - name: vendor_note
+        description: "Notes associated with the vendor."
+      - name: vendor_url
+        description: "Vendor website URL."
+      - name: lead_time_days
+        description: "Default lead time in days for vendor shipments."
+      - name: status_id
+        description: "Vendor status identifier."
+      - name: account_id
+        description: "Associated account identifier."
+      - name: sysuser_id
+        description: "System user identifier linked to the vendor."
+      - name: tax_rate_id
+        description: "Tax rate identifier applied to the vendor."
+      - name: account_number
+        description: "Vendor account number."
+      - name: is_active
+        description: "Whether the vendor is active."
+      - name: currency_id
+        description: "Currency identifier for the vendor."
+      - name: credit_limit
+        description: "Credit limit for the vendor."
+      - name: date_entered
+        description: "Date when the vendor was entered into the system."
+      - name: accounting_id
+        description: "Accounting system identifier for the vendor."
+      - name: currency_rate
+        description: "Currency exchange rate for the vendor."
+      - name: custom_fields
+        description: "Custom fields associated with the vendor."
+      - name: accounting_hash
+        description: "Hash value for accounting synchronization."
+      - name: minimum_order_amount
+        description: "Minimum order amount required by the vendor."
+      - name: last_changed_user
+        description: "User who last modified the vendor record."
+      - name: date_last_modified
+        description: "Date when the vendor record was last modified."
+      - name: default_carrier_id
+        description: "Default shipping carrier identifier."
+      - name: default_ship_terms_id
+        description: "Default shipping terms identifier."
+      - name: default_payment_terms_id
+        description: "Default payment terms identifier."
+      - name: default_carrier_service_id
+        description: "Default carrier service identifier."
