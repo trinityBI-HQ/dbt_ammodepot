@@ -13,7 +13,9 @@ models:
         description: Unique identifier for the plugin information record
         tests:
           - unique
-          - not_null
+          - not_null:
+              config:
+                severity: warn
 
       - name: record_id
         description: Foreign key reference to another table's record

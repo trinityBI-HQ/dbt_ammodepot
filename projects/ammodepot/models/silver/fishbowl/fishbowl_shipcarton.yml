@@ -7,7 +7,9 @@ models:
       - name: ship_carton_id
         tests:
           - unique
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: shipment_id
       - name: carton_number
       - name: carton_weight

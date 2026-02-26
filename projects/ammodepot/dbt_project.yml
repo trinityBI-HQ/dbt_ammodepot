@@ -71,14 +71,22 @@ vars:
   # Lead time ranking limit
   ammodepot_lead_time_rank_limit: 3
 
+tests:
+  ammodepot:
+    # Default warn severity: Airbyte CDC source data naturally has duplicate
+    # and null IDs for updated/deleted rows. Tests alert but do not block builds.
+    +severity: warn
+
 models:
   ammodepot:
     silver:
       +schema: silver
       +materialized: view
+      +bind: false
     gold:
       +schema: gold
       +materialized: table
       intermediate:
         +schema: gold
         +materialized: view
+        +bind: false

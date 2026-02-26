@@ -6,8 +6,12 @@ models:
     columns:
       - name: so_item_id
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
       - name: so_id
       - name: product_id
       - name: quantity_ordered

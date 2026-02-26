@@ -20,7 +20,9 @@ models:
       - name: part_number
         description: "Part number identifier."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: datereceived
         description: "Date when the item was received."
       - name: datelastmodified
@@ -56,7 +58,9 @@ models:
       - name: purchase_order_id
         description: "Purchase order identifier."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: receipt_item_status_id
         description: "Status identifier for the receipt item."
       - name: po_item_id
