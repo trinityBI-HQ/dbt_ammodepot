@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
 select
     part_id,
     location_group_id,

@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema = 'silver'
-  )
-}}
-
 with source_data as (
 
     select

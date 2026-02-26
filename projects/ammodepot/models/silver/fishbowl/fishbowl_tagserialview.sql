@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema = 'silver'
-  )
-}}
-
 with source_data as (
     -- This CTE selects all columns from the source view
     select

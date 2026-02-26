@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
 with purchase_order_item_allocations as (
     select
         p.part_id,                                -- from fishbowl_part

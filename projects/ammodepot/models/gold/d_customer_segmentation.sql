@@ -191,10 +191,10 @@ customer_group_cte as (
 
 -- 6. Customer-entity join to pick up group_id
 customer_entity_cte as (
-    select 
+    select
       email           as customer_email,
-      group_id        as customer_group_id
-    from {{ source('magento','customer_entity') }}
+      customer_group_id
+    from {{ ref('magento_customer_entity') }}
 )
 
 -- Final join & filter
