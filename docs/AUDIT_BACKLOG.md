@@ -39,9 +39,8 @@
 - [x] **H3** Replace `dv.*` wildcard in `d_customer_segmentation.sql` with 15 explicit columns
 - [x] **H5** Fix `SELECT *` in `int_magento_product_eav_lookups.sql` line 2
 
-## MEDIUM — Fixed in PR #13
+## LOW — Fixed in PR #13
 
-- [x] **M2** Add UPPER_CASE aliases to `d_vendor.sql` for Gold layer consistency
 - [x] **L1** Remove deprecated `version: 2` header from 41 YAML files
 
 ---
@@ -68,6 +67,11 @@
 ---
 
 ## MEDIUM — Backlog
+
+- [ ] **M2** Add UPPER_CASE aliases to `d_vendor.sql` for Gold layer consistency + rename `fishbowl_vendor_parts.sql` columns to snake_case
+  - Reverted from PR #13 to avoid breaking Power BI dashboards
+  - Requires coordinated Power BI update before implementing
+  - Also update: `d_vendor.yml`, `f_pos.yml` FK ref, `int_fishbowl_product_enrichment.sql`
 
 - [ ] **M1** Evaluate thin Gold pass-through models (`d_customer.sql`, `d_store.sql`, `d_vendor.sql`) — add business logic or document justification as BI interface layer
   - These are 1:1 mappings from Silver with only UPPER_CASE aliasing

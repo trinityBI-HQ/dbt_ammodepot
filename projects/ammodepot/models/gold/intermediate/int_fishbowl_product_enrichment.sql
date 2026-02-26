@@ -29,18 +29,18 @@ attribute_set_data as (
 
 vendorpartscost as (
     select
-        date_last_modified,
-        part_id,
-        last_cost,
-        ROW_NUMBER() over (partition by part_id order by date_last_modified desc) as rn
+        datelastmodified,
+        partid,
+        lastcost,
+        ROW_NUMBER() over (partition by partid order by datelastmodified desc) as rn
     from {{ ref('fishbowl_vendor_parts') }}
 ),
 
 vendorlast as (
     select
-        date_last_modified,
-        part_id,
-        last_cost
+        datelastmodified,
+        partid,
+        lastcost
     from vendorpartscost
     where rn = 1
 ),
@@ -50,7 +50,7 @@ fishbowl_conversion as (
         pr.product_number,
         AVG(uom.multiply_factor) as convert,
         AVG(pc.average_cost) as avgcost,
-        AVG(vp.last_cost) as lastvendorcost
+        AVG(vp.lastcost) as lastvendorcost
     from {{ ref('fishbowl_product') }} as pr
     left join {{ ref('fishbowl_uomconversion') }} as uom
         on pr.uom_id = uom.from_uom_id
@@ -58,7 +58,7 @@ fishbowl_conversion as (
     left join {{ ref('fishbowl_partcost') }} as pc
         on pr.part_id = pc.part_id
     left join vendorlast as vp
-        on pr.part_id = vp.part_id
+        on pr.part_id = vp.partid
     group by pr.product_number
 )
 
