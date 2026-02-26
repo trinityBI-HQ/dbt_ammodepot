@@ -1,5 +1,9 @@
 with int_entity as (
-    select *
+    select
+        entity_id,
+        attribute_id,
+        store_id,
+        value
     from {{ ref('magento_catalog_product_entity_int') }}
 ),
 

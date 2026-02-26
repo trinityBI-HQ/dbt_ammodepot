@@ -1,4 +1,3 @@
-version: 2
 
 # All silver model tests use severity: warn because these are views over
 # Airbyte CDC data which naturally contains duplicate and null IDs for
