@@ -1,0 +1,104 @@
+domain: langflow
+name: Langflow
+description: Visual low-code builder for AI agents, RAG pipelines, and multi-agent workflows using drag-and-drop components
+version: 1.0.0
+mcp_validated: 2026-02-06
+
+entry_points:
+  index: index.md
+  quick_reference: quick-reference.md
+
+concepts:
+  - name: flows-components
+    path: concepts/flows-components.md
+    description: Core building blocks - flows as DAGs, components as nodes
+    confidence: 0.95
+
+  - name: visual-editor
+    path: concepts/visual-editor.md
+    description: Drag-and-drop interface for building and testing
+    confidence: 0.95
+
+  - name: agents-tools
+    path: concepts/agents-tools.md
+    description: Autonomous components with tool integration
+    confidence: 0.95
+
+  - name: vector-stores
+    path: concepts/vector-stores.md
+    description: Embedding storage and similarity search for RAG
+    confidence: 0.95
+
+  - name: language-models
+    path: concepts/language-models.md
+    description: LLM integration and prompt configuration
+    confidence: 0.95
+
+  - name: data-loaders
+    path: concepts/data-loaders.md
+    description: Document loading, splitting, and chunking
+    confidence: 0.95
+
+  - name: api-deployment
+    path: concepts/api-deployment.md
+    description: REST API deployment with authentication
+    confidence: 0.95
+
+  - name: mcp-server
+    path: concepts/mcp-server.md
+    description: Model Context Protocol server and client
+    confidence: 0.95
+
+patterns:
+  - name: vector-rag-chatbot
+    path: patterns/vector-rag-chatbot.md
+    description: Production-ready RAG chatbot with vector retrieval
+
+  - name: multi-agent-workflow
+    path: patterns/multi-agent-workflow.md
+    description: Coordinate specialized agents for complex tasks
+
+  - name: custom-components
+    path: patterns/custom-components.md
+    description: Create reusable custom components
+
+  - name: api-integration
+    path: patterns/api-integration.md
+    description: Deploy flows as REST APIs with clients
+
+  - name: langchain-integration
+    path: patterns/langchain-integration.md
+    description: Use LangChain components in Langflow
+
+  - name: production-deployment
+    path: patterns/production-deployment.md
+    description: Deploy to production with Kubernetes
+
+tags:
+  - low-code
+  - visual-builder
+  - ai-agents
+  - rag
+  - multi-agent
+  - langchain
+  - vector-stores
+  - llm-orchestration
+
+related_domains:
+  - pydantic
+  - openrouter
+  - langfuse
+  - crewai
+
+agents:
+  - genai-architect
+  - ai-prompt-specialist
+  - function-developer
+
+use_cases:
+  - RAG chatbots
+  - Multi-agent systems
+  - Document Q&A
+  - AI workflow automation
+  - Customer support bots
+  - Research assistants

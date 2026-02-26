@@ -1,0 +1,26 @@
+{
+  "technology": "n8n",
+  "category": "automation",
+  "subcategory": "workflow-automation",
+  "version": "2.7.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "API integration and orchestration",
+    "Event-driven workflow automation",
+    "AI agent orchestration (LangChain-based)",
+    "MCP server/client integration",
+    "Low-code automation pipelines",
+    "Human-in-the-loop AI workflows",
+    "SaaS tool integration"
+  ],
+  "related_technologies": [
+    "Zapier",
+    "Make (Integromat)",
+    "LangChain",
+    "Temporal",
+    "Apache Airflow",
+    "Dagster"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.n8n.io"
+}

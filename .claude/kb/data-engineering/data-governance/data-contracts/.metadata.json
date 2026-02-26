@@ -1,0 +1,28 @@
+{
+  "technology": "Data Contracts",
+  "category": "data-engineering",
+  "subcategory": "data-governance",
+  "version": "ODCS 3.1.2",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Schema agreements between data producers and consumers",
+    "Data quality enforcement at pipeline boundaries",
+    "Domain-oriented data ownership in data mesh",
+    "Breaking changes prevention and versioning",
+    "Automated contract testing in CI/CD"
+  ],
+  "related_technologies": [
+    "dbt",
+    "Dagster",
+    "Snowflake",
+    "Kafka",
+    "Great Expectations",
+    "Soda",
+    "Protobuf",
+    "JSON Schema",
+    "Avro",
+    "Schema Registry"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://datacontract.com"
+}

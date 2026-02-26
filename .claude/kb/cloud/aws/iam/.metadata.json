@@ -1,0 +1,33 @@
+{
+  "technology": "AWS IAM",
+  "display_name": "AWS Identity and Access Management (IAM)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "AWS Identity and Access Management -- securely control access to AWS resources with users, roles, policies, and permissions boundaries",
+  "version": "current",
+  "website": "https://aws.amazon.com/iam/",
+  "documentation": "https://docs.aws.amazon.com/IAM/latest/UserGuide/",
+  "use_cases": [
+    "access control",
+    "least privilege enforcement",
+    "cross-account access",
+    "service role management",
+    "federated identity",
+    "permissions boundaries",
+    "compliance and auditing",
+    "multi-account governance"
+  ],
+  "related_technologies": [
+    "aws-s3",
+    "aws-lambda",
+    "aws-organizations",
+    "aws-sso",
+    "aws-sts",
+    "terraform",
+    "aws-cloudtrail"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

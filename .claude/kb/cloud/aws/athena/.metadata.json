@@ -1,0 +1,32 @@
+{
+  "technology": "AWS Athena",
+  "display_name": "Amazon Athena (Interactive SQL Analytics)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "Serverless interactive query service for analyzing data in Amazon S3 using standard SQL, powered by Trino and Apache Spark",
+  "version": "v3 (Trino-based)",
+  "website": "https://aws.amazon.com/athena/",
+  "documentation": "https://docs.aws.amazon.com/athena/latest/ug/",
+  "use_cases": [
+    "ad-hoc SQL queries on S3 data lakes",
+    "log analytics and troubleshooting",
+    "BI dashboards via QuickSight",
+    "federated queries across data sources",
+    "ACID transactions with Apache Iceberg",
+    "data exploration and profiling",
+    "cost-effective analytics without a warehouse"
+  ],
+  "related_technologies": [
+    "aws-glue",
+    "aws-s3",
+    "aws-lake-formation",
+    "aws-quicksight",
+    "apache-iceberg",
+    "apache-spark",
+    "terraform"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

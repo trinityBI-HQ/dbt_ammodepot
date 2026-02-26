@@ -1,0 +1,28 @@
+{
+  "technology": "FinOps",
+  "category": "data-engineering",
+  "subcategory": "finops",
+  "version": "FinOps Framework 2025",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Cloud cost optimization for data pipelines",
+    "Data warehouse cost management",
+    "Storage lifecycle optimization",
+    "Budget forecasting and anomaly detection",
+    "Cost allocation and chargeback",
+    "SaaS cost management (Snowflake, Databricks, Salesforce)",
+    "GenAI/LLM cost management"
+  ],
+  "related_technologies": [
+    "Snowflake",
+    "Databricks",
+    "Apache Spark",
+    "AWS S3",
+    "GCP BigQuery",
+    "Terraform",
+    "Apache Iceberg",
+    "dbt"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://www.finops.org/framework/"
+}

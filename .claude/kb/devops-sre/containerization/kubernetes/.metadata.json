@@ -1,0 +1,23 @@
+{
+  "technology": "Kubernetes",
+  "category": "devops-sre",
+  "subcategory": "containerization",
+  "version": "1.35.x",
+  "use_cases": [
+    "Container orchestration at scale",
+    "Microservices deployment and management",
+    "Auto-scaling and self-healing workloads",
+    "Multi-cloud and hybrid deployments",
+    "CI/CD and GitOps workflows",
+    "Stateful application management"
+  ],
+  "related_technologies": [
+    "Docker",
+    "Docker Compose",
+    "Helm",
+    "Kustomize",
+    "Argo CD",
+    "Istio",
+    "Terraform"
+  ]
+}

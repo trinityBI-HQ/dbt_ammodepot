@@ -1,0 +1,26 @@
+{
+  "technology": "Railway",
+  "category": "devops-sre",
+  "subcategory": "platform",
+  "version": "Current (Metal)",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Rapid application deployment",
+    "Preview environments per branch",
+    "Managed databases and services",
+    "Git-based deployment workflows",
+    "Railway Metal owned infrastructure with NVMe SSDs",
+    "Static inbound IPs for firewall allowlisting",
+    "High-availability volumes for persistent storage",
+    "Local development with railway dev TUI"
+  ],
+  "related_technologies": [
+    "Vercel",
+    "Render",
+    "Fly.io",
+    "Heroku",
+    "Docker"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.railway.com"
+}

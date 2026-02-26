@@ -1,0 +1,24 @@
+{
+  "technology": "Gemini",
+  "category": "ai-ml",
+  "subcategory": "llm-platforms",
+  "version": "3.0 / 2.5 GA",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Multimodal AI (text + vision + audio + video)",
+    "Document extraction (invoices, forms)",
+    "Structured JSON output",
+    "Large context windows (up to 1M tokens)",
+    "Thinking / reasoning (thinking_level parameter)",
+    "Computer Use (Gemini 3 preview)"
+  ],
+  "related_technologies": [
+    "OpenRouter",
+    "Pydantic",
+    "LangFuse",
+    "Vertex AI",
+    "OpenAI GPT-4V"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://ai.google.dev/gemini-api/docs"
+}
