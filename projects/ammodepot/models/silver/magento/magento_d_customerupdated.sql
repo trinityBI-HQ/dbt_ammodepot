@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized='view',
-    schema='silver'
-  )
-}}
-
 with cleaned_emails as (
     select
         LOWER(COALESCE(NULLIF(CUSTOMER_EMAIL, ''), 'customer@nonidentified.com')) as CUSTOMER_EMAIL
