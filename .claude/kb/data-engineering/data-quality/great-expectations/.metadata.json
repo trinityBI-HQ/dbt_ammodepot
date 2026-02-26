@@ -1,0 +1,30 @@
+{
+  "technology": "Great Expectations",
+  "category": "data-engineering",
+  "subcategory": "data-quality",
+  "version": "1.4-1.11 (GX Core)",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Data validation and quality checks",
+    "Pipeline quality gates",
+    "Auto-generated data documentation",
+    "Statistical profiling and assertions",
+    "Multi-backend validation (Pandas, Spark, SQL)",
+    "AI-driven Expectation generation (ExpectAI / GX Cloud)",
+    "Data health scoring and coverage metrics (GX Cloud)"
+  ],
+  "related_technologies": [
+    "dbt",
+    "Dagster",
+    "Airflow",
+    "Spark",
+    "Pandas",
+    "Snowflake",
+    "PostgreSQL",
+    "BigQuery",
+    "Redshift",
+    "Atlan"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docs.greatexpectations.io"
+}

@@ -1,0 +1,24 @@
+{
+  "technology": "Airbyte",
+  "category": "data-engineering",
+  "subcategory": "elt",
+  "version": "2.0.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Data integration and replication (4-6x faster syncs in 2.0)",
+    "SaaS API connector ecosystem (350+)",
+    "CDC (Change Data Capture)",
+    "Database-to-warehouse replication",
+    "Data Activation / Reverse ETL to CRMs and marketing tools",
+    "AI-configured connections"
+  ],
+  "related_technologies": [
+    "Fivetran",
+    "Meltano",
+    "dbt",
+    "Snowflake",
+    "Dagster"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.airbyte.com"
+}

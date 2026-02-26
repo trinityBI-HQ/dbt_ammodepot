@@ -1,0 +1,29 @@
+{
+  "technology": "Grafana",
+  "category": "devops-sre",
+  "subcategory": "monitoring",
+  "version": "11.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Metrics visualization and dashboarding",
+    "Infrastructure and application monitoring",
+    "Alerting and notification management",
+    "Log exploration (Loki)",
+    "Distributed tracing (Tempo)",
+    "Dashboard-as-code provisioning",
+    "Multi-source data correlation"
+  ],
+  "related_technologies": [
+    "Prometheus",
+    "Loki",
+    "Tempo",
+    "Mimir",
+    "InfluxDB",
+    "Elasticsearch",
+    "Datadog",
+    "Terraform",
+    "Kubernetes"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://grafana.com/docs/grafana/latest/"
+}

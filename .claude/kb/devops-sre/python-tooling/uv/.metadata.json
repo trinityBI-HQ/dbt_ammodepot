@@ -1,0 +1,34 @@
+{
+  "technology": "uv",
+  "display_name": "uv (Astral)",
+  "category": "devops-sre",
+  "subcategory": "python-tooling",
+  "description": "Ultra-fast Python package and project manager written in Rust, replacing pip, poetry, pyenv, and more",
+  "version": "0.10.x",
+  "website": "https://docs.astral.sh/uv/",
+  "repository": "https://github.com/astral-sh/uv",
+  "license": "Apache-2.0 / MIT",
+  "created_by": "Astral (creators of Ruff)",
+  "use_cases": [
+    "Python project management",
+    "Dependency resolution and lockfiles",
+    "Python version management",
+    "Virtual environment management",
+    "Running scripts with inline dependencies",
+    "Installing and running CLI tools",
+    "Building and publishing packages",
+    "Monorepo workspace management"
+  ],
+  "related_technologies": [
+    "pip",
+    "poetry",
+    "pipenv",
+    "pyenv",
+    "virtualenv",
+    "ruff",
+    "hatch",
+    "pdm"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-09"
+}

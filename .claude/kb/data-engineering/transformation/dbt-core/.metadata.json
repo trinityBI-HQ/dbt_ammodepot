@@ -1,0 +1,24 @@
+{
+  "technology": "dbt Core",
+  "category": "data-engineering",
+  "subcategory": "transformation",
+  "version": "1.11.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "SQL-based data transformations",
+    "Medallion architecture implementation",
+    "Data testing and documentation",
+    "Analytics engineering workflows",
+    "User-defined functions (UDFs)",
+    "Microbatch incremental processing"
+  ],
+  "related_technologies": [
+    "dbt Cloud",
+    "Snowflake",
+    "BigQuery",
+    "Databricks",
+    "Dagster"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.getdbt.com"
+}

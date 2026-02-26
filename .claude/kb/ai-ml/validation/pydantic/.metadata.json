@@ -1,0 +1,24 @@
+{
+  "technology": "Pydantic",
+  "category": "ai-ml",
+  "subcategory": "validation",
+  "version": "2.12.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "LLM output validation and parsing",
+    "Data model definition with type hints",
+    "JSON schema generation",
+    "Runtime type checking",
+    "Structured extraction schemas"
+  ],
+  "related_technologies": [
+    "Gemini",
+    "FastAPI",
+    "LangChain",
+    "OpenAI function calling",
+    "Instructor",
+    "Pydantic AI"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.pydantic.dev"
+}

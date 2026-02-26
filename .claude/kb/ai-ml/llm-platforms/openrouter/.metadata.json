@@ -1,0 +1,24 @@
+{
+  "technology": "OpenRouter",
+  "category": "ai-ml",
+  "subcategory": "llm-platforms",
+  "version": "Current (500+ models)",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Unified LLM API gateway (500+ models, 60+ providers)",
+    "Automatic model fallback and auto-routing",
+    "Cost optimization across providers",
+    "Structured outputs with json_schema",
+    "LangChain and SDK integration"
+  ],
+  "related_technologies": [
+    "Gemini",
+    "OpenAI",
+    "Anthropic Claude",
+    "DeepSeek",
+    "LangChain",
+    "LangFuse"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://openrouter.ai/docs"
+}

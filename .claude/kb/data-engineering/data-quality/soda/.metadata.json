@@ -1,0 +1,28 @@
+{
+  "technology": "Soda",
+  "category": "data-engineering",
+  "subcategory": "data-quality",
+  "version": "v4.x (Soda Core / Soda Library)",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Data quality testing with SodaCL checks",
+    "Schema validation and freshness monitoring",
+    "CI/CD data quality gates",
+    "Data contracts between producers and consumers",
+    "Anomaly detection and alerting via Soda Cloud",
+    "Cross-dataset and referential integrity checks"
+  ],
+  "related_technologies": [
+    "Great Expectations",
+    "dbt",
+    "Dagster",
+    "Airflow",
+    "Snowflake",
+    "BigQuery",
+    "PostgreSQL",
+    "Databricks",
+    "GitHub Actions"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docs.soda.io"
+}

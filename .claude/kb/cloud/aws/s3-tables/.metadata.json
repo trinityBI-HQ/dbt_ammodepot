@@ -1,0 +1,32 @@
+{
+  "technology": "AWS S3 Tables",
+  "display_name": "Amazon S3 Tables (Managed Apache Iceberg)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "Fully managed Apache Iceberg tables on S3 with built-in compaction, snapshot management, and analytics engine integration via AWS Glue Data Catalog",
+  "version": "current",
+  "website": "https://aws.amazon.com/s3/features/tables/",
+  "documentation": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables.html",
+  "use_cases": [
+    "managed data lakehouse",
+    "analytics-optimized tabular storage",
+    "transactional data lakes",
+    "streaming analytics",
+    "cross-engine SQL queries"
+  ],
+  "related_technologies": [
+    "aws-s3",
+    "apache-iceberg",
+    "aws-glue",
+    "aws-athena",
+    "aws-redshift",
+    "aws-emr",
+    "aws-lake-formation",
+    "terraform",
+    "sagemaker-lakehouse"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

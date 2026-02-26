@@ -1,0 +1,30 @@
+{
+  "technology": "Prometheus",
+  "category": "devops-sre",
+  "subcategory": "monitoring",
+  "version": "3.x (current: 3.9.x, LTS: 3.5.x)",
+  "last_updated": "2026-02-20",
+  "primary_use_cases": [
+    "Infrastructure and application metrics collection",
+    "Time series storage and querying with PromQL",
+    "Alerting with Alertmanager",
+    "Kubernetes cluster monitoring",
+    "Service-level objective (SLO) monitoring",
+    "Multi-dimensional data model with labels",
+    "Service discovery and dynamic target management"
+  ],
+  "related_technologies": [
+    "Grafana",
+    "Alertmanager",
+    "Thanos",
+    "Cortex",
+    "VictoriaMetrics",
+    "Grafana Mimir",
+    "Kubernetes",
+    "PromQL",
+    "OpenTelemetry",
+    "Loki"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://prometheus.io/docs/"
+}

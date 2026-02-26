@@ -1,0 +1,36 @@
+{
+  "technology": "Elementary",
+  "category": "data-engineering",
+  "subcategory": "observability",
+  "version": "2.0 (Dec 2025) / OSS 0.22.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Data quality monitoring",
+    "Anomaly detection",
+    "dbt test observability",
+    "Schema change tracking",
+    "Data freshness monitoring",
+    "Volume anomaly detection",
+    "Data & AI Control Plane (2.0)",
+    "AI-powered triage, test coverage, and performance tuning",
+    "Unified SQL, Python, and AI pipeline observability"
+  ],
+  "related_technologies": [
+    "dbt-core",
+    "dbt-cloud",
+    "dagster",
+    "snowflake",
+    "bigquery",
+    "databricks",
+    "great-expectations"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docs.elementary-data.com",
+  "packages": {
+    "dbt_package": "elementary-data/elementary",
+    "dbt_package_version": "0.22.1",
+    "python_cli": "elementary-data",
+    "python_cli_version": "0.22.0",
+    "elementary_cloud_version": "2.0"
+  }
+}

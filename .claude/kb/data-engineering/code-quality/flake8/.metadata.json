@@ -1,0 +1,25 @@
+{
+  "technology": "Flake8",
+  "category": "data-engineering",
+  "subcategory": "code-quality",
+  "version": "7.3.0",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Python code style enforcement (PEP 8)",
+    "Logical error detection via PyFlakes",
+    "Cyclomatic complexity measurement via McCabe",
+    "Plugin-based extensible linting",
+    "CI/CD code quality gates"
+  ],
+  "related_technologies": [
+    "ruff",
+    "black",
+    "isort",
+    "mypy",
+    "pre-commit",
+    "pycodestyle",
+    "pyflakes"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://flake8.pycqa.org/"
+}
