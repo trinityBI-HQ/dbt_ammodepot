@@ -1,4 +1,3 @@
-version: 2
 
 models:
   - name: f_pos
@@ -45,7 +44,7 @@ models:
           - relationships:
               arguments:
                 to: ref('d_vendor')
-                field: 'vendor_id'
+                field: 'VENDOR_ID'
               severity: warn
       - name: po_created_at
         description: "Timestamp when the purchase order was created."

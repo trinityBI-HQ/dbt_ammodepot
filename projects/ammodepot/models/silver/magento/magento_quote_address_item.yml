@@ -1,6 +1,4 @@
 
-version: 2
-
 models:
   - name: magento_quote_address_item
     description: "Silver-layer table for Magento quote address items, filtering out soft deletes and casting flags."
