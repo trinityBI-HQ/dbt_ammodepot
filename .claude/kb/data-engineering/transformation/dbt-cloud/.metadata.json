@@ -1,0 +1,25 @@
+{
+  "technology": "dbt Cloud",
+  "category": "data-engineering",
+  "subcategory": "transformation",
+  "version": "Release Tracks (Latest/Compatible/Extended)",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Managed dbt CI/CD and scheduling",
+    "Studio IDE for SQL development",
+    "Environment management with Release Tracks",
+    "Enhanced observability and alerting",
+    "dbt Mesh cross-project governance",
+    "Semantic Layer with MetricFlow",
+    "dbt Fusion Engine (preview)"
+  ],
+  "related_technologies": [
+    "dbt Core",
+    "Snowflake",
+    "BigQuery",
+    "Databricks",
+    "Dagster"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.getdbt.com/docs/cloud/about-cloud-setup"
+}

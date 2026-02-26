@@ -1,0 +1,41 @@
+{
+  "technology": "AWS CloudWatch",
+  "display_name": "Amazon CloudWatch",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "Full-stack observability service for monitoring AWS resources and applications with metrics, logs, alarms, dashboards, synthetics, and application performance monitoring",
+  "version": "current",
+  "website": "https://aws.amazon.com/cloudwatch/",
+  "documentation": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/",
+  "use_cases": [
+    "infrastructure monitoring",
+    "application performance monitoring",
+    "log aggregation and analysis",
+    "custom metric publishing",
+    "alerting and notifications",
+    "synthetic monitoring",
+    "cross-account observability",
+    "cost and usage monitoring",
+    "Lambda function monitoring",
+    "anomaly detection",
+    "Application Signals APM and SLOs",
+    "cross-account SLO monitoring",
+    "AI-powered canary debugging",
+    "tag-based dynamic telemetry",
+    "cross-account log centralization"
+  ],
+  "related_technologies": [
+    "aws-sns",
+    "aws-eventbridge",
+    "aws-x-ray",
+    "aws-lambda",
+    "aws-s3",
+    "aws-glue",
+    "aws-athena",
+    "terraform"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

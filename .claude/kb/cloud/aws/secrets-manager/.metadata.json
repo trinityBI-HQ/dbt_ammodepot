@@ -1,0 +1,34 @@
+{
+  "technology": "AWS Secrets Manager",
+  "display_name": "AWS Secrets Manager",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "AWS service for securely storing, rotating, and managing secrets such as database credentials, API keys, and tokens with KMS encryption and Lambda-based rotation",
+  "version": "current",
+  "website": "https://aws.amazon.com/secrets-manager/",
+  "documentation": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/",
+  "use_cases": [
+    "database credential management",
+    "API key storage and rotation",
+    "application secret management",
+    "cross-account secret sharing",
+    "multi-region secret replication",
+    "automated credential rotation",
+    "CI/CD secret injection",
+    "container secret management"
+  ],
+  "related_technologies": [
+    "aws-lambda",
+    "aws-iam",
+    "aws-kms",
+    "aws-rds",
+    "aws-ecs",
+    "aws-eks",
+    "terraform",
+    "aws-cloudformation"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

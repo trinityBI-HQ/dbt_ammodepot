@@ -1,0 +1,25 @@
+{
+  "technology": "Terragrunt",
+  "category": "devops-sre",
+  "subcategory": "iac",
+  "version": "0.99.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "DRY Terraform/OpenTofu configuration management",
+    "Multi-environment infrastructure promotion",
+    "Dependency graph between Terraform/OpenTofu units",
+    "Remote state configuration automation",
+    "Stacks for reusable infrastructure collections",
+    "Graph-based filtering for targeted deployments"
+  ],
+  "related_technologies": [
+    "Terraform",
+    "OpenTofu",
+    "AWS",
+    "GCP",
+    "Azure",
+    "Atlantis"
+  ],
+  "expertise_level": "advanced",
+  "external_docs": "https://terragrunt.gruntwork.io/docs"
+}

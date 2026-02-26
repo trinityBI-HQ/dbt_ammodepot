@@ -1,0 +1,33 @@
+{
+  "technology": "AWS Glue",
+  "display_name": "AWS Glue (Serverless Data Integration)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "Serverless data integration service for discovering, preparing, moving, and integrating data from multiple sources for analytics, ML, and application development",
+  "version": "5.1",
+  "website": "https://aws.amazon.com/glue/",
+  "documentation": "https://docs.aws.amazon.com/glue/latest/dg/",
+  "use_cases": [
+    "ETL/ELT data pipelines",
+    "data catalog and metadata management",
+    "schema discovery with crawlers",
+    "data quality validation",
+    "data lake integration",
+    "serverless Spark processing",
+    "CDC and streaming ETL"
+  ],
+  "related_technologies": [
+    "aws-s3",
+    "aws-athena",
+    "aws-redshift",
+    "aws-lake-formation",
+    "aws-step-functions",
+    "aws-eventbridge",
+    "apache-spark",
+    "terraform"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

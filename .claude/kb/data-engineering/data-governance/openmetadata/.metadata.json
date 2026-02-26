@@ -1,0 +1,31 @@
+{
+  "technology": "OpenMetadata",
+  "category": "data-engineering",
+  "subcategory": "data-governance",
+  "version": "1.6.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Data discovery and catalog across organizational data assets",
+    "Automated and manual data lineage tracking (table and column level)",
+    "Data quality testing with built-in profiler and test suites",
+    "Data governance with glossaries, classification, tags, and policies",
+    "Metadata ingestion from 80+ connectors (databases, dashboards, pipelines, ML)",
+    "Collaboration with conversations, tasks, and announcements on data assets",
+    "Data observability with alerts, freshness monitoring, and incident management"
+  ],
+  "related_technologies": [
+    "Airflow",
+    "Dagster",
+    "dbt",
+    "Great Expectations",
+    "Snowflake",
+    "BigQuery",
+    "Kafka",
+    "Elasticsearch",
+    "Kubernetes",
+    "Data Contracts",
+    "Elementary"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docs.open-metadata.org"
+}

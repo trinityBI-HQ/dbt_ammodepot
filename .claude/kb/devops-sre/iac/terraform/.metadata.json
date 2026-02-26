@@ -1,0 +1,27 @@
+{
+  "technology": "Terraform",
+  "category": "devops-sre",
+  "subcategory": "iac",
+  "version": "1.14.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Infrastructure as Code",
+    "Multi-cloud provisioning (GCP + AWS)",
+    "Declarative infrastructure management",
+    "State-based resource tracking",
+    "Native infrastructure testing",
+    "Ephemeral values for secrets management",
+    "Terraform Actions for Day 2 operations",
+    "Terraform Stacks for multi-workspace deployments"
+  ],
+  "related_technologies": [
+    "Terragrunt",
+    "AWS CloudFormation",
+    "Pulumi",
+    "GCP",
+    "AWS",
+    "OpenTofu"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://developer.hashicorp.com/terraform/docs"
+}

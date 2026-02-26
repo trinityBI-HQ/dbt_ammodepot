@@ -1,0 +1,28 @@
+{
+  "technology": "CrewAI",
+  "category": "ai-ml",
+  "subcategory": "multi-agent",
+  "version": "1.9.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Multi-agent orchestration with roles and Flows",
+    "Sequential, hierarchical, and event-driven task execution",
+    "Research and analysis pipelines",
+    "DataOps monitoring crews",
+    "Human-in-the-loop approval workflows",
+    "Agent-to-Agent (A2A) external interoperability",
+    "Knowledge-augmented agents (PDF, CSV, URLs)",
+    "Multimodal file handling (vision, audio)"
+  ],
+  "related_technologies": [
+    "LangChain",
+    "LangFuse",
+    "OpenRouter",
+    "Gemini",
+    "AutoGen",
+    "LiteLLM",
+    "Galileo"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docs.crewai.com"
+}

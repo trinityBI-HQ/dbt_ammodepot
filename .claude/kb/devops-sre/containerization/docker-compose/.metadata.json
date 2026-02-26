@@ -1,0 +1,23 @@
+{
+  "technology": "Docker Compose",
+  "category": "devops-sre",
+  "subcategory": "containerization",
+  "version": "2.40+",
+  "use_cases": [
+    "Multi-container local development",
+    "Service orchestration for development and testing",
+    "Reproducible development environments",
+    "CI/CD pipeline testing",
+    "Small-scale production deployments",
+    "AI/ML model serving with models top-level section",
+    "Compose-to-Kubernetes manifest conversion"
+  ],
+  "related_technologies": [
+    "Docker",
+    "Kubernetes",
+    "Docker Swarm",
+    "Podman Compose"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12"
+}
