@@ -1,5 +1,3 @@
-version: 2
-
 models:
   - name: f_pos
     description: "Purchase order fact table tracking receipt items, fulfillment status, and vendor lead times."

@@ -1,5 +1,3 @@
-version: 2
-
 models:
   - name: d_vendor
     description: "Vendor dimension containing supplier details, payment terms, and shipping defaults."

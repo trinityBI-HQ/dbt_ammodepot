@@ -1,4 +1,3 @@
-version: 2
 
 models:
   - name: magento_eav_attribute_option_value

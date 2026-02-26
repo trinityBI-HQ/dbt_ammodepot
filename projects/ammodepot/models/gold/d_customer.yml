@@ -1,5 +1,3 @@
-version: 2
-
 models:
   - name: d_customer
     description: "Customer dimension from Magento, containing customer profile and account details."

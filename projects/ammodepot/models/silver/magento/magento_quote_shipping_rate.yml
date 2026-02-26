@@ -1,5 +1,4 @@
 # models/silver/magento/quote_shipping_rate.yml
-version: 2
 
 models:
   - name: magento_quote_shipping_rate
