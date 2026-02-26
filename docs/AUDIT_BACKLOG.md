@@ -47,6 +47,12 @@
 
 ## HIGH — Backlog
 
+- [ ] **H0** Reconcile `f_sales` production table with dbt model — 4 manually-added columns (`testc`, `testr`, `testfr`, `testfc`) exist in `gold.f_sales` but NOT in dbt source code
+  - These are near-exact duplicates of `cost` (100%), `row_total` (100%), `freight_revenue` (98.2%), `freight_cost` (97.6%)
+  - ~35% populated (1.1M of 3.1M rows)
+  - **Risk**: Any `dbt run` on production (any branch) will recreate the table and drop these columns
+  - **Action**: Check with Power BI team if any report references `testc`/`testr`/`testfr`/`testfc`. If yes, add them to f_sales.sql. If no, document and proceed.
+
 - [ ] **H1** Fix `magento_d_customerupdated.sql`: add CDC filter (`WHERE _ab_cdc_deleted_at IS NULL`), rename file to remove `d_` prefix, fix UPPER_CASE usage in Silver layer
   - File: `models/silver/magento/magento_d_customerupdated.sql`
   - Rename to: `magento_customer_email_rank.sql` (or similar)
