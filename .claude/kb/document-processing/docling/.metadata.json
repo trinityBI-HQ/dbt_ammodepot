@@ -1,0 +1,27 @@
+{
+  "technology": "Docling",
+  "category": "document-processing",
+  "subcategory": "parsing",
+  "version": "2.74.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "PDF document parsing with Heron layout model",
+    "Multi-format conversion (PDF, Office, LaTeX, AsciiDoc, images, audio)",
+    "Document structure analysis (tables, headings, formulas)",
+    "RAG pipeline document preprocessing",
+    "VLM-powered complex layout extraction",
+    "Audio transcription via ASR pipeline",
+    "MCP server for agentic document processing"
+  ],
+  "related_technologies": [
+    "LangChain",
+    "LlamaIndex",
+    "Haystack",
+    "CrewAI",
+    "Gemini Vision",
+    "Unstructured.io",
+    "Tesseract OCR"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docling-project.github.io/docling"
+}

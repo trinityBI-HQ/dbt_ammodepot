@@ -1,0 +1,26 @@
+{
+  "technology": "LangFuse",
+  "category": "ai-ml",
+  "subcategory": "observability",
+  "version": "3.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "LLM tracing and debugging",
+    "Cost tracking per model/user/session",
+    "Prompt versioning and A/B testing",
+    "Quality scoring and feedback loops",
+    "Agent graph visualization",
+    "OpenTelemetry-based observability"
+  ],
+  "related_technologies": [
+    "Gemini",
+    "OpenRouter",
+    "LangChain",
+    "CrewAI",
+    "Datadog",
+    "OpenTelemetry",
+    "Mixpanel"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://langfuse.com/docs"
+}

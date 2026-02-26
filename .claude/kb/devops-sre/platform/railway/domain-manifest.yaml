@@ -1,0 +1,103 @@
+# Railway Domain Manifest
+# Deployment platform for modern cloud applications
+
+domain: railway
+version: "1.0"
+mcp_validated: "2026-02-19"
+
+description: |
+  Modern cloud deployment platform on owned Metal infrastructure with NVMe SSDs,
+  static inbound IPs, anycast edge network, automatic deployments from GitHub,
+  managed databases with HA volumes, and zero-configuration setup.
+
+entry_points:
+  index: index.md
+  quick_reference: quick-reference.md
+
+concepts:
+  - name: projects
+    file: concepts/projects.md
+    description: Organizational units containing services and environments
+    confidence: 0.95
+
+  - name: services
+    file: concepts/services.md
+    description: Deployable units from GitHub, Docker, or templates
+    confidence: 0.95
+
+  - name: deployments
+    file: concepts/deployments.md
+    description: Build and runtime execution of service versions
+    confidence: 0.95
+
+  - name: environments
+    file: concepts/environments.md
+    description: Isolated deployment contexts (production, staging, preview)
+    confidence: 0.95
+
+  - name: databases
+    file: concepts/databases.md
+    description: Managed Postgres, MySQL, MongoDB, Redis provisioning
+    confidence: 0.95
+
+  - name: railway-config
+    file: concepts/railway-config.md
+    description: railway.json and railway.toml configuration files
+    confidence: 0.95
+
+  - name: cli
+    file: concepts/cli.md
+    description: Railway CLI for local development and deployment
+    confidence: 0.95
+
+  - name: variables
+    file: concepts/variables.md
+    description: Environment variables and secrets management
+    confidence: 0.95
+
+patterns:
+  - name: deployment-strategies
+    file: patterns/deployment-strategies.md
+    description: GitHub auto-deploy, CLI deploy, Docker deploy strategies
+
+  - name: database-setup
+    file: patterns/database-setup.md
+    description: Provisioning and connecting to managed databases
+
+  - name: monorepo-handling
+    file: patterns/monorepo-handling.md
+    description: Deploying multiple services from monorepo structure
+
+  - name: environment-management
+    file: patterns/environment-management.md
+    description: Multi-environment setup with variable scoping
+
+  - name: custom-domains
+    file: patterns/custom-domains.md
+    description: Custom domain configuration with automatic SSL
+
+  - name: private-networking
+    file: patterns/private-networking.md
+    description: Service-to-service communication via private network
+
+validation_sources:
+  - name: Railway Documentation
+    url: https://docs.railway.com
+    validated: "2026-02-19"
+
+  - name: Railway Config as Code
+    url: https://docs.railway.com/reference/config-as-code
+    validated: "2026-02-19"
+
+  - name: Railway CLI Reference
+    url: https://docs.railway.com/reference/cli-api
+    validated: "2026-02-19"
+
+tags:
+  - deployment
+  - paas
+  - cloud
+  - docker
+  - kubernetes
+  - databases
+  - ci-cd

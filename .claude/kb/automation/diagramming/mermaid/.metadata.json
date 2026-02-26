@@ -1,0 +1,29 @@
+{
+  "technology": "Mermaid",
+  "category": "automation",
+  "subcategory": "diagramming",
+  "version": "11.12.x",
+  "last_updated": "2026-02-17",
+  "primary_use_cases": [
+    "Diagrams as code in Markdown",
+    "Software architecture visualization",
+    "Data flow and pipeline diagrams",
+    "CI/CD pipeline documentation",
+    "Entity-relationship modeling",
+    "Project timeline planning (Gantt)",
+    "Documentation-embedded diagrams"
+  ],
+  "related_technologies": [
+    "GitHub",
+    "GitLab",
+    "Docusaurus",
+    "MkDocs",
+    "Notion",
+    "Confluence",
+    "PlantUML",
+    "D2",
+    "draw.io"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://mermaid.js.org/"
+}

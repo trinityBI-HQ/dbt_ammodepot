@@ -1,0 +1,36 @@
+{
+  "technology": "Snowflake",
+  "category": "data-engineering",
+  "subcategory": "data-platforms",
+  "version": "Current",
+  "last_updated": "2026-02-25",
+  "primary_use_cases": [
+    "Cloud data warehousing",
+    "Semi-structured data processing (VARIANT)",
+    "Continuous ingestion (Snowpipe)",
+    "Data sharing and marketplace",
+    "Cortex AI (classify, transcribe, embed, similarity, sentiment, extract, redact)",
+    "Snowflake Intelligence (natural language querying)",
+    "Open Catalog / Polaris (managed Iceberg catalog)",
+    "Interactive Tables and Warehouses (sub-second low-latency analytics)",
+    "Cortex Code (AI-native coding agent for data work)",
+    "Openflow (managed Apache NiFi data integration)",
+    "Semantic Views (natural language query definitions)",
+    "Adaptive Compute (auto-adjusting policy-driven compute)",
+    "Gen2 Standard Warehouses (2.1x faster analytics)"
+  ],
+  "related_technologies": [
+    "dbt",
+    "BigQuery",
+    "Databricks",
+    "Airbyte",
+    "Dagster",
+    "Apache Iceberg",
+    "Apache Polaris",
+    "Apache NiFi",
+    "Kafka",
+    "Streamlit"
+  ],
+  "expertise_level": "intermediate",
+  "external_docs": "https://docs.snowflake.com"
+}

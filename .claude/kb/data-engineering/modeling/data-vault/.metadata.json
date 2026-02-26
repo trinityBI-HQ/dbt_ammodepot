@@ -1,0 +1,31 @@
+{
+  "technology": "Data Vault 2.0",
+  "category": "data-engineering",
+  "subcategory": "modeling",
+  "version": "2.0",
+  "author": "Dan Linstedt",
+  "description": "Enterprise data warehouse modeling methodology using Hubs, Links, and Satellites with insert-only patterns for full auditability",
+  "use_cases": [
+    "Enterprise data warehouse integration layer",
+    "Multi-source system integration",
+    "Regulatory compliance and audit trails",
+    "Agile data warehouse development",
+    "Historical data tracking"
+  ],
+  "related_technologies": [
+    "dbt-core",
+    "snowflake",
+    "dagster",
+    "automate-dv",
+    "datavault4dbt"
+  ],
+  "automate_dv_version": "0.11.0",
+  "agents": [
+    "dbt-expert",
+    "medallion-architect",
+    "snowflake-expert"
+  ],
+  "status": "documented",
+  "created": "2026-02-09",
+  "validated": "2026-02-19"
+}

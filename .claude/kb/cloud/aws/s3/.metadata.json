@@ -1,0 +1,33 @@
+{
+  "technology": "AWS S3",
+  "display_name": "Amazon S3 (Simple Storage Service)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "Amazon Simple Storage Service - scalable object storage with industry-leading durability, availability, performance, security, and virtually unlimited scalability",
+  "version": "current",
+  "website": "https://aws.amazon.com/s3/",
+  "documentation": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/",
+  "use_cases": [
+    "data lakes",
+    "backup and archive",
+    "static website hosting",
+    "application data storage",
+    "log storage and analytics",
+    "disaster recovery",
+    "content distribution",
+    "big data analytics"
+  ],
+  "related_technologies": [
+    "aws-lambda",
+    "aws-iam",
+    "aws-cloudfront",
+    "aws-glue",
+    "aws-athena",
+    "terraform",
+    "aws-eventbridge"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

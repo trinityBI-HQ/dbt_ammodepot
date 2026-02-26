@@ -1,0 +1,37 @@
+{
+  "technology": "github",
+  "display_name": "GitHub",
+  "category": "devops-sre",
+  "subcategory": "version-control",
+  "description": "Cloud-based Git hosting platform with pull requests, Actions CI/CD, security scanning, project management, and the gh CLI for end-to-end developer workflows",
+  "version": "current (2026)",
+  "website": "https://github.com",
+  "documentation": "https://docs.github.com",
+  "cli": "https://cli.github.com",
+  "license": "Proprietary (free tier available)",
+  "created_by": "GitHub, Inc. (Microsoft)",
+  "use_cases": [
+    "Git repository hosting and collaboration",
+    "Pull request code review workflows",
+    "CI/CD automation with GitHub Actions",
+    "AI-powered coding with Copilot Coding Agent and multi-model support",
+    "Project management with Issues and Projects",
+    "Security scanning (Dependabot, code scanning, secret scanning)",
+    "MCP Server integration for IDE-agnostic AI workflows",
+    "Release management and changelog automation",
+    "Open-source community collaboration",
+    "Inner-source development within organizations"
+  ],
+  "related_technologies": [
+    "git",
+    "GitHub Actions",
+    "GitHub CLI (gh)",
+    "GitHub Copilot",
+    "GitHub MCP Server",
+    "Terraform",
+    "Docker",
+    "Kubernetes"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12"
+}

@@ -1,0 +1,25 @@
+{
+  "technology": "LangFlow",
+  "category": "ai-ml",
+  "subcategory": "workflow",
+  "version": "1.7.x",
+  "last_updated": "2026-02-19",
+  "primary_use_cases": [
+    "Visual LLM workflow builder",
+    "Low-code AI application prototyping",
+    "MCP server and client integration",
+    "RAG pipeline orchestration",
+    "Multi-agent workflow design",
+    "Prompt chain visualization"
+  ],
+  "related_technologies": [
+    "LangChain",
+    "Flowise",
+    "n8n",
+    "CrewAI",
+    "LangFuse",
+    "Docling"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.langflow.org"
+}

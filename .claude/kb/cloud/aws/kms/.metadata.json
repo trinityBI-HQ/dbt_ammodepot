@@ -1,0 +1,33 @@
+{
+  "technology": "AWS KMS",
+  "display_name": "AWS Key Management Service (KMS)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "AWS Key Management Service -- create, manage, and control cryptographic keys for encryption across AWS services and applications",
+  "version": "current",
+  "website": "https://aws.amazon.com/kms/",
+  "documentation": "https://docs.aws.amazon.com/kms/latest/developerguide/",
+  "use_cases": [
+    "data encryption at rest",
+    "envelope encryption",
+    "key management and rotation",
+    "digital signing and verification",
+    "cross-account key sharing",
+    "compliance and audit",
+    "secrets encryption",
+    "S3 server-side encryption"
+  ],
+  "related_technologies": [
+    "aws-s3",
+    "aws-iam",
+    "aws-secrets-manager",
+    "aws-lambda",
+    "aws-cloudtrail",
+    "aws-cloudhsm",
+    "terraform"
+  ],
+  "mcp_validated": "2026-02-19",
+  "created": "2026-02-12",
+  "last_updated": "2026-02-19",
+  "status": "active"
+}

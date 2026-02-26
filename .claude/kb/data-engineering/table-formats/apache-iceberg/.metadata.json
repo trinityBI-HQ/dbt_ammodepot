@@ -1,0 +1,39 @@
+{
+  "technology": "Apache Iceberg",
+  "category": "data-engineering",
+  "subcategory": "table-formats",
+  "version": "1.10.x",
+  "maintainer": "Apache Software Foundation",
+  "description": "Open table format for huge analytic datasets with ACID transactions, schema evolution, hidden partitioning, time travel, and Format Spec v3 (deletion vectors, variant type, nanosecond timestamps)",
+  "use_cases": [
+    "Lakehouse table format for analytics",
+    "Multi-engine data access (Spark, Trino, Flink, Dremio)",
+    "Schema and partition evolution without rewrites",
+    "Time travel and audit trail",
+    "Data compaction and table maintenance",
+    "Migration from Hive tables",
+    "Deletion vectors for efficient row-level deletes (v3)",
+    "Semi-structured data with variant type (v3)"
+  ],
+  "related_technologies": [
+    "spark",
+    "trino",
+    "flink",
+    "snowflake",
+    "dbt-core",
+    "dagster",
+    "delta-lake",
+    "apache-hudi",
+    "apache-polaris",
+    "nessie"
+  ],
+  "agents": [
+    "spark-specialist",
+    "spark-performance-analyzer",
+    "medallion-architect",
+    "lakeflow-architect"
+  ],
+  "status": "documented",
+  "created": "2026-02-12",
+  "validated": "2026-02-19"
+}
