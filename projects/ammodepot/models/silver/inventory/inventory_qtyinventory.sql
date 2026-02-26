@@ -5,178 +5,178 @@
   )
 }}
 
-WITH combined_inventory_quantities AS (
+with combined_inventory_quantities as (
 
-    SELECT
-        'QTYONHAND' AS quantity_type,
+    select
+        'QTYONHAND' as quantity_type,
         part_id,
         location_group_id,
-        quantity_on_hand AS quantity
-    FROM
+        quantity_on_hand as quantity
+    from
         {{ ref('inventory_qtyonhand') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_on_hand
 
-    UNION ALL
+    union all
 
     -- Note: This total 'QTYALLOCATED' is selected but not used in the final CASE statements below.
     -- Included here for direct translation, but could be omitted if truly unused.
-    SELECT
-        'QTYALLOCATED' AS quantity_type,
+    select
+        'QTYALLOCATED' as quantity_type,
         part_id,
         location_group_id,
-        total_quantity_allocated AS quantity
-    FROM
+        total_quantity_allocated as quantity
+    from
         {{ ref('inventory_qtyallocated') }} -- Assumes ref exists with columns part_id, location_group_id, total_quantity_allocated
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYALLOCATEDPO' AS quantity_type,
+    select
+        'QTYALLOCATEDPO' as quantity_type,
         part_id,
         location_group_id,
-        quantity_allocated_to_po AS quantity
-    FROM
+        quantity_allocated_to_po as quantity
+    from
         {{ ref('inventory_qtyallocatedpo') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_allocated_to_po
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYALLOCATEDSO' AS quantity_type,
+    select
+        'QTYALLOCATEDSO' as quantity_type,
         part_id,
         location_group_id,
-        quantity_allocated_to_so AS quantity
-    FROM
+        quantity_allocated_to_so as quantity
+    from
         {{ ref('inventory_qtyallocatedso') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_allocated_to_so
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYALLOCATEDTORECEIVE' AS quantity_type,
+    select
+        'QTYALLOCATEDTORECEIVE' as quantity_type,
         part_id,
         location_group_id,
-        quantity_allocated_to_receive AS quantity
-    FROM
+        quantity_allocated_to_receive as quantity
+    from
         {{ ref('inventory_qtyallocatedtoreceive') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_allocated_to_receive
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYALLOCATEDTOSEND' AS quantity_type,
+    select
+        'QTYALLOCATEDTOSEND' as quantity_type,
         part_id,
         location_group_id,
-        quantity_allocated_to_send AS quantity
-    FROM
+        quantity_allocated_to_send as quantity
+    from
         {{ ref('inventory_qtyallocatedtosend') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_allocated_to_send
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYALLOCATEDMO' AS quantity_type,
+    select
+        'QTYALLOCATEDMO' as quantity_type,
         part_id,
         location_group_id,
-        quantity_allocated_to_mo AS quantity
-    FROM
+        quantity_allocated_to_mo as quantity
+    from
         {{ ref('inventory_qtyallocatedmo') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_allocated_to_mo
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYNOTAVAILABLE' AS quantity_type,
+    select
+        'QTYNOTAVAILABLE' as quantity_type,
         part_id,
         location_group_id,
-        quantity_not_available AS quantity
-    FROM
+        quantity_not_available as quantity
+    from
         {{ ref('inventory_qtynotavailable') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_not_available
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYNOTAVAILABLETOPICK' AS quantity_type,
+    select
+        'QTYNOTAVAILABLETOPICK' as quantity_type,
         part_id,
         location_group_id,
-        quantity_not_available_to_pick AS quantity
-    FROM
+        quantity_not_available_to_pick as quantity
+    from
         {{ ref('inventory_qtynotavailabletopick') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_not_available_to_pick
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYDROPSHIP' AS quantity_type,
+    select
+        'QTYDROPSHIP' as quantity_type,
         part_id,
         location_group_id,
-        quantity_dropship AS quantity
-    FROM
+        quantity_dropship as quantity
+    from
         {{ ref('inventory_qtydropship') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_dropship
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYONORDERPO' AS quantity_type,
+    select
+        'QTYONORDERPO' as quantity_type,
         part_id,
         location_group_id,
-        quantity_on_order_po AS quantity
-    FROM
+        quantity_on_order_po as quantity
+    from
         {{ ref('inventory_qtyonorderpo') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_on_order_po
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYONORDERSO' AS quantity_type,
+    select
+        'QTYONORDERSO' as quantity_type,
         part_id,
         location_group_id,
-        quantity_on_order_so AS quantity
-    FROM
+        quantity_on_order_so as quantity
+    from
         {{ ref('inventory_qtyonorderso') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_on_order_so
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYONORDERTORECEIVE' AS quantity_type,
+    select
+        'QTYONORDERTORECEIVE' as quantity_type,
         part_id,
         location_group_id,
-        quantity_on_order_to_receive AS quantity
-    FROM
+        quantity_on_order_to_receive as quantity
+    from
         {{ ref('inventory_qtyonordertoreceive') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_on_order_to_receive
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYONORDERTOSEND' AS quantity_type,
+    select
+        'QTYONORDERTOSEND' as quantity_type,
         part_id,
         location_group_id,
-        quantity_on_order_to_send AS quantity
-    FROM
+        quantity_on_order_to_send as quantity
+    from
         {{ ref('inventory_qtyonordertosend') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_on_order_to_send
 
-    UNION ALL
+    union all
 
-    SELECT
-        'QTYONORDERMO' AS quantity_type,
+    select
+        'QTYONORDERMO' as quantity_type,
         part_id,
         location_group_id,
-        quantity_on_order_mo AS quantity
-    FROM
+        quantity_on_order_mo as quantity
+    from
         {{ ref('inventory_qtyonordermo') }} -- Assumes ref exists with columns part_id, location_group_id, quantity_on_order_mo
 )
 
-SELECT
+select
     part_id,
     location_group_id,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYONHAND'             THEN quantity ELSE 0 END), 0) AS quantity_on_hand,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYALLOCATEDPO'        THEN quantity ELSE 0 END), 0) AS quantity_allocated_po,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYALLOCATEDSO'        THEN quantity ELSE 0 END), 0) AS quantity_allocated_so,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYALLOCATEDMO'        THEN quantity ELSE 0 END), 0) AS quantity_allocated_mo,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYALLOCATEDTORECEIVE' THEN quantity ELSE 0 END), 0) +
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYALLOCATEDTOSEND'    THEN quantity ELSE 0 END), 0) AS quantity_allocated_transfer_order,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYNOTAVAILABLE'       THEN quantity ELSE 0 END), 0) AS quantity_not_available,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYNOTAVAILABLETOPICK' THEN quantity ELSE 0 END), 0) AS quantity_not_available_to_pick,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYDROPSHIP'           THEN quantity ELSE 0 END), 0) AS quantity_dropship,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYONORDERPO'          THEN quantity ELSE 0 END), 0) AS quantity_on_order_po,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYONORDERSO'          THEN quantity ELSE 0 END), 0) AS quantity_on_order_so,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYONORDERTORECEIVE'   THEN quantity ELSE 0 END), 0) +
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYONORDERTOSEND'      THEN quantity ELSE 0 END), 0) AS quantity_on_order_transfer_order,
-    COALESCE(SUM(CASE WHEN quantity_type = 'QTYONORDERMO'          THEN quantity ELSE 0 END), 0) AS quantity_on_order_mo
-FROM
+    COALESCE(SUM(case when quantity_type = 'QTYONHAND'             then quantity else 0 end), 0) as quantity_on_hand,
+    COALESCE(SUM(case when quantity_type = 'QTYALLOCATEDPO'        then quantity else 0 end), 0) as quantity_allocated_po,
+    COALESCE(SUM(case when quantity_type = 'QTYALLOCATEDSO'        then quantity else 0 end), 0) as quantity_allocated_so,
+    COALESCE(SUM(case when quantity_type = 'QTYALLOCATEDMO'        then quantity else 0 end), 0) as quantity_allocated_mo,
+    COALESCE(SUM(case when quantity_type = 'QTYALLOCATEDTORECEIVE' then quantity else 0 end), 0)
+    + COALESCE(SUM(case when quantity_type = 'QTYALLOCATEDTOSEND'    then quantity else 0 end), 0) as quantity_allocated_transfer_order,
+    COALESCE(SUM(case when quantity_type = 'QTYNOTAVAILABLE'       then quantity else 0 end), 0) as quantity_not_available,
+    COALESCE(SUM(case when quantity_type = 'QTYNOTAVAILABLETOPICK' then quantity else 0 end), 0) as quantity_not_available_to_pick,
+    COALESCE(SUM(case when quantity_type = 'QTYDROPSHIP'           then quantity else 0 end), 0) as quantity_dropship,
+    COALESCE(SUM(case when quantity_type = 'QTYONORDERPO'          then quantity else 0 end), 0) as quantity_on_order_po,
+    COALESCE(SUM(case when quantity_type = 'QTYONORDERSO'          then quantity else 0 end), 0) as quantity_on_order_so,
+    COALESCE(SUM(case when quantity_type = 'QTYONORDERTORECEIVE'   then quantity else 0 end), 0)
+    + COALESCE(SUM(case when quantity_type = 'QTYONORDERTOSEND'      then quantity else 0 end), 0) as quantity_on_order_transfer_order,
+    COALESCE(SUM(case when quantity_type = 'QTYONORDERMO'          then quantity else 0 end), 0) as quantity_on_order_mo
+from
     combined_inventory_quantities
-GROUP BY
+group by
     part_id,
     location_group_id

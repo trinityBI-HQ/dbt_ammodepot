@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- Select ALL columns from the source DDL
         fax,
         city,
@@ -103,40 +103,40 @@ WITH source_data AS (
 
         -- Columns excluded: _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
 
-    FROM
+    from
         -- Source is defined in DDL as AD_AIRBYTE.TEST_DTO_2.QUOTE_ADDRESS
         -- Assuming you have a dbt source named 'magento' pointing to AD_AIRBYTE.TEST_DTO_2
         {{ source('magento', 'quote_address') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    address_id AS quote_address_id, -- Renamed primary key
+    address_id as quote_address_id, -- Renamed primary key
     quote_id,
     customer_id,
     customer_address_id,
     region_id,
-    country_id AS country_code, -- Assuming 2-letter code
+    country_id as country_code, -- Assuming 2-letter code
 
     -- Address Details
     address_type, -- 'billing' or 'shipping'
-    prefix AS name_prefix,
-    firstname AS first_name,
-    middlename AS middle_name,
-    lastname AS last_name,
-    suffix AS name_suffix,
+    prefix as name_prefix,
+    firstname as first_name,
+    middlename as middle_name,
+    lastname as last_name,
+    suffix as name_suffix,
     company,
-    street AS street_address,
+    street as street_address,
     city,
     region,
     postcode,
-    telephone AS phone_number,
-    fax AS fax_number,
+    telephone as phone_number,
+    fax as fax_number,
     email,
 
     -- Financials (Quote Currency)
@@ -174,13 +174,13 @@ SELECT
     base_shipping_discount_tax_compensation_amnt,
 
     -- Shipping Details
-    weight AS total_weight,
+    weight as total_weight,
     shipping_method,
     shipping_description,
     carrier_id,
     carrier_type,
-    CAST(free_shipping AS BOOLEAN) AS has_free_shipping,
-    CAST(collect_shipping_rates AS BOOLEAN) AS should_collect_shipping_rates,
+    CAST(free_shipping as BOOLEAN) as has_free_shipping,
+    CAST(collect_shipping_rates as BOOLEAN) as should_collect_shipping_rates,
     applied_taxes,
     destination_type,
     carriergroup_shipping_html,
@@ -188,25 +188,25 @@ SELECT
 
     -- VAT Details
     vat_id,
-    CAST(vat_is_valid AS BOOLEAN) AS is_vat_valid,
+    CAST(vat_is_valid as BOOLEAN) as is_vat_valid,
     vat_request_id,
     vat_request_date, -- Keep as VARCHAR for silver
-    CAST(vat_request_success AS BOOLEAN) AS was_vat_request_successful,
+    CAST(vat_request_success as BOOLEAN) as was_vat_request_successful,
     validated_vat_number,
     validated_country_code,
 
     -- Flags & Settings
-    CAST(same_as_billing AS BOOLEAN) AS is_same_as_billing,
-    CAST(save_in_address_book AS BOOLEAN) AS should_save_in_address_book,
-    CAST(is_ffl AS BOOLEAN) AS is_ffl_address,
-    CAST(is_checkout AS BOOLEAN) AS is_checkout_address, -- Unclear meaning, kept name
-    CAST(split_rates AS BOOLEAN) AS has_split_rates, -- Unclear meaning, kept name
-    CAST(smsoptin_check AS BOOLEAN) AS sms_optin_check,
+    CAST(same_as_billing as BOOLEAN) as is_same_as_billing,
+    CAST(save_in_address_book as BOOLEAN) as should_save_in_address_book,
+    CAST(is_ffl as BOOLEAN) as is_ffl_address,
+    CAST(is_checkout as BOOLEAN) as is_checkout_address, -- Unclear meaning, kept name
+    CAST(split_rates as BOOLEAN) as has_split_rates, -- Unclear meaning, kept name
+    CAST(smsoptin_check as BOOLEAN) as sms_optin_check,
     validation_status,
 
     -- Timestamps
-    created_at AS address_created_at,
-    updated_at AS address_updated_at,
+    created_at as address_created_at,
+    updated_at as address_updated_at,
 
     -- Other
     customer_notes,
@@ -217,8 +217,8 @@ SELECT
     -- System Specific Fields (kept as requested)
     route_fee,
     avatax_messages, -- Avalara AvaTax extension
-    CAST(aw_afptc_uses_coupon AS BOOLEAN) AS aw_afptc_uses_coupon, -- Advanced Promotions extension
-    CAST(checkout_display_merged AS BOOLEAN) AS is_checkout_display_merged, -- Unclear meaning
+    CAST(aw_afptc_uses_coupon as BOOLEAN) as aw_afptc_uses_coupon, -- Advanced Promotions extension
+    CAST(checkout_display_merged as BOOLEAN) as is_checkout_display_merged, -- Unclear meaning
 
     -- Airbyte CDC Metadata (kept as requested)
     _ab_cdc_cursor,
@@ -226,5 +226,5 @@ SELECT
     _ab_cdc_log_file,
     _ab_cdc_updated_at
 
-FROM
+from
     source_data

@@ -1,0 +1,91 @@
+version: 2
+
+models:
+  - name: magento_eav_attribute_option_value
+    description: "EAV attribute option value lookups for translating integer attribute values to human-readable labels. One row per option per store."
+    columns:
+      - name: option_id
+        description: "Option identifier (not unique - one row per store_id)."
+        tests:
+          - not_null
+
+  - name: magento_catalog_product_entity_varchar
+    description: "Product EAV varchar attribute values, storing text-based product attributes such as name, URL key, and meta descriptions."
+    columns:
+      - name: value_id
+        description: "Primary key for the varchar attribute value record."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_catalog_product_entity_decimal
+    description: "Product EAV decimal attribute values, storing numeric product attributes such as price, weight, and special price."
+    columns:
+      - name: value_id
+        description: "Primary key for the decimal attribute value record."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_catalog_product_entity_int
+    description: "Product EAV integer attribute values, storing integer-based product attributes such as status, visibility, and color option IDs."
+    columns:
+      - name: value_id
+        description: "Primary key for the integer attribute value record."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_catalog_product_entity_text
+    description: "Product EAV text attribute values, storing long-form product attributes such as descriptions and custom text fields."
+    columns:
+      - name: value_id
+        description: "Primary key for the text attribute value record."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_catalog_product_super_link
+    description: "Links between configurable parent products and their associated simple product variants."
+    columns:
+      - name: link_id
+        description: "Primary key for the configurable-to-simple product relationship."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_eav_attribute
+    description: "EAV attribute definitions containing attribute codes, types, labels, and configuration metadata."
+    columns:
+      - name: attribute_id
+        description: "Primary key for the attribute definition."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_eav_attribute_set
+    description: "Attribute set definitions that group related attributes together for product type classification."
+    columns:
+      - name: attribute_set_id
+        description: "Primary key for the attribute set."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_catalog_category_entity_varchar
+    description: "Category EAV varchar attribute values, storing text-based category attributes such as category name and URL key."
+    columns:
+      - name: value_id
+        description: "Primary key for the category varchar attribute value record."
+        tests:
+          - unique
+          - not_null
+
+  - name: magento_catalog_category_product
+    description: "Mapping table linking products to their assigned categories, defining the product-category relationship."
+    columns:
+      - name: entity_id
+        description: "Primary key for the category-product relationship."
+        tests:
+          - unique
+          - not_null

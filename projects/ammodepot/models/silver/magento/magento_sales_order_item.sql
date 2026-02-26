@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- All columns from the CREATE TABLE statement (excluding specific Airbyte/CDC meta)
         sku,
         name,
@@ -102,50 +102,50 @@ WITH source_data AS (
         -- CDC Column for filtering ONLY
         _ab_cdc_deleted_at
 
-    FROM
+    from
         -- Assuming TEST_DTO_2 schema maps to 'magento' source
         {{ source('magento', 'sales_order_item') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    item_id AS order_item_id, -- Renamed primary key
+    item_id as order_item_id, -- Renamed primary key
     order_id,
     product_id,
     parent_item_id,
     quote_item_id,
     store_id,
     sku,
-    ext_order_item_id AS external_order_item_id,
-    vendor AS vendor_id, -- Renamed to clarify it's likely an ID
+    ext_order_item_id as external_order_item_id,
+    vendor as vendor_id, -- Renamed to clarify it's likely an ID
 
     -- Product Details
-    name AS product_name,
-    description AS product_description,
+    name as product_name,
+    description as product_description,
     product_type,
     product_options,
-    weight AS item_weight,
+    weight as item_weight,
     row_weight,
 
     -- Quantities
-    qty_ordered AS quantity_ordered,
-    qty_shipped AS quantity_shipped,
-    qty_invoiced AS quantity_invoiced,
-    qty_refunded AS quantity_refunded,
-    qty_canceled AS quantity_canceled,
-    qty_backordered AS quantity_backordered,
-    CAST(is_qty_decimal AS BOOLEAN) AS is_quantity_decimal,
+    qty_ordered as quantity_ordered,
+    qty_shipped as quantity_shipped,
+    qty_invoiced as quantity_invoiced,
+    qty_refunded as quantity_refunded,
+    qty_canceled as quantity_canceled,
+    qty_backordered as quantity_backordered,
+    CAST(is_qty_decimal as BOOLEAN) as is_quantity_decimal,
 
     -- Pricing & Financials (Order Currency)
-    price AS unit_price,
-    original_price AS unit_original_price,
+    price as unit_price,
+    original_price as unit_original_price,
     row_total,
-    price_incl_tax AS unit_price_incl_tax,
+    price_incl_tax as unit_price_incl_tax,
     row_total_incl_tax,
     tax_amount,
     tax_percent,
@@ -165,10 +165,10 @@ SELECT
     discount_tax_compensation_refunded,
 
     -- Pricing & Financials (Base Currency)
-    base_price AS base_unit_price,
-    base_original_price AS base_unit_original_price,
+    base_price as base_unit_price,
+    base_original_price as base_unit_original_price,
     base_row_total,
-    base_price_incl_tax AS base_unit_price_incl_tax,
+    base_price_incl_tax as base_unit_price_incl_tax,
     base_row_total_incl_tax,
     base_tax_amount,
     base_tax_invoiced,
@@ -187,17 +187,17 @@ SELECT
     base_cost,
 
     -- Flags & Settings
-    CAST(is_virtual AS BOOLEAN) AS is_virtual_item,
-    CAST(no_discount AS BOOLEAN) AS is_discount_excluded,
-    CAST(free_shipping AS BOOLEAN) AS has_free_shipping,
-    CAST(locked_do_ship AS BOOLEAN) AS is_locked_for_shipping,
-    CAST(locked_do_invoice AS BOOLEAN) AS is_locked_for_invoicing,
-    CAST(gift_message_available AS BOOLEAN) AS is_gift_message_available,
-    CAST(requires_ffl AS BOOLEAN) AS requires_ffl, -- Assuming NUMBER is 0/1 flag
+    CAST(is_virtual as BOOLEAN) as is_virtual_item,
+    CAST(no_discount as BOOLEAN) as is_discount_excluded,
+    CAST(free_shipping as BOOLEAN) as has_free_shipping,
+    CAST(locked_do_ship as BOOLEAN) as is_locked_for_shipping,
+    CAST(locked_do_invoice as BOOLEAN) as is_locked_for_invoicing,
+    CAST(gift_message_available as BOOLEAN) as is_gift_message_available,
+    CAST(requires_ffl as BOOLEAN) as requires_ffl, -- Assuming NUMBER is 0/1 flag
 
     -- Timestamps
-    created_at AS item_created_at,
-    updated_at AS item_updated_at,
+    created_at as item_created_at,
+    updated_at as item_updated_at,
 
     -- Other Fields (including AW_AFPTC, CARRIERGROUP, etc.)
     applied_rule_ids,
@@ -209,7 +209,7 @@ SELECT
     aw_afptc_amount,
     aw_afptc_percent,
     aw_afptc_invoiced,
-    CAST(aw_afptc_is_promo AS BOOLEAN) AS is_aw_afptc_promo, -- Assuming NUMBER is 0/1 flag
+    CAST(aw_afptc_is_promo as BOOLEAN) as is_aw_afptc_promo, -- Assuming NUMBER is 0/1 flag
     aw_afptc_refunded,
     aw_afptc_rule_ids,
     base_aw_afptc_amount,
@@ -222,5 +222,5 @@ SELECT
     carriergroup_id,
     carriergroup_shipping
 
-FROM
+from
     source_data

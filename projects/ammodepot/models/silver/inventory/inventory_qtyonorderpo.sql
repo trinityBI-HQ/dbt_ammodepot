@@ -5,47 +5,47 @@
   )
 }}
 
-WITH receipt_item_on_order AS (
-    SELECT
+with receipt_item_on_order as (
+    select
         p.part_id,                                  -- from fishbowl_part
         r.location_group_id,                        -- from fishbowl_receipt
-        ri.uom_id AS receipt_item_uom_id,           -- from fishbowl_receiptitem
-        p.default_uom_id AS part_uom_id,                    -- from fishbowl_part
+        ri.uom_id as receipt_item_uom_id,           -- from fishbowl_receiptitem
+        p.default_uom_id as part_uom_id,                    -- from fishbowl_part
         ri.quantity_received,                       -- from fishbowl_receiptitem (renamed from qty)
         uomc.multiply_factor,                       -- from fishbowl_uomconversion
         uomc.factor,                                -- from fishbowl_uomconversion
         uomc.uom_conversion_id                      -- from fishbowl_uomconversion (to check if a conversion exists)
-    FROM
-        {{ ref('fishbowl_receipt') }} r
-    JOIN
-        {{ ref('fishbowl_receiptitem') }} ri -- Assuming a silver model fishbowl_receiptitem exists
-        ON r.receipt_id = ri.receipt_id
-    JOIN
-        {{ ref('fishbowl_part') }} p
-        ON p.part_id = ri.part_id
-    LEFT JOIN
-        {{ ref('fishbowl_uomconversion') }} uomc
-        ON uomc.to_uom_id = p.default_uom_id AND uomc.from_uom_id = ri.uom_id
-    WHERE
+    from
+        {{ ref('fishbowl_receipt') }} as r
+    inner join
+        {{ ref('fishbowl_receiptitem') }} as ri -- Assuming a silver model fishbowl_receiptitem exists
+        on r.receipt_id = ri.receipt_id
+    inner join
+        {{ ref('fishbowl_part') }} as p
+        on p.part_id = ri.part_id
+    left join
+        {{ ref('fishbowl_uomconversion') }} as uomc
+        on uomc.to_uom_id = p.default_uom_id and uomc.from_uom_id = ri.uom_id
+    where
         r.order_type_id = 10
-        AND ri.receipt_item_status_id IN (10, 20) -- Use renamed column
+        and ri.receipt_item_status_id in (10, 20) -- Use renamed column
 )
 
-SELECT
+select
     part_id,
     location_group_id,
     COALESCE(
         SUM(
-            CASE
-                WHEN (receipt_item_uom_id <> part_uom_id) AND (uom_conversion_id IS NOT NULL) -- Check existence of conversion
-                THEN (quantity_received * multiply_factor) / factor -- Ensure factor is not zero if used in division
-                ELSE quantity_received
-            END
+            case
+                when (receipt_item_uom_id <> part_uom_id) and (uom_conversion_id is not null) -- Check existence of conversion
+                then (quantity_received * multiply_factor) / factor -- Ensure factor is not zero if used in division
+                else quantity_received
+            end
         ),
         0
-    ) AS quantity_on_order_po
-FROM
+    ) as quantity_on_order_po
+from
     receipt_item_on_order
-GROUP BY
+group by
     part_id,
     location_group_id

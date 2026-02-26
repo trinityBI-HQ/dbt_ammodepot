@@ -1,0 +1,79 @@
+version: 2
+
+models:
+  - name: f_pos
+    description: "Purchase order fact table tracking receipt items, fulfillment status, and vendor lead times."
+    columns:
+      - name: part_id
+        description: "Identifier for the part."
+      - name: receipt_item_id
+        description: "Primary key for the receipt item."
+        tests:
+          - unique
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier for the receipt."
+      - name: qty
+        description: "Quantity received."
+      - name: datereconciled
+        description: "Date when the receipt item was reconciled."
+      - name: part_number
+        description: "Part number identifier."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: datereceived
+        description: "Date when the item was received."
+      - name: datelastmodified
+        description: "Date when the record was last modified."
+      - name: unit_cost
+        description: "Unit cost of the received item."
+      - name: total_cost
+        description: "Total cost of the received items."
+      - name: last_fulfillment_date
+        description: "Date of the last fulfillment."
+      - name: scheduled_fulfillment_date
+        description: "Scheduled date for fulfillment."
+      - name: quantity_fulfilled
+        description: "Quantity that has been fulfilled."
+      - name: quantity_to_fulfill
+        description: "Quantity remaining to be fulfilled."
+      - name: vendor_id
+        description: "Vendor identifier for the purchase order."
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_vendor')
+                field: 'vendor_id'
+              severity: warn
+      - name: po_created_at
+        description: "Timestamp when the purchase order was created."
+      - name: po_confirmed_at
+        description: "Timestamp when the purchase order was confirmed."
+      - name: po_issued_at
+        description: "Timestamp when the purchase order was issued."
+      - name: po_first_shipment_date
+        description: "Date of the first shipment for the purchase order."
+      - name: purchase_order_id
+        description: "Purchase order identifier."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: receipt_item_status_id
+        description: "Status identifier for the receipt item."
+      - name: po_item_id
+        description: "Purchase order item identifier."
+      - name: last_date_prior_to_received
+        description: "Last date prior to the item being received."
+      - name: vendor_lead_time
+        description: "Lead time in days from the vendor."
+      - name: vendor_product_leadtime
+        description: "Lead time specific to the vendor-product combination."
+      - name: product_leadtime
+        description: "Overall product lead time."
+      - name: precise_leadtime
+        description: "Precisely calculated lead time."
+      - name: date_expected
+        description: "Expected delivery date."

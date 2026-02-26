@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- Core Identifiers
         id,
         num,
@@ -59,61 +59,61 @@ WITH source_data AS (
         -- _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
         -- _AB_CDC_CURSOR, _AB_CDC_LOG_POS, _AB_CDC_LOG_FILE, _AB_CDC_UPDATED_AT
 
-    FROM
+    from
         -- Source is defined in DDL as AD_AIRBYTE.AIRBYTE_SCHEMA.SHIP
         -- Assuming you have a dbt source named 'ad_airbyte' pointing to AD_AIRBYTE.AIRBYTE_SCHEMA
         {{ source('fishbowl', 'ship') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Core Identifiers
-    id AS shipment_id,                  -- Renamed primary key
-    num AS shipment_number,
-    shipmentidentificationnumber AS shipment_identification_number,
+    id as shipment_id,                  -- Renamed primary key
+    num as shipment_number,
+    shipmentidentificationnumber as shipment_identification_number,
 
     -- Related Order Identifiers
-    soid AS sales_order_id,
-    poid AS purchase_order_id,
-    xoid AS transfer_order_id,
-    ordertypeid AS order_type_id,
+    soid as sales_order_id,
+    poid as purchase_order_id,
+    xoid as transfer_order_id,
+    ordertypeid as order_type_id,
 
     -- Shipment Details
-    statusid AS status_id,
-    carrierid AS carrier_id,
-    carrierserviceid AS carrier_service_id,
-    fobpointid AS fob_point_id,
-    cartoncount AS carton_count,
-    billoflading AS bill_of_lading,
-    contact AS shipment_contact,
-    shippedby AS shipped_by_user_id,
-    note AS shipment_note,
+    statusid as status_id,
+    carrierid as carrier_id,
+    carrierserviceid as carrier_service_id,
+    fobpointid as fob_point_id,
+    cartoncount as carton_count,
+    billoflading as bill_of_lading,
+    contact as shipment_contact,
+    shippedby as shipped_by_user_id,
+    note as shipment_note,
 
     -- Shipping Address
-    shiptoid AS ship_to_id,
-    shiptoname AS ship_to_name,
-    shiptoaddress AS ship_to_address,
-    shiptocity AS ship_to_city,
-    shiptozip AS ship_to_zip,
-    shiptostateid AS ship_to_state_id,
-    shiptocountryid AS ship_to_country_id,
-    CAST(shiptoresidential AS BOOLEAN) AS is_ship_to_residential,
+    shiptoid as ship_to_id,
+    shiptoname as ship_to_name,
+    shiptoaddress as ship_to_address,
+    shiptocity as ship_to_city,
+    shiptozip as ship_to_zip,
+    shiptostateid as ship_to_state_id,
+    shiptocountryid as ship_to_country_id,
+    CAST(shiptoresidential as BOOLEAN) as is_ship_to_residential,
 
     -- Location & Ownership
-    locationgroupid AS location_group_id,
-    CAST(ownerisfrom AS BOOLEAN) AS owner_is_from, -- Rename based on actual meaning if known
+    locationgroupid as location_group_id,
+    CAST(ownerisfrom as BOOLEAN) as owner_is_from, -- Rename based on actual meaning if known
 
     -- Timestamps
-    datecreated AS created_at,
-    dateshipped AS shipped_at,
-    datelastmodified AS last_modified_at,
+    datecreated as created_at,
+    dateshipped as shipped_at,
+    datelastmodified as last_modified_at,
 
     -- Custom Fields
-    customfields AS custom_fields
+    customfields as custom_fields
 
-FROM
+from
     source_data

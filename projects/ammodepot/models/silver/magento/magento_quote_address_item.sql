@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- Select ALL columns from the source DDL
         qty,
         sku,
@@ -67,20 +67,20 @@ WITH source_data AS (
 
         -- Columns excluded: _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
 
-    FROM
+    from
         -- Source is defined in DDL as AD_AIRBYTE.TEST_DTO_2.QUOTE_ADDRESS_ITEM
         -- Assuming you have a dbt source named 'magento' pointing to AD_AIRBYTE.TEST_DTO_2
         {{ source('magento', 'quote_address_item') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
      -- Identifiers
-    address_item_id AS quote_address_item_id, -- Renamed primary key
+    address_item_id as quote_address_item_id, -- Renamed primary key
     quote_address_id,
     quote_item_id,
     parent_item_id,
@@ -91,22 +91,22 @@ SELECT
     sku,
 
     -- Item Details
-    name AS product_name,
-    description AS product_description,
-    image AS image_url,
-    weight AS item_weight,
+    name as product_name,
+    description as product_description,
+    image as image_url,
+    weight as item_weight,
     row_weight,
     additional_data,
     gift_message_id,
 
     -- Quantity
-    qty AS quantity,
-    CAST(is_qty_decimal AS BOOLEAN) AS is_quantity_decimal,
+    qty as quantity,
+    CAST(is_qty_decimal as BOOLEAN) as is_quantity_decimal,
 
     -- Pricing & Financials (Quote Currency)
-    price AS unit_price,
+    price as unit_price,
     base_price, -- Unit price in base currency before conversion
-    price_incl_tax AS unit_price_incl_tax,
+    price_incl_tax as unit_price_incl_tax,
     row_total,
     row_total_incl_tax,
     row_total_with_discount,
@@ -114,13 +114,13 @@ SELECT
     tax_percent,
     discount_amount,
     discount_percent,
-    CAST(no_discount AS BOOLEAN) AS is_discount_excluded,
+    CAST(no_discount as BOOLEAN) as is_discount_excluded,
     applied_rule_ids,
     discount_tax_compensation_amount,
 
     -- Pricing & Financials (Base Currency)
     base_row_total,
-    base_price_incl_tax AS base_unit_price_incl_tax,
+    base_price_incl_tax as base_unit_price_incl_tax,
     base_row_total_incl_tax,
     base_tax_amount,
     base_discount_amount,
@@ -132,7 +132,7 @@ SELECT
     -- Shipping
     carriergroup,
     carriergroup_id,
-    CAST(free_shipping AS BOOLEAN) AS has_free_shipping,
+    CAST(free_shipping as BOOLEAN) as has_free_shipping,
     carriergroup_shipping,
 
     -- Promotions (AW Advanced Promotions & Tier Pricing)
@@ -151,5 +151,5 @@ SELECT
     _ab_cdc_log_file,
     _ab_cdc_updated_at
 
-FROM
+from
     source_data
