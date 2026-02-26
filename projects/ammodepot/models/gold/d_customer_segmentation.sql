@@ -142,8 +142,22 @@ d_customerupdatesview as (
 
 -- 4. RFM + Monetary Value segmentation
 Segmentation as (
-    select 
-        dv.*,
+    select
+        dv.rank_id,
+        dv.customer_email,
+        dv.number_of_purchases,
+        dv.total_revenue,
+        dv.margin,
+        dv.days_since_last_purchase,
+        dv.total_purchases_all_time,
+        dv.frequency,
+        dv.frequency_int,
+        dv.recency,
+        dv.recency_int,
+        dv.value,
+        dv.value_int,
+        dv.margin_classification,
+        dv.margin_int,
 
         case
           when FLOOR((dv.margin_int + dv.value_int)/2) = 1 then 'MV1'
