@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- Select ALL columns from the source DDL
         state,
         status,
@@ -194,31 +194,31 @@ WITH source_data AS (
 
         -- Columns excluded: _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
 
-    FROM
+    from
         -- Source is defined in DDL as AD_AIRBYTE.TEST_DTO_2.SALES_ORDER
         -- Assuming you have a dbt source named 'magento' pointing to AD_AIRBYTE.TEST_DTO_2
         {{ source('magento', 'sales_order') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Renaming and Casting applied where appropriate
-    entity_id AS order_id,
-    increment_id AS order_increment_id,
+    entity_id as order_id,
+    increment_id as order_increment_id,
     store_id,
     customer_id,
     quote_id,
     billing_address_id,
     shipping_address_id,
-    ext_order_id AS external_order_id,
-    ext_customer_id AS external_customer_id,
+    ext_order_id as external_order_id,
+    ext_customer_id as external_customer_id,
 
-    state AS order_state,
-    status AS order_status,
+    state as order_state,
+    status as order_status,
 
     created_at,
     updated_at,
@@ -233,9 +233,9 @@ SELECT
     customer_suffix,
     customer_gender,
     customer_group_id,
-    CAST(customer_is_guest AS BOOLEAN) AS is_customer_guest,
+    CAST(customer_is_guest as BOOLEAN) as is_customer_guest,
     customer_note,
-    CAST(customer_note_notify AS BOOLEAN) AS should_notify_customer_note,
+    CAST(customer_note_notify as BOOLEAN) as should_notify_customer_note,
     customer_taxvat,
 
     store_name,
@@ -333,14 +333,14 @@ SELECT
     weight,
     total_qty_ordered,
     total_item_count,
-    CAST(can_ship_partially AS BOOLEAN) AS can_ship_partially,
-    CAST(can_ship_partially_item AS BOOLEAN) AS can_ship_partially_item,
+    CAST(can_ship_partially as BOOLEAN) as can_ship_partially,
+    CAST(can_ship_partially_item as BOOLEAN) as can_ship_partially_item,
     --carrier_id,
     --carrier_type,
     destination_type,
     --carriergroup_shipping_html,
     --carriergroup_shipping_details,
-    CAST(forced_shipment_with_invoice AS BOOLEAN) AS has_forced_shipment_with_invoice,
+    CAST(forced_shipment_with_invoice as BOOLEAN) as has_forced_shipment_with_invoice,
 
     -- Billing/Payment Details
     coupon_code,
@@ -352,12 +352,12 @@ SELECT
     protect_code,
 
     -- Flags & Settings
-    CAST(is_virtual AS BOOLEAN) AS is_virtual_order,
-    CAST(email_sent AS BOOLEAN) AS is_email_sent,
-    CAST(send_email AS BOOLEAN) AS should_send_email,
+    CAST(is_virtual as BOOLEAN) as is_virtual_order,
+    CAST(email_sent as BOOLEAN) as is_email_sent,
+    CAST(send_email as BOOLEAN) as should_send_email,
     validation_status,
-    CAST(sent_to_measurement AS BOOLEAN) AS is_sent_to_measurement,
-    CAST(aw_afptc_uses_coupon AS BOOLEAN) AS aw_afptc_uses_coupon, -- Advanced Promotions extension flag
+    CAST(sent_to_measurement as BOOLEAN) as is_sent_to_measurement,
+    CAST(aw_afptc_uses_coupon as BOOLEAN) as aw_afptc_uses_coupon, -- Advanced Promotions extension flag
 
     -- Technical/Metadata
     remote_ip,
@@ -396,18 +396,18 @@ SELECT
     route_fee,
     route_tax_fee,
     route_order_id,
-    CAST(route_is_insured AS BOOLEAN) AS is_route_insured,
+    CAST(route_is_insured as BOOLEAN) as is_route_insured,
     applied_restrictions,
-    CAST(is_sportsouth_failed AS BOOLEAN) AS is_sportsouth_failed,
-    CAST(is_sportssouth_order AS BOOLEAN) AS is_sportssouth_order,
+    CAST(is_sportsouth_failed as BOOLEAN) as is_sportsouth_failed,
+    CAST(is_sportssouth_order as BOOLEAN) as is_sportssouth_order,
     sports_south_order_id,
     sports_south_accs_order_id,
     sports_south_ship_order_id,
-    CAST(mp_smtp_email_marketing_synced AS BOOLEAN) AS is_mp_smtp_email_marketing_synced,
-    CAST(mp_smtp_email_marketing_order_created AS BOOLEAN) AS is_mp_smtp_email_marketing_order_created,
+    CAST(mp_smtp_email_marketing_synced as BOOLEAN) as is_mp_smtp_email_marketing_synced,
+    CAST(mp_smtp_email_marketing_order_created as BOOLEAN) as is_mp_smtp_email_marketing_order_created,
     location_id -- Often related to inventory source/location
 
     -- Note: _AB_CDC_DELETED_AT is used in the WHERE clause and typically not selected in the final output.
 
-FROM
+from
     source_data

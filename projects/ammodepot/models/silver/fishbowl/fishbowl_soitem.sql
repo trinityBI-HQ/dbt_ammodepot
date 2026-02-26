@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         -- Core Identifiers
         id,
         soid,             -- Foreign Key to the Sales Order (SO) view
@@ -65,67 +65,67 @@ WITH source_data AS (
         -- _AIRBYTE_RAW_ID, _AIRBYTE_EXTRACTED_AT, _AIRBYTE_META, _AIRBYTE_GENERATION_ID
         -- _AB_CDC_CURSOR, _AB_CDC_LOG_POS, _AB_CDC_LOG_FILE, _AB_CDC_UPDATED_AT
 
-    FROM
+    from
         -- Source is defined in DDL as AD_AIRBYTE.AIRBYTE_SCHEMA.SOITEM
         -- Assuming you have a dbt source named 'ad_airbyte' pointing to AD_AIRBYTE.AIRBYTE_SCHEMA
         {{ source('fishbowl', 'soitem') }}
-    WHERE
+    where
         -- Filter out soft deletes. Note: Your DDL shows _ab_cdc_deleted_at as VARCHAR.
         -- This IS NULL check assumes it behaves like a standard timestamp NULL.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Core Identifiers
-    id AS so_item_id,           -- Renamed primary key
-    soid AS sales_order_id,     -- Renamed foreign key to SO
-    productid AS product_id,    -- Renamed foreign key to Product
-    solineitem AS line_item_number,
+    id as so_item_id,           -- Renamed primary key
+    soid as sales_order_id,     -- Renamed foreign key to SO
+    productid as product_id,    -- Renamed foreign key to Product
+    solineitem as line_item_number,
 
     -- Item Details
-    productnum AS product_number,
-    description AS product_description,
-    customerpartnum AS customer_part_number,
-    revlevel AS revision_level,
+    productnum as product_number,
+    description as product_description,
+    customerpartnum as customer_part_number,
+    revlevel as revision_level,
     note,
 
     -- Quantity Information
-    qtyordered AS quantity_ordered,
-    qtyfulfilled AS quantity_fulfilled,
-    qtypicked AS quantity_picked,
-    qtytofulfill AS quantity_to_fulfill,
+    qtyordered as quantity_ordered,
+    qtyfulfilled as quantity_fulfilled,
+    qtypicked as quantity_picked,
+    qtytofulfill as quantity_to_fulfill,
 
     -- Pricing & Financials
-    unitprice AS unit_price,
-    totalprice AS total_price,
-    mctotalprice AS mc_total_price,
-    totalcost AS total_cost,
-    markupcost AS markup_cost,
-    taxid AS tax_id,
-    taxrate AS tax_rate,
-    CAST(taxableflag AS BOOLEAN) AS is_taxable,
-    adjustamount AS adjustment_amount,
-    adjustpercentage AS adjustment_percentage,
-    itemadjustid AS item_adjustment_id,
+    unitprice as unit_price,
+    totalprice as total_price,
+    mctotalprice as mc_total_price,
+    totalcost as total_cost,
+    markupcost as markup_cost,
+    taxid as tax_id,
+    taxrate as tax_rate,
+    CAST(taxableflag as BOOLEAN) as is_taxable,
+    adjustamount as adjustment_amount,
+    adjustpercentage as adjustment_percentage,
+    itemadjustid as item_adjustment_id,
 
     -- Relationships & Classifications
-    typeid AS item_type_id,
-    statusid AS status_id,
-    uomid AS uom_id,
-    qbclassid AS quickbooks_class_id,
+    typeid as item_type_id,
+    statusid as status_id,
+    uomid as uom_id,
+    qbclassid as quickbooks_class_id,
 
     -- Flags
-    CAST(showitemflag AS BOOLEAN) AS show_item,
+    CAST(showitemflag as BOOLEAN) as show_item,
 
     -- Timestamps
-    datelastfulfillment AS last_fulfillment_date,
-    datescheduledfulfillment AS scheduled_fulfillment_date,
-    datelastmodified AS last_modified_at,
+    datelastfulfillment as last_fulfillment_date,
+    datescheduledfulfillment as scheduled_fulfillment_date,
+    datelastmodified as last_modified_at,
 
     -- Other Related Info
-    exchangesolineitem AS exchange_so_line_item,
-    customfields AS custom_fields
+    exchangesolineitem as exchange_so_line_item,
+    customfields as custom_fields
 
-FROM
+from
     source_data

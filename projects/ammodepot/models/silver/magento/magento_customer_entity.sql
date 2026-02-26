@@ -4,9 +4,9 @@
     schema = 'silver'
   )
 }}
-WITH source_data AS (
+with source_data as (
 
-    SELECT
+    select
         dob,
         email,
         gender,
@@ -45,44 +45,44 @@ WITH source_data AS (
         _ab_cdc_deleted_at,
         _ab_cdc_updated_at
 
-    FROM {{ source('magento', 'customer_entity') }}
-    WHERE _ab_cdc_deleted_at IS NULL
+    from {{ source('magento', 'customer_entity') }}
+    where _ab_cdc_deleted_at is null
 )
 
-SELECT
-    entity_id                               AS customer_id,
-    increment_id                            AS customer_increment_id,
-    group_id                                AS customer_group_id,
+select
+    entity_id                               as customer_id,
+    increment_id                            as customer_increment_id,
+    group_id                                as customer_group_id,
     website_id,
     store_id,
     email,
-    prefix                                  AS name_prefix,
-    firstname                               AS first_name,
-    middlename                              AS middle_name,
-    lastname                                AS last_name,
-    suffix                                  AS name_suffix,
-    dob                                     AS date_of_birth,
+    prefix                                  as name_prefix,
+    firstname                               as first_name,
+    middlename                              as middle_name,
+    lastname                                as last_name,
+    suffix                                  as name_suffix,
+    dob                                     as date_of_birth,
     gender,
-    taxvat                                  AS tax_vat_number,
-    default_billing                         AS default_billing_address_id,
-    default_shipping                        AS default_shipping_address_id,
-    CAST(is_active AS BOOLEAN)              AS is_active,
+    taxvat                                  as tax_vat_number,
+    default_billing                         as default_billing_address_id,
+    default_shipping                        as default_shipping_address_id,
+    CAST(is_active as BOOLEAN)              as is_active,
     password_hash,
-    confirmation                            AS confirmation_token,
-    failures_num                            AS login_failures_count,
-    first_failure                           AS first_login_failure_at,
-    lock_expires                            AS account_lock_expires_at,
-    rp_token                                AS password_reset_token,
-    rp_token_created_at                     AS password_reset_token_created_at,
-    created_at                              AS customer_created_at,
-    updated_at                              AS customer_updated_at,
-    created_in                              AS created_in_store_view,
+    confirmation                            as confirmation_token,
+    failures_num                            as login_failures_count,
+    first_failure                           as first_login_failure_at,
+    lock_expires                            as account_lock_expires_at,
+    rp_token                                as password_reset_token,
+    rp_token_created_at                     as password_reset_token_created_at,
+    created_at                              as customer_created_at,
+    updated_at                              as customer_updated_at,
+    created_in                              as created_in_store_view,
     session_cutoff,
-    CAST(disable_auto_group_change AS BOOLEAN)        AS is_auto_group_change_disabled,
-    is_zendesk_user                AS is_zendesk_user,
-    CAST(mp_smtp_email_marketing_synced AS BOOLEAN)  AS is_mp_smtp_email_marketing_synced,
+    CAST(disable_auto_group_change as BOOLEAN)        as is_auto_group_change_disabled,
+    is_zendesk_user                as is_zendesk_user,
+    CAST(mp_smtp_email_marketing_synced as BOOLEAN)  as is_mp_smtp_email_marketing_synced,
     _ab_cdc_cursor,
     _ab_cdc_log_pos,
     _ab_cdc_log_file,
     _ab_cdc_updated_at
-FROM source_data
+from source_data

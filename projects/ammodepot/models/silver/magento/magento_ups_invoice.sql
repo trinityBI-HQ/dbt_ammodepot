@@ -5,14 +5,14 @@
   )
 }}
 
-WITH source_data AS (
-    SELECT
+with source_data as (
+    select
         tracking_number,
         net_amount
-    FROM {{ source('magento', 'ups_invoice') }}
+    from {{ source('magento', 'ups_invoice') }}
 )
 
-SELECT
+select
     tracking_number,
     net_amount
-FROM source_data
+from source_data

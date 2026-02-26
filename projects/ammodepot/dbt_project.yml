@@ -1,6 +1,5 @@
 name: 'ammodepot'
 version: '1.0'
-
 config-version: 2
 
 profile: 'ammodepot'
@@ -12,12 +11,82 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
+clean-targets:
+  - target
+  - dbt_packages
+
+vars:
+  # Timezone for all convert_timezone() calls
+  ammodepot_timezone: 'America/New_York'
+
+  # Default customer email fallback
+  ammodepot_default_customer_email: 'customer@nonidentified.com'
+
+  # Base URL for product links
+  ammodepot_base_url: 'https://www.ammunitiondepot.com'
+
+  # Free shipping threshold
+  ammodepot_free_shipping_threshold: 140
+
+  # Fishbowl location group for inventory views
+  ammodepot_default_location_group_id: 8
+
+  # Valid order statuses for segmentation
+  ammodepot_valid_order_statuses: "'PROCESSING','COMPLETE','UNVERIFIED'"
+
+  # Fishbowl relationship/type IDs
+  ammodepot_kit_relationship_type_id: 30
+  ammodepot_sale_item_type_id: 10
+  ammodepot_kit_type_id: 10
+  ammodepot_receipt_order_type_id: 10
+  ammodepot_base_uom_id: 1
+
+  # Magento default store ID (admin/global scope)
+  ammodepot_default_store_id: 0
+
+  # Magento discontinued attribute set
+  ammodepot_discontinued_attribute_set_id: 50
+
+  # Magento EAV attribute IDs
+  ammodepot_magento_attr_id_manufacturer: 677
+  ammodepot_magento_attr_id_projectile: 681
+  ammodepot_magento_attr_id_unit_type: 649
+  ammodepot_magento_attr_id_ddcaliber: 678
+  ammodepot_magento_attr_id_dd_suggested_use: 682
+  ammodepot_magento_attr_id_ddaction: 718
+  ammodepot_magento_attr_id_ddcondition: 676
+  ammodepot_magento_attr_id_ddgun_parts: 817
+  ammodepot_magento_attr_id_rounds_package: 152
+  ammodepot_magento_attr_id_capacity: 165
+  ammodepot_magento_attr_id_vendor: 145
+  ammodepot_magento_attr_id_material: 188
+  ammodepot_magento_attr_id_primary_category: 878
+  ammodepot_magento_attr_id_ddcolor: 685
+  ammodepot_magento_attr_id_ddweapons_platform: 756
+
+  # Receipt item status IDs (received/reconciled)
+  ammodepot_receipt_status_received: 10
+  ammodepot_receipt_status_reconciled: 40
+
+  # Lead time ranking limit
+  ammodepot_lead_time_rank_limit: 3
+
+tests:
+  ammodepot:
+    # Default warn severity: Airbyte CDC source data naturally has duplicate
+    # and null IDs for updated/deleted rows. Tests alert but do not block builds.
+    +severity: warn
+
 models:
-  ammodepot: 
+  ammodepot:
     silver:
       +schema: silver
       +materialized: view
-      
+      +bind: false
     gold:
       +schema: gold
-      +materialized: view
+      +materialized: table
+      intermediate:
+        +schema: gold
+        +materialized: view
+        +bind: false

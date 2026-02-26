@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
     -- This CTE selects all relevant columns from the source
-    SELECT
+    select
         id,
         refid,
         txnid,
@@ -36,41 +36,41 @@ WITH source_data AS (
 
         -- Columns to be excluded from final select:
         -- _airbyte_raw_id, _airbyte_extracted_at, _airbyte_generation_id, _airbyte_meta
-    FROM
+    from
         {{ source('fishbowl', 'post') }}
-    WHERE
+    where
         -- Filter out soft deletes. Assuming _ab_cdc_deleted_at follows previous patterns (VARCHAR).
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
-        _ab_cdc_deleted_at IS NULL
+        _ab_cdc_deleted_at is null
 )
 
-SELECT
+select
     -- Identifiers
-    id AS post_id,                  -- Renamed primary key for this posting record
-    txnid AS transaction_id,        -- Accounting transaction ID
-    txnlineid AS transaction_line_id, -- Line ID within the accounting transaction
-    orderid AS order_id,            -- Related order ID (SO, PO, etc.)
-    ordertypeid AS order_type_id,    -- Type of the related order
-    refid AS reference_id,          -- General reference ID (context-dependent)
-    refitemid AS reference_item_id,  -- Item ID within the reference document
-    customerid AS customer_id,      -- Related customer ID
+    id as post_id,                  -- Renamed primary key for this posting record
+    txnid as transaction_id,        -- Accounting transaction ID
+    txnlineid as transaction_line_id, -- Line ID within the accounting transaction
+    orderid as order_id,            -- Related order ID (SO, PO, etc.)
+    ordertypeid as order_type_id,    -- Type of the related order
+    refid as reference_id,          -- General reference ID (context-dependent)
+    refitemid as reference_item_id,  -- Item ID within the reference document
+    customerid as customer_id,      -- Related customer ID
 
     -- Posting Details
-    typeid AS post_type_id,         -- Type of posting (e.g., inventory, AR, AP)
-    statusid AS post_status_id,     -- Status of the posting
-    refnumber AS reference_number,   -- Reference document number
-    serialnum AS serial_number,     -- Serial number if applicable
+    typeid as post_type_id,         -- Type of posting (e.g., inventory, AR, AP)
+    statusid as post_status_id,     -- Status of the posting
+    refnumber as reference_number,   -- Reference document number
+    serialnum as serial_number,     -- Serial number if applicable
 
     -- Financials & Quantity
-    amount AS post_amount,
-    postedtotalcost AS posted_total_cost,
-    quantity AS posted_quantity,
+    amount as post_amount,
+    postedtotalcost as posted_total_cost,
+    quantity as posted_quantity,
 
     -- Timestamps & Sequencing
-    dateposted AS posted_at,
-    datecreated AS record_created_at,
-    editsequence AS edit_sequence,  -- For QuickBooks integration, sequence of edits
+    dateposted as posted_at,
+    datecreated as record_created_at,
+    editsequence as edit_sequence,  -- For QuickBooks integration, sequence of edits
 
     -- Airbyte CDC Metadata (kept as requested, adjust if not needed in final silver)
     _ab_cdc_cursor,
@@ -78,5 +78,5 @@ SELECT
     _ab_cdc_log_file,
     _ab_cdc_updated_at
 
-FROM
+from
     source_data

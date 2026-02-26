@@ -5,9 +5,9 @@
   )
 }}
 
-WITH source_data AS (
+with source_data as (
     -- This CTE selects all columns from the source view
-    SELECT
+    select
         abbr,
         name,
         tagid,
@@ -23,31 +23,31 @@ WITH source_data AS (
 
         -- Airbyte internal columns are excluded as they are not relevant for a view source
         -- _airbyte_raw_id, _airbyte_extracted_at, _airbyte_generation_id, _airbyte_meta
-    FROM
+    from
         {{ source('fishbowl', 'tagserialview') }}
     -- No WHERE clause for _ab_cdc_deleted_at as this is likely a view
 )
 
-SELECT
+select
     -- Identifiers (from the view)
-    tagid AS tag_id,
-    serialid AS serial_id,              -- Likely the ID from the SERIAL table
-    serialnumid AS serial_num_record_id, -- Likely the ID from the SERIALNUM table
-    parttrackingid AS part_tracking_id, -- ID of the part tracking definition
+    tagid as tag_id,
+    serialid as serial_id,              -- Likely the ID from the SERIAL table
+    serialnumid as serial_num_record_id, -- Likely the ID from the SERIALNUM table
+    parttrackingid as part_tracking_id, -- ID of the part tracking definition
 
     -- Serial Number Details
-    serialnum AS serial_number_value,
+    serialnum as serial_number_value,
 
     -- Part Tracking Details (denormalized from PARTTRACKING via the view)
-    name AS part_tracking_name,
-    abbr AS part_tracking_abbreviation,
-    description AS part_tracking_description,
-    typeid AS part_tracking_type_id,
-    sortorder AS part_tracking_sort_order,
-    CAST(activeflag AS BOOLEAN) AS is_part_tracking_active,
+    name as part_tracking_name,
+    abbr as part_tracking_abbreviation,
+    description as part_tracking_description,
+    typeid as part_tracking_type_id,
+    sortorder as part_tracking_sort_order,
+    CAST(activeflag as BOOLEAN) as is_part_tracking_active,
 
     -- Serial Number Status (denormalized from SERIAL via the view)
-    CAST(committedflag AS BOOLEAN) AS is_serial_committed
+    CAST(committedflag as BOOLEAN) as is_serial_committed
 
-FROM
+from
     source_data
