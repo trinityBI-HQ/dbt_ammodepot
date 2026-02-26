@@ -1,11 +1,4 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
-    select
+select
         p.part_id,                    
         wo.location_group_id,          
         COALESCE(

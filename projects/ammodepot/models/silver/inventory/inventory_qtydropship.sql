@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
 with dropship_item_quantities as (
     select
         p.part_id,                                -- from fishbowl_part

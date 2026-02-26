@@ -27,7 +27,14 @@ freeoptions as (
 ),
 
 address as (
-    select *
+    select
+        order_address_id,
+        order_id,
+        postcode,
+        country_code,
+        region,
+        city,
+        phone_number
     from {{ ref('magento_sales_order_address') }}
     where address_type = 'shipping'
 ),
@@ -36,7 +43,7 @@ newship as (
     select
         tracking_number          as tracking_number,
         SUM(net_amount)          as net_amount
-    from {{ source('magento','ups_invoice') }}
+    from {{ ref('magento_ups_invoice') }}
     group by tracking_number
 ),
 

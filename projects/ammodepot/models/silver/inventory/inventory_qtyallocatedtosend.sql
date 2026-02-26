@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
 with transfer_order_item_send_allocations as (
     select
         p.part_id,                                -- from fishbowl_part

@@ -286,16 +286,8 @@ models:
         description: Flag indicating if the order can be partially shipped
       - name: can_ship_partially_item
         description: Flag indicating if individual items can be partially shipped
-      - name: carrier_id
-        description: Identifier for the shipping carrier
-      - name: carrier_type
-        description: Type of the shipping carrier
       - name: destination_type
         description: Destination type for shipping (e.g., commercial, residential)
-      - name: carriergroup_shipping_html
-        description: HTML representation of carrier group shipping details
-      - name: carriergroup_shipping_details
-        description: Text details of carrier group shipping
       - name: has_forced_shipment_with_invoice
         description: Flag indicating if shipment was forced with invoice
 
