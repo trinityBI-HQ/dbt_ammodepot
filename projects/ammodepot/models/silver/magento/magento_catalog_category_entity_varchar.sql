@@ -1,6 +1,7 @@
 with source_data as (
 
     select
+        value_id,
         entity_id,
         attribute_id,
         value
@@ -9,6 +10,7 @@ with source_data as (
 )
 
 select
+    value_id,
     entity_id,
     attribute_id,
     value
