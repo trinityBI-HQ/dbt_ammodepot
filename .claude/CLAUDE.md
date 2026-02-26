@@ -44,7 +44,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Transformation | dbt-core + dbt-redshift (migrating to dbt-snowflake) |
 | Warehouse | Amazon Redshift (migrating to Snowflake) |
 | Ingestion | Airbyte (CDC) |
-| Packages | dbt_utils, dbt_expectations |
+| Packages | dbt_utils, dbt_expectations (metaplane fork) |
 | Linting | SQLFluff (Redshift dialect) |
 | Python | uv (package manager) |
 
@@ -94,7 +94,8 @@ projects/ammodepot/
 ├── snapshots/
 └── analyses/
 docs/
-└── snowflake_access_setup.md   # Snowflake roles, warehouses, RSA key-pair setup
+├── snowflake_access_setup.md   # Snowflake roles, warehouses, RSA key-pair setup
+└── AUDIT_BACKLOG.md            # Audit findings, backlog, and prioritized roadmap
 ```
 
 **Counts:** 95 models (34 Fishbowl + 23 Magento + 21 Inventory + 10 Gold + 7 Intermediate), 59 source tables, 16 generic tests, 1 macro
@@ -201,6 +202,18 @@ uv run sqlfluff fix models/                # Auto-fix (review changes before com
 8. **Generic tests in `tests/generic/`** -- 16 reusable test macros using `{% test %}` wrapper syntax.
 
 9. **Snowflake migration** -- Migrating from Redshift to Snowflake. Snowflake uses `AD_AIRBYTE` database with `AIRBYTE_ROLE` (ingestion, OWNERSHIP) and `TRANSFORMER_ROLE` (dbt, owns SILVER/GOLD schemas). Service accounts use RSA key-pair auth (TYPE=SERVICE, no passwords). Shared `ETL_WH` warehouse (XSMALL).
+
+10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/AUDIT_BACKLOG.md` for deferred items.
+
+---
+
+## Build & Deployment Status
+
+- **dbt-core**: 1.11.6 with dbt-redshift 1.10.1
+- **dbt Cloud**: Scheduled runs on Redshift (production), 88 of 95 models selected
+- **Last local build**: PASS=402, WARN=32, ERROR=0, SKIP=0, TOTAL=434
+- **Audit score**: 8.0/10 (see `docs/AUDIT_BACKLOG.md` for details)
+- **Audit backlog**: 4 HIGH items, 6 MEDIUM items, 3 LOW items pending
 
 ---
 

@@ -1,6 +1,7 @@
 with source_data as (
 
     select
+        id,
         partid,
         datelastmodified,
         lastcost
@@ -10,6 +11,7 @@ with source_data as (
 )
 
 select
+    id,
     partid,
     datelastmodified,
     lastcost
