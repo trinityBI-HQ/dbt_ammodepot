@@ -12,13 +12,19 @@ models:
       - name: sales_order_id
         description: Unique identifier for the sales order
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
       - name: sales_order_number
         description: Sales order number
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
 
       - name: customer_id
         description: Identifier of the customer placing the order

@@ -110,7 +110,6 @@ magento_order_shipping_agg as (
         SUM(ms.shipping_amount)               as shipping_amount,
         SUM(ms.base_shipping_amount)          as base_shipping_amount,
         SUM(ms.base_shipping_canceled)        as base_shipping_canceled,
-        SUM(ms.base_shipping_canceled)        as base_shipping_canceled,
         SUM(ms.base_shipping_discount_amount) as base_shipping_discount_amount,
         SUM(ms.base_shipping_refunded)        as base_shipping_refunded,
         SUM(ms.base_shipping_tax_amount)      as base_shipping_tax_amount,

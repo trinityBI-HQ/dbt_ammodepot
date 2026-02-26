@@ -144,8 +144,8 @@ rounds_package_data as (
         cpv.entity_id,
         cpv.value as rounds_package
     from {{ ref('magento_catalog_product_entity_varchar') }} as cpv
-    where cpv.attribute_id = cpv.{{ var('ammodepot_magento_attr_id_rounds_package') }}
-        and cpv.store_id = cpv.{{ var('ammodepot_default_store_id') }}
+    where cpv.attribute_id = {{ var('ammodepot_magento_attr_id_rounds_package') }}
+        and cpv.store_id = {{ var('ammodepot_default_store_id') }}
 ),
 
 capacity_data as (
@@ -153,8 +153,8 @@ capacity_data as (
         cpv.entity_id,
         cpv.value as capacity
     from {{ ref('magento_catalog_product_entity_varchar') }} as cpv
-    where cpv.attribute_id = cpv.{{ var('ammodepot_magento_attr_id_capacity') }}
-        and cpv.store_id = cpv.{{ var('ammodepot_default_store_id') }}
+    where cpv.attribute_id = {{ var('ammodepot_magento_attr_id_capacity') }}
+        and cpv.store_id = {{ var('ammodepot_default_store_id') }}
 ),
 
 material_data as (
@@ -162,8 +162,8 @@ material_data as (
         cpv.entity_id,
         cpv.value as material
     from {{ ref('magento_catalog_product_entity_varchar') }} as cpv
-    where cpv.attribute_id = cpv.{{ var('ammodepot_magento_attr_id_material') }}
-        and cpv.store_id = cpv.{{ var('ammodepot_default_store_id') }}
+    where cpv.attribute_id = {{ var('ammodepot_magento_attr_id_material') }}
+        and cpv.store_id = {{ var('ammodepot_default_store_id') }}
 ),
 
 optic_coating_data as (
@@ -182,8 +182,8 @@ dd_suggested_use_raw as (
         cpt.entity_id,
         cpt.value as raw_value
     from {{ ref('magento_catalog_product_entity_text') }} as cpt
-    where cpt.attribute_id = cpt.{{ var('ammodepot_magento_attr_id_dd_suggested_use') }}
-      and cpt.store_id = cpt.{{ var('ammodepot_default_store_id') }}
+    where cpt.attribute_id = {{ var('ammodepot_magento_attr_id_dd_suggested_use') }}
+      and cpt.store_id = {{ var('ammodepot_default_store_id') }}
 ),
 
 counter as (
@@ -225,7 +225,7 @@ dd_suggested_use_exploded as (
 dd_suggested_use_data as (
     select
         ex.entity_id,
-        LISTAGG(eov.value, ', ') as dd_suggested_use
+        LISTAGG(eov.value, ', ') within group (order by eov.value) as dd_suggested_use
     from dd_suggested_use_exploded as ex
     inner join {{ ref('magento_eav_attribute_option_value') }} as eov
         on eov.option_id = ex.option_id

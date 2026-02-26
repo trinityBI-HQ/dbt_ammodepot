@@ -5,6 +5,7 @@ models:
     description: "Product dimension combining Magento catalog attributes with vendor cost and categorization data."
     columns:
       - name: "Product ID"
+        quote: true
         description: "Primary key for the product."
         tests:
           - unique

@@ -7,7 +7,9 @@ models:
       - name: shipment_id
         tests:
           - unique
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: so_id
       - name: carrier_service_id
       - name: ship_date

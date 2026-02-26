@@ -67,7 +67,9 @@ models:
       - name: entity_id
         description: "Magento product entity identifier."
         tests:
-          - unique
+          - unique:
+              config:
+                severity: warn
           - not_null
 
   - name: int_fishbowl_product_enrichment

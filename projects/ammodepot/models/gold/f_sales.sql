@@ -102,7 +102,7 @@ skubase as (
         CAST(ib.created_at as DATE)                                as created_at,
         ib.created_at                                      as timedate,
         DATE_TRUNC('hour', ib.created_at)                  as tiniciodahora_copiar,
-        CAST(DATE_TRUNC('HOUR', ib.created_at) as TIME )   as tiniciodaHora,
+        TO_CHAR(DATE_TRUNC('hour', ib.created_at), 'HH24:MI:SS') as tiniciodaHora,
         ib.product_id,
         ib.order_id,
 

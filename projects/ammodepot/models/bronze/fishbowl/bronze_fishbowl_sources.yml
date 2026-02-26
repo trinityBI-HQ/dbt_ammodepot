@@ -2,7 +2,11 @@ version: 2
 
 sources:
   - name: fishbowl
-    description: Fishbowl inventory management raw data
+    description: >
+      Fishbowl inventory management raw data.
+      Source unique/not_null tests use severity: warn because Airbyte CDC
+      naturally produces duplicate and null IDs for updated/deleted rows.
+      Deduplication is handled in the Silver layer.
     schema: fishbowl
     config:
       freshness:
@@ -16,8 +20,12 @@ sources:
           - name: id
             description: Primary key for Customer
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: part
         description: Fishbowl Part data
@@ -25,8 +33,12 @@ sources:
           - name: id
             description: Primary key for Part
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: soitem
         description: Fishbowl Sales Order Item data
@@ -34,8 +46,12 @@ sources:
           - name: id
             description: Primary key for Sales Order Item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: so
         description: Fishbowl Sales Order data
@@ -43,8 +59,12 @@ sources:
           - name: id
             description: Primary key for Sales Order
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: product
         description: Fishbowl Product data
@@ -52,8 +72,12 @@ sources:
           - name: id
             description: Primary key for Product
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: ship
         description: Fishbowl Shipping data
@@ -61,8 +85,12 @@ sources:
           - name: id
             description: Primary key for Shipping
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: shipcarton
         description: Fishbowl Shipping Carton data
@@ -70,8 +98,12 @@ sources:
           - name: id
             description: Primary key for Shipping Carton
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: vendor
         description: Fishbowl Vendor data
@@ -79,8 +111,12 @@ sources:
           - name: id
             description: Primary key for Vendor
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: plugininfo
         description: Fishbowl Plugin Info data
@@ -88,8 +124,12 @@ sources:
           - name: id
             description: Primary key for Plugin Info
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: uomconversion
         description: Fishbowl Unit of Measure Conversion data
@@ -97,8 +137,12 @@ sources:
           - name: id
             description: Primary key for UOM Conversion
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: objecttoobject
         description: Fishbowl Object relationships data
@@ -106,8 +150,12 @@ sources:
           - name: id
             description: Primary key for ObjectToObject relationship
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: partcost
         description: Fishbowl Part Cost details data
@@ -115,7 +163,9 @@ sources:
           - name: partid
             description: Foreign key related to Part
             tests:
-              - not_null
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: carrierservice
         description: Fishbowl carrier service lookup
@@ -123,8 +173,12 @@ sources:
           - name: id
             description: Primary key for the carrier service
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: vendorparts
         description: Fishbowl Vendorparts data
@@ -132,17 +186,25 @@ sources:
           - name: id
             description: Primary key for Vendor Parts
             tests:
-              - unique
-              - not_null
-              
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: inventorylog
         description: Fishbowl Inventory Log data
         columns:
           - name: id
             description: Primary key for Inventory Log
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: kititem
         description: Fishbowl Kit Item data
@@ -150,8 +212,12 @@ sources:
           - name: id
             description: Primary key for Kit Item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: location
         description: Fishbowl Location data
@@ -159,17 +225,25 @@ sources:
           - name: id
             description: Primary key for Location
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: parttracking
         description: Fishbowl Part Tracking association
         columns:
           - name: id
-            description: Primary key for Part to Tracking
+            description: Primary key for Part Tracking
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: parttotracking
         description: Fishbowl Part to Tracking association
@@ -177,8 +251,12 @@ sources:
           - name: id
             description: Primary key for Part to Tracking
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: po
         description: Fishbowl Purchase Order data
@@ -186,17 +264,25 @@ sources:
           - name: id
             description: Primary key for Purchase Order
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: poitem
         description: Fishbowl Purchase Order Item data
         columns:
           - name: id
-            description: Primary key for Purchase Order
+            description: Primary key for Purchase Order Item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: post
         description: Fishbowl Post data
@@ -204,8 +290,12 @@ sources:
           - name: id
             description: Primary key for Post
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: postpo
         description: Fishbowl Post PO data
@@ -213,8 +303,12 @@ sources:
           - name: id
             description: Primary key for Post PO
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: postpoitem
         description: Fishbowl Post PO Item data
@@ -222,8 +316,12 @@ sources:
           - name: id
             description: Primary key for Post PO Item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: receipt
         description: Fishbowl Receipt data
@@ -231,8 +329,12 @@ sources:
           - name: id
             description: Primary key for Receipt
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: receiptitem
         description: Fishbowl Receipt Item data
@@ -240,8 +342,12 @@ sources:
           - name: id
             description: Primary key for Receipt Item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: serial
         description: Fishbowl Serial data
@@ -249,8 +355,12 @@ sources:
           - name: id
             description: Primary key for Serial
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: serialnum
         description: Fishbowl Serial Number data
@@ -258,8 +368,12 @@ sources:
           - name: id
             description: Primary key for Serial Number
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: tag
         description: Fishbowl Tag data
@@ -267,17 +381,15 @@ sources:
           - name: id
             description: Primary key for Tag
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: tagserialview
-        description: Fishbowl Tag Serial View data
-        columns:
-          - name: id
-            description: Primary key for Tag Serial View
-            tests:
-              - unique
-              - not_null
+        description: Fishbowl Tag Serial View data (denormalized view - no single PK column)
 
       - name: wo
         description: Fishbowl Work Order data
@@ -285,8 +397,12 @@ sources:
           - name: id
             description: Primary key for Work Order
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: woitem
         description: Fishbowl Work Order Item data
@@ -294,8 +410,12 @@ sources:
           - name: id
             description: Primary key for Work Order Item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: xo
         description: Fishbowl XO data
@@ -303,14 +423,22 @@ sources:
           - name: id
             description: Primary key for XO
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: xoitem
         description: Fishbowl XO item data
         columns:
           - name: id
             description: Primary key for XOitem
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn

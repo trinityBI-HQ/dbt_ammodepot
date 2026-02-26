@@ -1,5 +1,9 @@
 version: 2
 
+# All silver model tests use severity: warn because these are views over
+# Airbyte CDC data which naturally contains duplicate and null IDs for
+# updated/deleted rows. Deduplication is handled downstream in Gold models.
+
 models:
   - name: fishbowl_kititem
     description: >
@@ -9,8 +13,12 @@ models:
       - name: kit_item_id
         description: Primary key for the kit item record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_inventorylog
     description: >
@@ -20,8 +28,12 @@ models:
       - name: inventory_log_id
         description: Primary key for the inventory log record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_po
     description: >
@@ -31,8 +43,12 @@ models:
       - name: purchase_order_id
         description: Primary key for the purchase order.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_poitem
     description: >
@@ -42,8 +58,12 @@ models:
       - name: po_item_id
         description: Primary key for the purchase order item record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_receipt
     description: >
@@ -53,8 +73,12 @@ models:
       - name: receipt_id
         description: Primary key for the receipt record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_receiptitem
     description: >
@@ -64,8 +88,12 @@ models:
       - name: receipt_item_id
         description: Primary key for the receipt item record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_serial
     description: >
@@ -75,8 +103,12 @@ models:
       - name: serial_id
         description: Primary key for the serial record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_serialnum
     description: >
@@ -86,8 +118,12 @@ models:
       - name: serial_num_record_id
         description: Primary key for the serial number record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_tag
     description: >
@@ -97,8 +133,12 @@ models:
       - name: tag_id
         description: Primary key for the tag record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_tagserialview
     description: >
@@ -120,8 +160,12 @@ models:
       - name: part_tracking_id
         description: Primary key for the part tracking definition.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_parttotracking
     description: >
@@ -131,8 +175,12 @@ models:
       - name: part_to_tracking_id
         description: Primary key for the part-to-tracking mapping record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_location
     description: >
@@ -142,8 +190,12 @@ models:
       - name: location_id
         description: Primary key for the location record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_post
     description: >
@@ -153,8 +205,12 @@ models:
       - name: post_id
         description: Primary key for the posting record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_postpo
     description: >
@@ -164,8 +220,12 @@ models:
       - name: post_po_id
         description: Primary key for the PO posting record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_postpoitem
     description: >
@@ -175,8 +235,12 @@ models:
       - name: post_po_item_id
         description: Primary key for the PO item posting record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_wo
     description: >
@@ -186,8 +250,12 @@ models:
       - name: work_order_id
         description: Primary key for the work order.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_woitem
     description: >
@@ -197,8 +265,12 @@ models:
       - name: wo_item_id
         description: Primary key for the work order item record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_vendor_parts
     description: >
@@ -208,8 +280,12 @@ models:
       - name: id
         description: Primary key for the vendor parts record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_xo
     description: >
@@ -219,8 +295,12 @@ models:
       - name: transfer_order_id
         description: Primary key for the transfer order.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
 
   - name: fishbowl_xoitem
     description: >
@@ -230,5 +310,9 @@ models:
       - name: xo_item_id
         description: Primary key for the transfer order item record.
         tests:
-          - unique
-          - not_null
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn

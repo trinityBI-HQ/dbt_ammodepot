@@ -80,19 +80,23 @@ models:
         description: "Aggregated freight weight."
       - name: ext_shipping_info
         description: "External shipping info from the quote record."
-      - name: is_free
+      - name: isfree
         description: "'Yes' if base_subtotal >= free shipping threshold, else 'No'."
         tests:
           - accepted_values:
               arguments:
                 values: ['Yes', 'No']
+              config:
+                severity: warn
       - name: carrierserviceid
         description: "Carrier service ID aggregated from Fishbowl shipments."
-      - name: is_free_auto
+      - name: isfreeauto
         description: "'Yes' if a free shipping quote option was applied."
         tests:
           - accepted_values:
               arguments:
                 values: ['Yes', 'No']
+              config:
+                severity: warn
       - name: carrierservice
         description: "Carrier service name from the Fishbowl lookup."

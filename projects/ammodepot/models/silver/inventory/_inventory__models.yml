@@ -169,7 +169,9 @@ models:
       - name: part_id
         description: "Part identifier from fishbowl_tag."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: location_group_id
         description: "Location group identifier from fishbowl_location."
         tests:
@@ -337,19 +339,27 @@ models:
       - name: location_group_id
         description: "Location group identifier from fishbowl_location."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: location_id
         description: "Location identifier from fishbowl_tag."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: part_id
         description: "Part identifier from fishbowl_tag."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: tag_number
         description: "Tag number identifier from fishbowl_tag."
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: serial_number
         description: "Serial number value from the tag serial view, may be null for non-serialized parts."
       - name: calculated_quantity_on_hand

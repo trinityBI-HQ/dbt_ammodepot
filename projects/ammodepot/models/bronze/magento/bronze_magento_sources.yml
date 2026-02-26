@@ -2,7 +2,11 @@ version: 2
 
 sources:
   - name: magento
-    description: Magento e-commerce platform raw data
+    description: >
+      Magento e-commerce platform raw data.
+      Source unique/not_null tests use severity: warn because Airbyte CDC
+      naturally produces duplicate and null IDs for updated/deleted rows.
+      Deduplication is handled in the Silver layer.
     schema: magento
     config:
       freshness:
@@ -16,72 +20,103 @@ sources:
           - name: entity_id
             description: Primary key for customer
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: amasty_orderachive_sales_order_grid_archive
         description: Archived sales order grid data
         columns:
           - name: entity_id
             description: Primary key for order
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: catalog_category_product
         description: Mapping between products and categories
         columns:
           - name: entity_id
             description: Primary key for the relation
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: catalog_category_entity_varchar
         description: Category attribute values of varchar type
         columns:
           - name: value_id
             description: Primary key for the attribute value
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: catalog_product_super_link
         description: Relationship between configurable products and their simple product variants
         columns:
           - name: link_id
             description: Primary key for the relationship
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: admin_user
         description: Admin users of the Magento system
         columns:
           - name: user_id
             description: Primary key for admin user
             tests:
-              - unique
-              - not_null
-      
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: mostviewed_analytics
         description: Analytics data for most viewed products and content
         columns:
           - name: id
             description: Primary key for analytics record
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
-              
       - name: store
         description: List of stores
         columns:
           - name: store_id
             description: Primary key for the store
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: sales_order
         description: Orders data from Magento
@@ -89,8 +124,12 @@ sources:
           - name: entity_id
             description: Primary key for the order
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: sales_order_item
         description: Order items data from Magento
@@ -98,8 +137,12 @@ sources:
           - name: item_id
             description: Primary key for the order item
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: sales_order_address
         description: Order address data from Magento
@@ -107,8 +150,12 @@ sources:
           - name: entity_id
             description: Primary key for the order address
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: catalog_product_entity
         description: Product entity details from Magento
@@ -116,17 +163,22 @@ sources:
           - name: entity_id
             description: Primary key for the product entity
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: ups_invoice
-        description: UPS Invoice data from Magento
+        description: UPS Invoice data from Magento (tracking_number is not unique - multiple invoices per shipment)
         columns:
           - name: tracking_number
             description: Tracking number for shipment
             tests:
-              - unique
-              - not_null
+              - not_null:
+                  config:
+                    severity: warn
 
       - name: sales_shipment_grid
         description: "Denormalized shipment grid data (shipment + order + customer + billing)"
@@ -134,15 +186,22 @@ sources:
           - name: entity_id
             description: "Primary key of the shipment grid record"
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: quote_shipping_rate
         description: "Shipping rate options for Magento quotes"
         columns:
           - name: code
             description: "Unique code for the shipping rate"
             tests:
-              - not_null
+              - not_null:
+                  config:
+                    severity: warn
           - name: method
             description: "Internal identifier of the shipping method"
           - name: carrier_title
@@ -156,8 +215,12 @@ sources:
           - name: address_id
             description: "Primary key for the quote address"
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: quote_id
             description: "Foreign key back to the quote entity"
 
@@ -167,26 +230,40 @@ sources:
           - name: entity_id
             description: "Primary key for the quote"
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: ext_shipping_info
             description: "Additional external shipping information"
+
       - name: quote_address_item
-        description: "Raw Magento quote address item data "
+        description: "Raw Magento quote address item data"
         columns:
           - name: address_item_id
             description: "Primary key for the quote address item record"
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
       - name: catalog_product_entity_varchar
         description: Raw varchar attributes for products
         columns:
           - name: value_id
             description: PK for the varchar attribute
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: entity_id
           - name: attribute_id
           - name: store_id
@@ -198,8 +275,12 @@ sources:
           - name: value_id
             description: PK for the decimal attribute
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: entity_id
           - name: attribute_id
           - name: store_id
@@ -211,8 +292,12 @@ sources:
           - name: value_id
             description: PK for the int attribute
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: entity_id
           - name: attribute_id
           - name: store_id
@@ -224,22 +309,26 @@ sources:
           - name: value_id
             description: PK for the text attribute
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: entity_id
           - name: attribute_id
           - name: store_id
           - name: value
 
       - name: eav_attribute_option_value
-        description: Attribute option values for EAV model lookups
+        description: Attribute option values for EAV model lookups (one row per option per store)
         columns:
           - name: option_id
-            description: Primary key for attribute option value
+            description: Option identifier (not unique - one row per store_id)
             tests:
-              - unique
-              - not_null
-          - name: attribute_id
+              - not_null:
+                  config:
+                    severity: warn
           - name: store_id
           - name: value
 
@@ -249,8 +338,12 @@ sources:
           - name: attribute_set_id
             description: Primary key for attribute set
             tests:
-              - unique
-              - not_null
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
           - name: attribute_set_name
 
       - name: eav_attribute
@@ -259,7 +352,10 @@ sources:
           - name: attribute_id
             description: Primary key for attribute
             tests:
-              - unique
-              - not_null
-          - name: attribute_name          
-
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: attribute_name

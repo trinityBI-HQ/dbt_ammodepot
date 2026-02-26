@@ -2,12 +2,11 @@ version: 2
 
 models:
   - name: magento_eav_attribute_option_value
-    description: "EAV attribute option value lookups for translating integer attribute values to human-readable labels."
+    description: "EAV attribute option value lookups for translating integer attribute values to human-readable labels. One row per option per store."
     columns:
       - name: option_id
-        description: "Primary key for the attribute option value."
+        description: "Option identifier (not unique - one row per store_id)."
         tests:
-          - unique
           - not_null
 
   - name: magento_catalog_product_entity_varchar
