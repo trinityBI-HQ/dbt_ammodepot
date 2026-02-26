@@ -29,9 +29,16 @@
 
 ## CRITICAL — Fixed in PR #13
 
-- [x] **C1** Remove `password_hash` PII from `d_customer.sql` Gold output _(security)_
-- [x] **C2** Remove `_ab_cdc_cursor` and `_ab_cdc_log_pos` CDC metadata from `d_customer.sql` Gold output _(data governance)_
 - [x] **C3** Replace `SELECT *` with explicit column lists in 12 Silver models + 1 intermediate _(schema drift risk)_
+
+## CRITICAL — Backlog
+
+- [ ] **C1** Remove `password_hash` PII from `d_customer.sql` Gold output _(security)_
+  - Reverted from PR #13 to avoid breaking Power BI dashboards
+  - Requires coordinated Power BI update before implementing
+- [ ] **C2** Remove `_ab_cdc_cursor` and `_ab_cdc_log_pos` CDC metadata from `d_customer.sql` Gold output _(data governance)_
+  - Reverted from PR #13 to avoid breaking Power BI dashboards
+  - Requires coordinated Power BI update before implementing
 
 ## HIGH — Fixed in PR #13
 
