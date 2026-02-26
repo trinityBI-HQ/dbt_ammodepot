@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
 select
     sn.part_tracking_id,               -- from fishbowl_serialnum
     s.serial_id,                       -- from fishbowl_serial

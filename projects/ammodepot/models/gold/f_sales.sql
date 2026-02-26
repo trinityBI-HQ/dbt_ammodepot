@@ -248,12 +248,12 @@ last as (
         z.vendor,
         z.customer_id,
 
-        case when ty.ID is not null then Ty.Row_total else z.row_total end as row_total,
-        case when ty.ID is not null then Ty.COST else z.COST end as cost,
-        case when ty.ID is not null then Ty.qty_ordered else z.qty_Ordered end as qty_Ordered,
-        case when ty.ID is not null then Ty.Part_Qty_Sold else z.Part_Qty_Sold end as part_qty_sold,
-        case when ty.ID is not null then Ty.Freight_revenue else z.freight_revenue end as freight_revenue,
-        case when ty.ID is not null then Ty.Freight_cost else z.freight_cost end as freight_cost
+        case when ty.id is not null then ty.row_total else z.row_total end as row_total,
+        case when ty.id is not null then ty.cost else z.cost end as cost,
+        case when ty.id is not null then ty.qty_ordered else z.qty_ordered end as qty_ordered,
+        case when ty.id is not null then ty.part_qty_sold else z.part_qty_sold end as part_qty_sold,
+        case when ty.id is not null then ty.freight_revenue else z.freight_revenue end as freight_revenue,
+        case when ty.id is not null then ty.freight_cost else z.freight_cost end as freight_cost
      from skubase as z
     left join to_transfer as ty
            on ty.id = z.parent_item_id

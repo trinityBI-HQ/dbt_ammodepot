@@ -1,10 +1,3 @@
-{{
-  config(
-    materialized = 'view',
-    schema       = 'silver'
-  )
-}}
-
 select
     t.part_id,                                   -- from fishbowl_tag
     l.location_group_id,                         -- from fishbowl_location

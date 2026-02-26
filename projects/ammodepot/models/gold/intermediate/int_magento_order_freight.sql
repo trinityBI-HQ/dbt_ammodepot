@@ -1,10 +1,3 @@
-{{
-  config(
-    schema='gold',
-    materialized='view'
-  )
-}}
-
 -- int_magento_order_freight
 --
 -- Computes freight allocation data per Magento order by combining:
@@ -31,7 +24,7 @@ ups_shipment_cost as (
     select
         tracking_number,
         SUM(net_amount)          as net_amount
-    from {{ source('magento', 'ups_invoice') }}
+    from {{ ref('magento_ups_invoice') }}
     group by tracking_number
 ),
 

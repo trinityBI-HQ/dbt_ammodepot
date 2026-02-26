@@ -1,7 +1,3 @@
-{{ config(
-materialized = 'view',
-schema       = 'silver'
-) }}
 with tagserialview_cte as (
     select
         l.location_group_id     as location_group_id,
