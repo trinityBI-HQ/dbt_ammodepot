@@ -1,0 +1,13 @@
+
+models:
+  - name: magento_ups_invoice
+    description: "Table containing UPS invoice details from Magento. Tracking number is not unique (multiple invoices per shipment)."
+    columns:
+      - name: tracking_number
+        description: "Shipment tracking number."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: net_amount
+        description: "Net amount associated with the shipment."

@@ -1,0 +1,365 @@
+
+models:
+  - name: inventory_qtyonorderpo
+    description: "Calculates the quantity on order from purchase orders by part and location group. Joins receipt items with parts and applies UOM conversion when the receipt item UOM differs from the part default UOM. Filters for purchase order type receipts (order_type_id = 10) with open or pending statuses."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_receipt."
+        tests:
+          - not_null
+      - name: quantity_on_order_po
+        description: "Total quantity on order from purchase orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyonordermo
+    description: "Calculates the quantity on order from manufacturing orders (work orders) by part and location group. Joins work order items with parts and applies UOM conversion when the work order item UOM differs from the part default UOM. Filters for active work orders (status_id < 40) with finished good or by-product item types."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_wo."
+        tests:
+          - not_null
+      - name: quantity_on_order_mo
+        description: "Total quantity on order from manufacturing orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyonhand
+    description: "Calculates the quantity on hand by part and location group. Sums the quantity on tags from fishbowl_tag joined with fishbowl_location, filtering for committed and shipped tag types (tag_type_id IN 30, 40)."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_tag."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_location."
+        tests:
+          - not_null
+      - name: quantity_on_hand
+        description: "Total quantity on hand, summed from tag quantities."
+
+  - name: inventory_qtyonorderso
+    description: "Calculates the quantity on order from sales orders by part and location group. Computes the unfulfilled quantity (quantity_to_fulfill - quantity_fulfilled) for each sales order item, applying UOM conversion when necessary. Filters for open sales orders (status_id IN 20, 25) with eligible item statuses and sale item type."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_so."
+        tests:
+          - not_null
+      - name: quantity_on_order_so
+        description: "Total unfulfilled quantity on order from sales orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyinventory
+    description: "Consolidates all inventory quantity metrics by part and location group into a single pivoted view. Unions quantities from on-hand, allocated (by type), not available, dropship, and on-order (by type) models, then pivots each quantity type into its own column using conditional aggregation."
+    columns:
+      - name: part_id
+        description: "Part identifier."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier."
+        tests:
+          - not_null
+      - name: quantity_on_hand
+        description: "Total quantity on hand."
+      - name: quantity_allocated_po
+        description: "Quantity allocated to purchase orders."
+      - name: quantity_allocated_so
+        description: "Quantity allocated to sales orders."
+      - name: quantity_allocated_mo
+        description: "Quantity allocated to manufacturing orders."
+      - name: quantity_allocated_transfer_order
+        description: "Quantity allocated to transfer orders (sum of allocated to receive and allocated to send)."
+      - name: quantity_not_available
+        description: "Quantity not available in non-available locations."
+      - name: quantity_not_available_to_pick
+        description: "Quantity not available to pick from non-pickable locations."
+      - name: quantity_dropship
+        description: "Quantity designated for dropship."
+      - name: quantity_on_order_po
+        description: "Quantity on order from purchase orders."
+      - name: quantity_on_order_so
+        description: "Quantity on order from sales orders."
+      - name: quantity_on_order_transfer_order
+        description: "Quantity on order from transfer orders (sum of to receive and to send)."
+      - name: quantity_on_order_mo
+        description: "Quantity on order from manufacturing orders."
+
+  - name: inventory_qtyallocated
+    description: "Calculates the total allocated quantity across all order types by part and location group. Unions allocated quantities from sales orders, purchase orders, transfer orders (send and receive), and manufacturing orders, then sums them into a single total."
+    columns:
+      - name: part_id
+        description: "Part identifier."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier."
+        tests:
+          - not_null
+      - name: total_quantity_allocated
+        description: "Total quantity allocated across all order types (SO, PO, TO send, TO receive, MO)."
+
+  - name: inventory_qtynotavailabletopick
+    description: "Calculates the quantity not available to pick by part and location group. Sums the uncommitted tag quantity (quantity_on_tag - quantity_committed_on_tag) from non-pickable locations, excluding shipping locations (location_type_id <> 100)."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_tag."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_location."
+        tests:
+          - not_null
+      - name: quantity_not_available_to_pick
+        description: "Total uncommitted quantity in non-pickable locations."
+
+  - name: inventory_qtyallocatedmo
+    description: "Calculates the quantity allocated to manufacturing orders (work orders) by part and location group. Sums the target quantity from work order items for active work orders (status_id < 40) with raw material and consumed item types, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_wo."
+        tests:
+          - not_null
+      - name: quantity_allocated_to_mo
+        description: "Total quantity allocated to manufacturing orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyallocatedso
+    description: "Calculates the quantity allocated to sales orders by part and location group. Computes the unfulfilled quantity (quantity_to_fulfill - quantity_fulfilled) for sales order items with allocation-eligible statuses and pick/ship item types, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_so."
+        tests:
+          - not_null
+      - name: quantity_allocated_to_so
+        description: "Total unfulfilled quantity allocated to sales orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtydropship
+    description: "Calculates the quantity designated for dropship by part and location group. Computes the unfulfilled quantity from sales order items where the item type is dropship (item_type_id = 12) on open sales orders, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_so."
+        tests:
+          - not_null
+      - name: quantity_dropship
+        description: "Total unfulfilled dropship quantity, converted to the part default UOM when applicable."
+
+  - name: inventory_qtycommitted
+    description: "Calculates the committed quantity by part and location group. Sums the committed quantity on tags (quantity_committed_on_tag) from fishbowl_tag joined with fishbowl_location."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_tag."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_location."
+        tests:
+          - not_null
+      - name: quantity_committed
+        description: "Total committed quantity from inventory tags."
+
+  - name: inventory_qtyinventorytotals
+    description: "Provides summarized inventory totals by part and location group. Derives total allocated quantity (sum of PO, SO, transfer order, and MO allocations) and total on-order quantity (sum of PO, SO, transfer order, and MO on-order) from the inventory_qtyinventory model."
+    columns:
+      - name: part_id
+        description: "Part identifier."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier."
+        tests:
+          - not_null
+      - name: quantity_on_hand
+        description: "Total quantity on hand."
+      - name: quantity_allocated
+        description: "Total allocated quantity across all order types (PO + SO + transfer order + MO)."
+      - name: quantity_not_available
+        description: "Quantity not available in non-available locations."
+      - name: quantity_not_available_to_pick
+        description: "Quantity not available to pick from non-pickable locations."
+      - name: quantity_dropship
+        description: "Quantity designated for dropship."
+      - name: quantity_on_order
+        description: "Total on-order quantity across all order types (PO + SO + transfer order + MO)."
+
+  - name: inventory_qtyonordertoreceive
+    description: "Calculates the quantity on order to receive from transfer orders by part and location group. Uses the source (from) location group from the transfer order and computes the unfulfilled quantity for items with eligible statuses, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Source (from) location group identifier from fishbowl_xo."
+        tests:
+          - not_null
+      - name: quantity_on_order_to_receive
+        description: "Total unfulfilled quantity on order to receive from transfer orders, converted to the part default UOM when applicable."
+
+  - name: inventory_tagserialviewview
+    description: "Joins serial number tracking information with tags and part tracking metadata. Provides a denormalized view of serial numbers, their associated tags, part tracking details, and commitment status."
+    columns:
+      - name: part_tracking_id
+        description: "Part tracking identifier from fishbowl_serialnum."
+        tests:
+          - not_null
+      - name: serial_id
+        description: "Serial identifier from fishbowl_serial."
+        tests:
+          - not_null
+      - name: part_tracking_name
+        description: "Name of the part tracking type."
+      - name: part_tracking_abbreviation
+        description: "Abbreviation for the part tracking type."
+      - name: part_tracking_description
+        description: "Description of the part tracking type."
+      - name: part_tracking_sort_order
+        description: "Sort order for the part tracking type."
+      - name: part_tracking_type_id
+        description: "Type identifier for the part tracking."
+      - name: tag_id
+        description: "Tag identifier from fishbowl_serial."
+      - name: serial_num_record_id
+        description: "Serial number record identifier from fishbowl_serialnum."
+      - name: serial_number_value
+        description: "The actual serial number value."
+      - name: is_committed
+        description: "Whether the serial number is committed."
+      - name: is_part_tracking_active
+        description: "Whether the part tracking type is active."
+
+  - name: inventory_qtyallocatedpo
+    description: "Calculates the quantity allocated to purchase orders by part and location group. Computes the unfulfilled quantity (quantity_ordered - quantity_fulfilled) for PO items with eligible statuses and item types, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_po."
+        tests:
+          - not_null
+      - name: quantity_allocated_to_po
+        description: "Total unfulfilled quantity allocated to purchase orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyonordertosend
+    description: "Calculates the quantity on order to send from transfer orders by part and location group. Uses the destination (to) location group from the transfer order and computes the unfulfilled quantity for ship-type items with eligible statuses, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Destination (to) location group identifier from fishbowl_xo."
+        tests:
+          - not_null
+      - name: quantity_on_order_to_send
+        description: "Total unfulfilled quantity on order to send from transfer orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtynotavailable
+    description: "Calculates the quantity not available by part and location group. Sums the uncommitted tag quantity (quantity_on_tag - quantity_committed_on_tag) from locations not counted as available, excluding shipping locations (location_type_id <> 100)."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_tag."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_location."
+        tests:
+          - not_null
+      - name: quantity_not_available
+        description: "Total uncommitted quantity in locations not counted as available."
+
+  - name: inventory_qtyallocatedtosend
+    description: "Calculates the quantity allocated to send for transfer orders by part and location group. Uses the source (from) location group from the transfer order and computes the unfulfilled quantity for ship-type items (item_type_id = 10) with eligible statuses, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Source (from) location group identifier from fishbowl_xo."
+        tests:
+          - not_null
+      - name: quantity_allocated_to_send
+        description: "Total unfulfilled quantity allocated to send for transfer orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyallocatedtoreceive
+    description: "Calculates the quantity allocated to receive for transfer orders by part and location group. Uses the destination (to) location group from the transfer order and computes the unfulfilled quantity for receive-type items (item_type_id = 20) with eligible statuses, applying UOM conversion when necessary."
+    columns:
+      - name: part_id
+        description: "Part identifier from fishbowl_part."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Destination (to) location group identifier from fishbowl_xo."
+        tests:
+          - not_null
+      - name: quantity_allocated_to_receive
+        description: "Total unfulfilled quantity allocated to receive for transfer orders, converted to the part default UOM when applicable."
+
+  - name: inventory_qtyonorder
+    description: "Calculates the total quantity on order across all order types by part and location group. Unions on-order quantities from sales orders, purchase orders, transfer orders (send and receive), and manufacturing orders, then sums them into a single total."
+    columns:
+      - name: part_id
+        description: "Part identifier."
+        tests:
+          - not_null
+      - name: location_group_id
+        description: "Location group identifier."
+        tests:
+          - not_null
+      - name: total_quantity_on_order
+        description: "Total quantity on order across all order types (SO, PO, TO send, TO receive, MO)."
+
+  - name: inventory_qohview
+    description: "Provides a consolidated quantity-on-hand view by combining tag and serial number data. Joins locations, tags, and the tag serial view to calculate an adjusted quantity on hand that accounts for serialized items. Groups by location group, location, part, tag number, serial number, and tag quantity."
+    columns:
+      - name: location_group_id
+        description: "Location group identifier from fishbowl_location."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: location_id
+        description: "Location identifier from fishbowl_tag."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: part_id
+        description: "Part identifier from fishbowl_tag."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: tag_number
+        description: "Tag number identifier from fishbowl_tag."
+        tests:
+          - not_null:
+              config:
+                severity: warn
+      - name: serial_number
+        description: "Serial number value from the tag serial view, may be null for non-serialized parts."
+      - name: calculated_quantity_on_hand
+        description: "Adjusted quantity on hand that accounts for serialized items using the formula ((1 - quantity_on_tag) * (COUNT(serial_number) - 1) + 1)."

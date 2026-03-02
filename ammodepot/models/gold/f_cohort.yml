@@ -1,0 +1,14 @@
+models:
+  - name: f_cohort
+    description: >
+      Cohort analysis fact table. Groups customers by their first purchase month
+      and tracks retention across subsequent months. One row per cohort_month + month_number.
+    columns:
+      - name: COHORT_MONTH
+        description: "Month of the customer's first purchase (cohort assignment)"
+      - name: MONTH_NUMBER
+        description: "Number of months since the cohort's first purchase (0 = acquisition month)"
+      - name: PURCHASERS
+        description: "Count of distinct customers who made a purchase in this month_number"
+      - name: COHORT_SIZE
+        description: "Count of distinct customers who were acquired in this cohort_month"

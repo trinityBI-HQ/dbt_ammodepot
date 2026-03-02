@@ -1,0 +1,317 @@
+
+# All silver model tests use severity: warn because these are views over
+# Airbyte CDC data which naturally contains duplicate and null IDs for
+# updated/deleted rows. Deduplication is handled downstream in Gold models.
+
+models:
+  - name: fishbowl_kititem
+    description: >
+      Silver layer view containing kit item components from Fishbowl.
+      Links component products to parent kit assemblies with quantity and pricing configuration.
+    columns:
+      - name: kit_item_id
+        description: Primary key for the kit item record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_inventorylog
+    description: >
+      Silver layer view containing inventory log entries from Fishbowl.
+      Tracks inventory changes including quantity adjustments, location movements, and associated costs.
+    columns:
+      - name: inventory_log_id
+        description: Primary key for the inventory log record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_po
+    description: >
+      Silver layer view containing purchase order headers from Fishbowl.
+      Includes vendor details, shipping and remit-to addresses, financial totals, and order lifecycle timestamps.
+    columns:
+      - name: purchase_order_id
+        description: Primary key for the purchase order.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_poitem
+    description: >
+      Silver layer view containing purchase order line items from Fishbowl.
+      Tracks individual items on a PO including part details, quantities, costs, and fulfillment status.
+    columns:
+      - name: po_item_id
+        description: Primary key for the purchase order item record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_receipt
+    description: >
+      Silver layer view containing receipt headers from Fishbowl.
+      Records goods received against purchase orders, sales orders (RMAs), or transfer orders.
+    columns:
+      - name: receipt_id
+        description: Primary key for the receipt record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_receiptitem
+    description: >
+      Silver layer view containing receipt line items from Fishbowl.
+      Tracks individual items received including quantities, costs, tax, shipping details, and reconciliation timestamps.
+    columns:
+      - name: receipt_item_id
+        description: Primary key for the receipt item record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_serial
+    description: >
+      Silver layer view containing serial number records from Fishbowl.
+      Links serial numbers to inventory tags and tracks their committed status.
+    columns:
+      - name: serial_id
+        description: Primary key for the serial record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_serialnum
+    description: >
+      Silver layer view containing serial number values from Fishbowl.
+      Stores actual serial number strings associated with serial records and part tracking definitions.
+    columns:
+      - name: serial_num_record_id
+        description: Primary key for the serial number record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_tag
+    description: >
+      Silver layer view containing inventory tag records from Fishbowl.
+      Tracks tagged inventory at specific locations with quantities, serialization flags, and cycle count dates.
+    columns:
+      - name: tag_id
+        description: Primary key for the tag record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_tagserialview
+    description: >
+      Silver layer view sourced from the Fishbowl tagserialview database view.
+      Provides a denormalized view joining tags, serial numbers, and part tracking definitions.
+    columns:
+      - name: tag_id
+        description: Foreign key to the tag table, part of composite identifier.
+      - name: serial_id
+        description: Foreign key to the serial table, part of composite identifier.
+      - name: serial_num_record_id
+        description: Foreign key to the serialnum table, part of composite identifier.
+
+  - name: fishbowl_parttracking
+    description: >
+      Silver layer view containing part tracking type definitions from Fishbowl.
+      Defines tracking methods (e.g., serial numbers, lot numbers) with their type, abbreviation, and active status.
+    columns:
+      - name: part_tracking_id
+        description: Primary key for the part tracking definition.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_parttotracking
+    description: >
+      Silver layer view mapping parts to their tracking type configurations in Fishbowl.
+      Associates parts with specific tracking definitions and indicates which tracking is primary.
+    columns:
+      - name: part_to_tracking_id
+        description: Primary key for the part-to-tracking mapping record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_location
+    description: >
+      Silver layer view containing warehouse location records from Fishbowl.
+      Defines inventory locations with hierarchy, type, and flags for pickable, receivable, and availability counting.
+    columns:
+      - name: location_id
+        description: Primary key for the location record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_post
+    description: >
+      Silver layer view containing accounting posting records from Fishbowl.
+      Tracks financial postings tied to orders, including transaction IDs, amounts, and quantities for accounting integration.
+    columns:
+      - name: post_id
+        description: Primary key for the posting record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_postpo
+    description: >
+      Silver layer view containing purchase order posting headers from Fishbowl.
+      Links POs to their accounting postings with external transaction references and journal entry details.
+    columns:
+      - name: post_po_id
+        description: Primary key for the PO posting record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_postpoitem
+    description: >
+      Silver layer view containing purchase order item posting records from Fishbowl.
+      Tracks cost postings at the PO line item level including standard, posted, and received costs.
+    columns:
+      - name: post_po_item_id
+        description: Primary key for the PO item posting record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_wo
+    description: >
+      Silver layer view containing work order headers from Fishbowl.
+      Tracks manufacturing work orders with quantities, costs, scheduling, and production lifecycle timestamps.
+    columns:
+      - name: work_order_id
+        description: Primary key for the work order.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_woitem
+    description: >
+      Silver layer view containing work order line items from Fishbowl.
+      Tracks components and finished goods on a work order with target, used, and scrapped quantities plus costs.
+    columns:
+      - name: wo_item_id
+        description: Primary key for the work order item record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_vendor_parts
+    description: >
+      Silver layer view containing vendor part associations from Fishbowl.
+      Passes through all columns from the vendorparts source without transformation.
+    columns:
+      - name: id
+        description: Primary key for the vendor parts record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_xo
+    description: >
+      Silver layer view containing transfer order headers from Fishbowl.
+      Tracks inter-location inventory transfers with from/to addresses, carrier details, and order lifecycle timestamps.
+    columns:
+      - name: transfer_order_id
+        description: Primary key for the transfer order.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+
+  - name: fishbowl_xoitem
+    description: >
+      Silver layer view containing transfer order line items from Fishbowl.
+      Tracks individual items being transferred with quantities, costs, and fulfillment status.
+    columns:
+      - name: xo_item_id
+        description: Primary key for the transfer order item record.
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn

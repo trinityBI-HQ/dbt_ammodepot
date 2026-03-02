@@ -1,0 +1,21 @@
+
+models:
+  - name: fishbowl_soitem
+    description: Silver table containing sales order item details from Fishbowl.
+    columns:
+      - name: so_item_id
+        tests:
+          - unique:
+              config:
+                severity: warn
+          - not_null:
+              config:
+                severity: warn
+      - name: so_id
+      - name: product_id
+      - name: quantity_ordered
+      - name: quantity_fulfilled
+      - name: quantity_shipped
+      - name: unit_price
+      - name: total_price
+      - name: total_cost

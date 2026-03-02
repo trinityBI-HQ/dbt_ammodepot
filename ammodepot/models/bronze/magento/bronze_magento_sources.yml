@@ -1,0 +1,357 @@
+sources:
+  - name: magento
+    description: >
+      Magento e-commerce platform raw data ingested via Airbyte CDC.
+      Source unique/not_null tests use severity: warn because Airbyte CDC
+      naturally produces duplicate and null IDs for updated/deleted rows.
+      Deduplication is handled in the Silver layer.
+    database: AD_AIRBYTE
+    schema: AD_MAGENTO
+    config:
+      freshness:
+        warn_after: {count: 24, period: hour}
+        error_after: {count: 48, period: hour}
+      loaded_at_field: "_airbyte_extracted_at"
+    tables:
+      - name: customer_entity
+        description: Raw customer account data from Magento
+        columns:
+          - name: entity_id
+            description: Primary key for customer
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: amasty_orderachive_sales_order_grid_archive
+        description: Archived sales order grid data
+        columns:
+          - name: entity_id
+            description: Primary key for order
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: catalog_category_product
+        description: Mapping between products and categories
+        columns:
+          - name: entity_id
+            description: Primary key for the relation
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: catalog_category_entity_varchar
+        description: Category attribute values of varchar type
+        columns:
+          - name: value_id
+            description: Primary key for the attribute value
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: catalog_product_super_link
+        description: Relationship between configurable products and their simple product variants
+        columns:
+          - name: link_id
+            description: Primary key for the relationship
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: admin_user
+        description: Admin users of the Magento system
+        columns:
+          - name: user_id
+            description: Primary key for admin user
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: mostviewed_analytics
+        description: Analytics data for most viewed products and content
+        columns:
+          - name: id
+            description: Primary key for analytics record
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: store
+        description: List of stores
+        columns:
+          - name: store_id
+            description: Primary key for the store
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: sales_order
+        description: Orders data from Magento
+        columns:
+          - name: entity_id
+            description: Primary key for the order
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: sales_order_item
+        description: Order items data from Magento
+        columns:
+          - name: item_id
+            description: Primary key for the order item
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: sales_order_address
+        description: Order address data from Magento
+        columns:
+          - name: entity_id
+            description: Primary key for the order address
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: catalog_product_entity
+        description: Product entity details from Magento
+        columns:
+          - name: entity_id
+            description: Primary key for the product entity
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: ups_invoice
+        description: >
+          UPS Invoice data — NOT available as a Magento Airbyte stream.
+          Source data lives in a separate system (UPS_INVOICE_HISTORY).
+          Silver model is stubbed; downstream models use LEFT JOIN + COALESCE fallbacks.
+        # No columns/tests — table does not exist in AD_AIRBYTE.AD_MAGENTO
+
+      - name: sales_shipment_grid
+        description: "Denormalized shipment grid data (shipment + order + customer + billing)"
+        columns:
+          - name: entity_id
+            description: "Primary key of the shipment grid record"
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: quote_shipping_rate
+        description: "Shipping rate options for Magento quotes"
+        columns:
+          - name: code
+            description: "Unique code for the shipping rate"
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+          - name: method
+            description: "Internal identifier of the shipping method"
+          - name: carrier_title
+            description: "Human-readable name of the carrier"
+          - name: method_title
+            description: "Display title for the shipping method"
+
+      - name: quote_address
+        description: "Addresses associated with Magento quotes"
+        columns:
+          - name: address_id
+            description: "Primary key for the quote address"
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: quote_id
+            description: "Foreign key back to the quote entity"
+
+      - name: quote
+        description: "Magento quote header data"
+        columns:
+          - name: entity_id
+            description: "Primary key for the quote"
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: ext_shipping_info
+            description: "Additional external shipping information"
+
+      - name: quote_address_item
+        description: "Raw Magento quote address item data"
+        columns:
+          - name: address_item_id
+            description: "Primary key for the quote address item record"
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+
+      - name: catalog_product_entity_varchar
+        description: Raw varchar attributes for products
+        columns:
+          - name: value_id
+            description: PK for the varchar attribute
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: catalog_product_entity_decimal
+        description: Raw decimal attributes for products
+        columns:
+          - name: value_id
+            description: PK for the decimal attribute
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: catalog_product_entity_int
+        description: Raw int attributes for products
+        columns:
+          - name: value_id
+            description: PK for the int attribute
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: catalog_product_entity_text
+        description: Raw text attributes for products
+        columns:
+          - name: value_id
+            description: PK for the text attribute
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: entity_id
+          - name: attribute_id
+          - name: store_id
+          - name: value
+
+      - name: eav_attribute_option_value
+        description: Attribute option values for EAV model lookups (one row per option per store)
+        columns:
+          - name: option_id
+            description: Option identifier (not unique - one row per store_id)
+            tests:
+              - not_null:
+                  config:
+                    severity: warn
+          - name: store_id
+          - name: value
+
+      - name: eav_attribute_set
+        description: Attribute sets defining product attribute groups
+        columns:
+          - name: attribute_set_id
+            description: Primary key for attribute set
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: attribute_set_name
+
+      - name: eav_attribute
+        description: EAV attribute definitions (codes, types, labels)
+        columns:
+          - name: attribute_id
+            description: Primary key for attribute
+            tests:
+              - unique:
+                  config:
+                    severity: warn
+              - not_null:
+                  config:
+                    severity: warn
+          - name: attribute_name

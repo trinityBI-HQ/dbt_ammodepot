@@ -1,0 +1,27 @@
+
+models:
+  - name: d_product_bundle
+    description: "Product bundle dimension mapping component products to kit products with quantity and conversion details."
+    columns:
+      - name: component_product_id
+        description: "Identifier for the component product within the bundle."
+        tests:
+          - not_null
+      - name: kit_product_id
+        description: "Identifier for the kit (parent) product."
+        tests:
+          - not_null
+      - name: individual_num
+        description: "Number of individual units of the component in the bundle."
+        tests:
+          - not_null
+      - name: default_quantity
+        description: "Default quantity of the component in the kit."
+      - name: num_bundle
+        description: "Number of bundles."
+        tests:
+          - not_null
+      - name: conversion_rate
+        description: "Conversion rate between component and kit units."
+      - name: kit_type
+        description: "Type of kit (e.g., standard, custom)."

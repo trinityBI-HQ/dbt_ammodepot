@@ -1,0 +1,71 @@
+with source_data as (
+    select
+        id,
+        name,
+        number,
+        statusid,
+        accountid,
+        sysuserid,
+        taxexempt,
+        taxrateid,
+        activeflag,
+        currencyid,
+        creditlimit,
+        datecreated,
+        tobeemailed,
+        tobeprinted,
+        accountingid,
+        currencyrate,
+        customfields,
+        accountinghash,
+        taxexemptnumber,
+        carrierserviceid,
+        datelastmodified,
+        defaultcarrierid,
+        issuablestatusid,
+        defaultpriorityid,
+        defaultsalesmanid,
+        defaultshiptermsid,
+        defaultpaymenttermsid,
+        note,
+        url,
+        lastchangeduser
+    from
+        {{ source('fishbowl', 'customer') }}
+    where
+        _ab_cdc_deleted_at is null
+)
+
+select
+    id as customer_id,
+    name as customer_name,
+    number as customer_number,
+    statusid as status_id,
+    accountid as account_id,
+    sysuserid as sysuser_id,
+    taxexempt as is_tax_exempt,
+    taxrateid as tax_rate_id,
+    activeflag as is_active,
+    currencyid as currency_id,
+    creditlimit as credit_limit,
+    datecreated as date_created,
+    tobeemailed as to_be_emailed,
+    tobeprinted as to_be_printed,
+    accountingid as accounting_id,
+    currencyrate as currency_rate,
+    customfields as custom_fields,
+    accountinghash as accounting_hash,
+    taxexemptnumber as tax_exempt_number,
+    carrierserviceid as carrier_service_id,
+    datelastmodified as date_last_modified,
+    defaultcarrierid as default_carrier_id,
+    issuablestatusid as issuable_status_id,
+    defaultpriorityid as default_priority_id,
+    defaultsalesmanid as default_salesman_id,
+    defaultshiptermsid as default_ship_terms_id,
+    defaultpaymenttermsid as default_payment_terms_id,
+    note as customer_note,
+    url as customer_url,
+    lastchangeduser as last_changed_user
+from
+    source_data

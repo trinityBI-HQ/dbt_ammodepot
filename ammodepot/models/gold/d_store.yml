@@ -1,0 +1,22 @@
+
+models:
+  - name: d_store
+    description: "Store dimension from Magento, mapping store codes to names and website groups."
+    columns:
+      - name: CODE
+        description: "Store code identifier."
+      - name: NAME
+        description: "Store display name."
+      - name: GROUP_ID
+        description: "Store group identifier."
+      - name: STORE_ID
+        description: "Primary key for the store."
+        tests:
+          - unique
+          - not_null
+      - name: IS_ACTIVE
+        description: "Whether the store is active."
+      - name: SORT_ORDER
+        description: "Display sort order."
+      - name: WEBSITE_ID
+        description: "Website identifier the store belongs to."
