@@ -1,0 +1,21 @@
+models:
+  - name: f_cohort_detailed
+    description: >
+      Detailed cohort analysis fact table with product, region, and store breakdowns.
+      Extends f_cohort with dimensional slicing by Manufacturer SKU, region, and store.
+    columns:
+      - name: COHORT_MONTH
+        description: "Month of the customer's first purchase (cohort assignment)"
+      - name: MONTH_NUMBER
+        description: "Number of months since the cohort's first purchase"
+      - name: '"Manufacturer SKU"'
+        description: "Manufacturer SKU from d_product"
+        quote: true
+      - name: REGION
+        description: "Customer region from sales order address"
+      - name: STORE_ID
+        description: "Magento store identifier"
+      - name: PURCHASERS
+        description: "Count of distinct customers who purchased in this slice"
+      - name: COHORT_SIZE
+        description: "Count of distinct customers acquired in this cohort_month for this slice"

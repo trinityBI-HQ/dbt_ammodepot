@@ -5,6 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "dbt-redshift>=1.10.1",
+    "dbt-snowflake>=1.11.2",
     "openpyxl>=3.1.5",
     "python-dotenv>=1.2.1",
     "snowflake-connector-python>=4.3.0",

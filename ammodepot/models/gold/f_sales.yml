@@ -1,0 +1,104 @@
+
+models:
+  - name: f_sales
+    description: "Consolidated sales fact combining Magento orders and Fishbowl cost data, with timezone conversion, freight allocation, and customer ranking."
+    columns:
+      - name: CREATED_AT
+        description: "Order datetime converted from UTC to America/New_York."
+        tests:
+          - not_null
+      - name: TIMEDATE
+        description: "Original order timestamp."
+      - name: ID
+        description: "Magento order item ID."
+        tests:
+          - not_null
+      - name: INCREMENT_ID
+        description: "Magento order increment identifier."
+        tests:
+          - not_null
+      - name: "Início da Hora - Copiar"
+        description: "Hour of day truncated from created_at (copy)."
+      - name: PRODUCT_ID
+        description: "Magento product entity identifier."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('d_product')
+                field: '"Product ID"'
+              severity: warn
+      - name: ORDER_ID
+        description: "Magento order entity identifier."
+        tests:
+          - not_null
+      - name: TRICKAT
+        description: "Cost source indicator (real vs estimated)."
+      - name: PRODUCT_OPTIONS
+        description: "Product options JSON from the order item."
+      - name: PRODUCT_TYPE
+        description: "Magento product type (simple, bundle, etc.)."
+      - name: PARENT_ITEM_ID
+        description: "Parent item ID for bundled/configurable products."
+      - name: TESTSKU
+        description: "SKU used for cost matching."
+      - name: CONVERSION
+        description: "Unit-of-measure conversion factor."
+      - name: "Início da Hora"
+        description: "Hour of day truncated from created_at."
+      - name: CUSTOMER_EMAIL
+        description: "Customer email address."
+      - name: POSTCODE
+        description: "Billing address postal code."
+      - name: COUNTRY
+        description: "Billing address country code."
+      - name: REGION
+        description: "Billing address region or state."
+      - name: CITY
+        description: "Billing address city."
+      - name: STREET
+        description: "Billing address street."
+      - name: TELEPHONE
+        description: "Customer telephone number."
+      - name: CUSTOMER_NAME
+        description: "Customer full name."
+      - name: STORE_ID
+        description: "Magento store identifier."
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_store')
+                field: 'STORE_ID'
+              severity: warn
+      - name: STATUS
+        description: "Magento order status."
+        tests:
+          - not_null
+      - name: ROW_TOTAL
+        description: "Gross item revenue minus discount."
+        tests:
+          - assert_non_negative_values
+      - name: COST
+        description: "Allocated cost for the item (Magento or Fishbowl fallback)."
+      - name: QTY_ORDERED
+        description: "Net quantity ordered."
+        tests:
+          - assert_non_negative_values
+      - name: FREIGHT_REVENUE
+        description: "Allocated freight revenue per item."
+      - name: FREIGHT_COST
+        description: "Allocated freight cost per item."
+      - name: VENDOR
+        description: "Fishbowl vendor identifier."
+      - name: CUSTOMER_ID
+        description: "Magento customer entity identifier."
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_customer')
+                field: 'ENTITY_ID'
+              severity: warn
+      - name: RANK_ID
+        description: "Customer rank identifier from customer deduplication."
+      - name: PART_QTY_SOLD
+        description: "Total piece quantity sold adjusted by conversion factor."

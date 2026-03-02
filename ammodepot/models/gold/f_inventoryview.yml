@@ -1,0 +1,20 @@
+
+models:
+  - name: f_inventoryview
+    description: "Inventory fact view providing current stock levels and costs by part number."
+    columns:
+      - name: part_number
+        description: "Primary key identifying the inventory part."
+        tests:
+          - unique
+          - not_null
+      - name: qty_available
+        description: "Quantity currently available in stock."
+      - name: qty_not_available
+        description: "Quantity not available (e.g., reserved or held)."
+      - name: qty_on_order
+        description: "Quantity currently on order from vendors."
+      - name: part_cost
+        description: "Unit cost of the part."
+      - name: extended_cost
+        description: "Extended cost (quantity multiplied by unit cost)."
