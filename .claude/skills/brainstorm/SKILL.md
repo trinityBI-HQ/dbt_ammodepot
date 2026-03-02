@@ -1,3 +1,9 @@
+---
+name: brainstorm
+description: Collaborative exploration before requirements capture (Phase 0 of SDD workflow)
+argument-hint: "<idea>"
+---
+
 # Brainstorm Command
 
 > Collaborative exploration before requirements capture (Phase 0)

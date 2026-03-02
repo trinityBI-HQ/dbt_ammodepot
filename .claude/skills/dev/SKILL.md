@@ -1,3 +1,9 @@
+---
+name: dev
+description: Agentic development with PROMPT files — craft, execute, or resume Dev Loop sessions
+argument-hint: "<idea-or-prompt-file>"
+---
+
 # /dev Command
 
 > **Dev Loop** — Agentic Development (Level 2) with structured iteration and intelligent routing.

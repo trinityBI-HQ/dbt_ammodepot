@@ -1,3 +1,8 @@
+---
+name: create-pr
+description: Automate professional pull request creation with conventional commits and structured descriptions
+---
+
 # Create PR Command
 
 > Automate professional pull request creation with conventional commits and structured descriptions

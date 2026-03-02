@@ -25,6 +25,7 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite]
+memory: user
 color: orange
 ---
 

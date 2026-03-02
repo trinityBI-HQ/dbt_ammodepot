@@ -8,12 +8,12 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 
 ### Warehouse Migration (In Progress)
 
-Migrating from **Amazon Redshift** to **Snowflake**. Current state:
-- **Redshift**: Production (dbt models run here today)
-- **Snowflake**: Setting up — Airbyte destination, service accounts, key-pair auth
+Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
+- **Redshift** (`projects/ammodepot/`): Production — dbt Cloud scheduled runs, 95 models
+- **Snowflake** (`ammodepot/`): Operational — 98 models, all passing (3 new Gold models)
 - **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys)
-- **Adapter switch**: dbt-redshift installed; dbt-snowflake pending
-- Both connection configs in `.env.example` (Snowflake + Redshift)
+- **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 7 Airbyte connections)
+- **Adapters**: dbt-redshift 1.10.1 (Redshift) + dbt-snowflake 1.11.2 (Snowflake)
 
 ---
 
@@ -41,64 +41,91 @@ Airbyte CDC (Fishbowl, Magento)
 
 | Component | Technology |
 |---|---|
-| Transformation | dbt-core + dbt-redshift (migrating to dbt-snowflake) |
-| Warehouse | Amazon Redshift (migrating to Snowflake) |
-| Ingestion | Airbyte (CDC) |
+| Transformation | dbt-core 1.11.6 + dbt-redshift 1.10.1 / dbt-snowflake 1.11.2 |
+| Warehouse | Amazon Redshift (production) + Snowflake (migration target) |
+| Ingestion | Airbyte CDC (7 active connections) |
 | Packages | dbt_utils, dbt_expectations (metaplane fork) |
-| Linting | SQLFluff (Redshift dialect) |
+| Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
 | Python | uv (package manager) |
 
 ---
 
 ## Project Structure
 
+### Redshift Project (Production)
+
 ```
 projects/ammodepot/
-├── dbt_project.yml
+├── dbt_project.yml             # version 1.0
 ├── packages.yml
-├── profiles.yml              # Not committed (.gitignore)
-├── .env                      # Not committed (.gitignore)
-├── .env.example              # Snowflake + Redshift connection vars
-├── .sqlfluff
+├── profiles.yml                # Not committed (.gitignore)
+├── .env                        # Not committed (.gitignore)
+├── .env.example                # Snowflake + Redshift connection vars
+├── .sqlfluff                   # dialect: redshift
 ├── macros/
 │   └── generate_schema_name.sql
-├── tests/generic/            # 16 custom generic tests
+├── tests/generic/              # 16 custom generic tests
 ├── models/
-│   ├── bronze/               # Source definitions only
-│   │   ├── fishbowl/         # 34 source tables
-│   │   └── magento/          # 25 source tables
-│   ├── silver/               # 78 view models
-│   │   ├── fishbowl/         # 34 models (ERP data)
-│   │   ├── magento/          # 23 models (e-commerce data)
-│   │   └── inventory/        # 21 models (quantity calculations)
-│   └── gold/                 # 10 table models + 7 intermediate views
-│       ├── intermediate/     # 7 reusable view models
-│       │   ├── int_fishbowl_order_cost.sql
-│       │   ├── int_fishbowl_product_enrichment.sql
-│       │   ├── int_magento_order_freight.sql
-│       │   ├── int_magento_product_attributes.sql
-│       │   ├── int_magento_product_conversion.sql
-│       │   ├── int_magento_product_eav_lookups.sql
-│       │   └── int_magento_product_taxonomy.sql
-│       ├── d_customer.sql
-│       ├── d_customer_segmentation.sql
-│       ├── d_product.sql
-│       ├── d_product_bundle.sql
-│       ├── d_store.sql
-│       ├── d_vendor.sql
-│       ├── f_inventoryview.sql
-│       ├── f_pos.sql
-│       ├── f_sales.sql
+│   ├── bronze/                 # Source definitions only
+│   │   ├── fishbowl/           # 34 source tables
+│   │   └── magento/            # 25 source tables
+│   ├── silver/                 # 78 view models
+│   │   ├── fishbowl/           # 34 models (ERP data)
+│   │   ├── magento/            # 23 models (e-commerce data)
+│   │   └── inventory/          # 21 models (quantity calculations)
+│   └── gold/                   # 10 table models + 7 intermediate views
+│       ├── intermediate/       # 7 reusable view models
+│       ├── d_customer.sql, d_customer_segmentation.sql, d_product.sql
+│       ├── d_product_bundle.sql, d_store.sql, d_vendor.sql
+│       ├── f_inventoryview.sql, f_pos.sql, f_sales.sql
 │       └── f_shippment.sql
 ├── seeds/
 ├── snapshots/
 └── analyses/
-docs/
-├── snowflake_access_setup.md   # Snowflake roles, warehouses, RSA key-pair setup
-└── AUDIT_BACKLOG.md            # Audit findings, backlog, and prioritized roadmap
 ```
 
-**Counts:** 95 models (34 Fishbowl + 23 Magento + 21 Inventory + 10 Gold + 7 Intermediate), 59 source tables, 16 generic tests, 1 macro
+**Redshift Counts:** 95 models (34 FB + 23 MG + 21 Inv + 10 Gold + 7 Int), 59 source tables, 16 generic tests, 1 macro
+
+### Snowflake Project (Migration Target)
+
+```
+ammodepot/
+├── dbt_project.yml             # version 2.0
+├── packages.yml
+├── profiles.yml                # Not committed (.gitignore)
+├── .env                        # Not committed (.gitignore)
+├── .env.example                # Snowflake-only connection vars
+├── .sqlfluff                   # dialect: snowflake
+├── macros/
+│   ├── generate_schema_name.sql
+│   └── json_extract_text.sql   # Cross-dialect JSON extraction macro
+├── tests/generic/              # 16 custom generic tests (same as Redshift)
+├── models/
+│   ├── bronze/                 # Source definitions (AD_AIRBYTE database)
+│   │   ├── fishbowl/           # schema: AD_FISHBOWL (35 source tables)
+│   │   └── magento/            # schema: AD_MAGENTO (30 source tables)
+│   ├── silver/                 # 78 view models (same as Redshift)
+│   └── gold/                   # 13 table models + 7 intermediate views
+│       ├── intermediate/       # 7 reusable view models (same as Redshift)
+│       ├── (all Redshift gold models)
+│       ├── f_cohort.sql        # NEW: Customer cohort analysis
+│       ├── f_cohort_detailed.sql  # NEW: Detailed cohort metrics
+│       └── f_sales_realtime.sql   # NEW: Real-time sales view
+├── seeds/
+├── snapshots/
+└── analyses/
+```
+
+**Snowflake Counts:** 98 models (34 FB + 23 MG + 21 Inv + 13 Gold + 7 Int), 65 source tables, 16 generic tests, 2 macros
+
+### Shared Documentation
+
+```
+docs/
+├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA key-pair setup
+├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
+└── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
+```
 
 ---
 
@@ -148,11 +175,13 @@ docs/
 
 ## Sources
 
-### Fishbowl (34 tables)
+### Fishbowl (34 Redshift / 35 Snowflake tables)
 Inventory management / ERP system. Key tables: `so`, `soitem`, `product`, `part`, `vendor`, `ship`, `po`, `poitem`, `receipt`, `receiptitem`, `uomconversion`, `kititem`, `objecttoobject`
+- Redshift: `fishbowl` schema | Snowflake: `AD_AIRBYTE.AD_FISHBOWL`
 
-### Magento (25 tables)
+### Magento (25 Redshift / 30 Snowflake tables)
 E-commerce platform. Key tables: `sales_order`, `sales_order_item`, `customer_entity`, `catalog_product_entity`, `quote`, `store`, EAV attribute tables (`eav_attribute`, `catalog_product_entity_varchar/int/text/decimal`)
+- Redshift: `magento` schema | Snowflake: `AD_AIRBYTE.AD_MAGENTO`
 
 ### Source Freshness
 Both sources have freshness configured: warn after 24h, error after 48h, using `_airbyte_extracted_at` as the loaded_at_field.
@@ -164,10 +193,9 @@ Magento uses Entity-Attribute-Value for product attributes. Product attributes a
 
 ## Common Commands
 
-All commands run from `projects/ammodepot/`:
+### Redshift Project (from `projects/ammodepot/`)
 
 ```bash
-# Development (via uv)
 uv run dbt deps --profiles-dir .           # Install packages
 uv run dbt debug --profiles-dir .          # Test connection
 uv run dbt parse --profiles-dir .          # Validate SQL/YAML (no connection needed)
@@ -175,10 +203,17 @@ uv run dbt build --profiles-dir .          # Run all models + tests
 uv run dbt build --profiles-dir . --select +f_sales   # Run f_sales with upstream deps
 uv run dbt test --profiles-dir . --select gold        # Test gold layer only
 uv run dbt source freshness --profiles-dir .          # Check source freshness
-
-# Linting
 uv run sqlfluff lint models/               # Lint all models
 uv run sqlfluff fix models/                # Auto-fix (review changes before committing)
+```
+
+### Snowflake Project (from `ammodepot/`)
+
+```bash
+# IMPORTANT: dbt doesn't auto-load .env — must source it first
+set -a && source .env && set +a && uv run dbt build --profiles-dir . --target prod
+set -a && source .env && set +a && uv run dbt parse --profiles-dir .
+set -a && source .env && set +a && uv run dbt test --profiles-dir . --target prod --select gold
 ```
 
 ---
@@ -201,19 +236,24 @@ uv run sqlfluff fix models/                # Auto-fix (review changes before com
 
 8. **Generic tests in `tests/generic/`** -- 16 reusable test macros using `{% test %}` wrapper syntax.
 
-9. **Snowflake migration** -- Migrating from Redshift to Snowflake. Snowflake uses `AD_AIRBYTE` database with `AIRBYTE_ROLE` (ingestion, OWNERSHIP) and `TRANSFORMER_ROLE` (dbt, owns SILVER/GOLD schemas). Service accounts use RSA key-pair auth (TYPE=SERVICE, no passwords). Shared `ETL_WH` warehouse (XSMALL).
+9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). Uses `AD_AIRBYTE` database (sources in AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database (SILVER/GOLD schemas). `TRANSFORMER_ROLE` for dbt, RSA key-pair auth. Cross-dialect `json_extract_text` macro handles Snowflake vs Redshift JSON syntax.
 
-10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/AUDIT_BACKLOG.md` for deferred items.
+10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/PIPELINE_ASSESSMENT.md` for pipeline details.
 
 ---
 
 ## Build & Deployment Status
 
+### Redshift (Production)
 - **dbt-core**: 1.11.6 with dbt-redshift 1.10.1
-- **dbt Cloud**: Scheduled runs on Redshift (production), 88 of 95 models selected
+- **dbt Cloud**: Scheduled runs, 88 of 95 models selected
 - **Last local build**: PASS=402, WARN=32, ERROR=0, SKIP=0, TOTAL=434
-- **Audit score**: 8.0/10 (see `docs/AUDIT_BACKLOG.md` for details)
-- **Audit backlog**: 4 HIGH items, 6 MEDIUM items, 3 LOW items pending
+- **Audit score**: 8.0/10
+
+### Snowflake (Migration Target)
+- **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
+- **Last build**: PASS=424, WARN=12, ERROR=0, SKIP=0, TOTAL=436 (98 models, 338 tests)
+- **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 
 ---
 
@@ -245,41 +285,37 @@ uv run sqlfluff fix models/                # Auto-fix (review changes before com
 
 ---
 
-## Knowledge Base
+## Knowledge Base (53 technologies in 6 categories)
 
-KB domains in `.claude/kb/` across 6 categories:
+| Category | Full | Placeholder | Key Technologies |
+|---|---|---|---|
+| data-engineering | 16 | 3 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, Onehouse |
+| cloud | 11 | 0 | S3, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, S3 Tables, GCP, EMR, Fargate |
+| devops-sre | 9 | 4 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus |
+| ai-ml | 6 | 0 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
+| automation | 2 | 1 | mermaid, n8n |
+| document-processing | 1 | 0 | docling |
 
-| Category | Domains | Key Topics |
-|---|---|---|
-| **AI/ML** | Gemini, OpenRouter, CrewAI, LangFuse, Pydantic, Langflow | LLM platforms, multi-agent, observability, validation |
-| **Automation** | n8n, Zapier, Mermaid | Workflow automation, diagramming |
-| **Cloud** | AWS (S3, Athena, Glue, IAM, KMS, CloudWatch, Secrets Manager, S3 Tables), Azure, Multi-Cloud Patterns, GCP | AWS/Azure/GCP services |
-| **Data Engineering** | Snowflake, dbt-core, dbt-cloud, Airbyte, Dagster, BigQuery, Airflow, Kafka, Apache Iceberg, Data Vault, Elementary, Great Expectations, Soda, FinOps, Data Contracts, Data Quality, Data Governance, OpenMetadata, Flake8 | Platforms, transformation, quality, governance, streaming |
-| **DevOps/SRE** | Terraform, Terragrunt, Docker, Kubernetes, Grafana, Prometheus, Datadog, GitHub Actions, GitLab CI, Railway, uv, GitHub | IaC, containers, monitoring, CI/CD, tooling |
-| **Document Processing** | Docling | Document parsing |
+Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.
 
 ---
 
-## Commands
+## Skills (14 slash commands)
 
-14 slash commands in `.claude/commands/`:
+Located in `.claude/skills/<name>/SKILL.md`:
 
-| Command | Purpose |
-|---|---|
-| `/memory` | Save session insights to persistent memory |
-| `/sync-context` | Analyze codebase and update CLAUDE.md |
-| `/readme-maker` | Generate README.md from codebase analysis |
-| `/create-kb` | Create new Knowledge Base domain |
-| `/review` | Code review with quality analysis |
-| `/build` | Build/implement features (SDD workflow) |
-| `/define` | Define requirements and specs |
-| `/design` | Design architecture and approach |
-| `/iterate` | Iterate on existing implementation |
-| `/brainstorm` | Brainstorm ideas and approaches |
-| `/ship` | Ship/deploy changes |
-| `/create-pr` | Create pull request |
-| `/dev` | Dev Loop command (Level 2 agentic) |
-| `/create-agent` | Create new specialized agent |
+**Core:** `/memory`, `/readme-maker`, `/sync-context`
+**Development:** `/dev`, `/review`, `/create-agent`, `/create-kb`
+**Workflow (SDD):** `/brainstorm` → `/define` → `/design` → `/build` → `/iterate` → `/ship`, `/create-pr`
+
+---
+
+## Rules
+
+Path-scoped instruction files in `.claude/rules/`:
+- **kb-development.md** — KB file conventions and size limits
+- **agent-development.md** — Agent template and MCP validation conventions
+- **git-workflow.md** — Commit message and PR conventions
 
 ---
 
@@ -287,8 +323,7 @@ KB domains in `.claude/kb/` across 6 categories:
 
 | MCP Server | Purpose |
 |---|---|
-| upstash-context-7-mcp | KB context storage and retrieval |
-| exa | Code context search (web) |
 | context7 | Library documentation lookup |
-| n8n-mcp | n8n workflow automation |
-| ref-tools-ref-tools-mcp | Reference tools |
+| exa | Code context search (web) |
+| Ref | Framework documentation |
+| upstash-context-7-mcp | KB context storage and retrieval |
