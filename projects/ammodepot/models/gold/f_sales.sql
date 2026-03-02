@@ -253,7 +253,11 @@ last as (
         case when ty.id is not null then ty.qty_ordered else z.qty_ordered end as qty_ordered,
         case when ty.id is not null then ty.part_qty_sold else z.part_qty_sold end as part_qty_sold,
         case when ty.id is not null then ty.freight_revenue else z.freight_revenue end as freight_revenue,
-        case when ty.id is not null then ty.freight_cost else z.freight_cost end as freight_cost
+        case when ty.id is not null then ty.freight_cost else z.freight_cost end as freight_cost,
+        ty.cost            as testc,
+        ty.row_total       as testr,
+        ty.freight_revenue as testfr,
+        ty.freight_cost    as testfc
      from skubase as z
     left join to_transfer as ty
            on ty.id = z.parent_item_id
@@ -327,10 +331,10 @@ select
     l.customer_id                           as CUSTOMER_ID,
     cu.rank_id                              as RANK_ID,
     COALESCE(l.part_qty_sold, l.qty_ordered) as PART_QTY_SOLD,
-    null                                    as TESTC,
-    null                                    as TESTR,
-    null                                    as TESTFR,
-    null                                    as TESTFC
+    l.testc                                 as TESTC,
+    l.testr                                 as TESTR,
+    l.testfr                                as TESTFR,
+    l.testfc                                as TESTFC
 from last as l
 left join filtered_cost_final as fcf
   on fcf.product_id = l.product_id
