@@ -178,4 +178,4 @@ Document lessons in these areas:
 - Agent: `.claude/agents/workflow/ship-agent.md`
 - Template: `.claude/sdd/templates/SHIPPED_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`
-- Previous Phase: `.claude/commands/workflow/build.md`
+- Previous Phase: `.claude/skills/build/SKILL.md`

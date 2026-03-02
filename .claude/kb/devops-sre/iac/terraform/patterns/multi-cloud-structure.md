@@ -36,8 +36,6 @@ infrastructure/
 
 ## Alternative: Stacks by Cloud Provider
 
-For teams that manage each cloud separately:
-
 ```text
 infrastructure/
 ├── gcp/
@@ -107,8 +105,6 @@ module "aws_data_lake" {
 
 ## Backend Strategy
 
-### Separate State per Cloud
-
 ```hcl
 # gcp/prod/backend.tf
 terraform {
@@ -130,8 +126,6 @@ terraform {
 }
 ```
 
-### Cross-Cloud State References
-
 ```hcl
 # In AWS config, reference GCP outputs
 data "terraform_remote_state" "gcp" {
@@ -150,8 +144,6 @@ resource "aws_ssm_parameter" "gcp_endpoint" {
 ```
 
 ## With Terragrunt
-
-For DRY multi-environment management:
 
 ```text
 infrastructure/
@@ -198,16 +190,6 @@ inputs = {
 | Many environments | Use Terragrunt for DRY |
 | Cross-cloud dependencies | Use `terraform_remote_state` data source |
 | Simple setup, few resources | Single root with both providers |
-
-## State Isolation Best Practices
-
-| Practice | Why |
-|----------|-----|
-| Separate state per environment | Blast radius containment |
-| Separate state per cloud provider | Independent deploy cycles |
-| Use cloud-native backend per stack | GCS for GCP, S3 for AWS |
-| Enable state encryption | Protect sensitive outputs |
-| Enable versioning on state bucket | Recover from state corruption |
 
 ## Related
 

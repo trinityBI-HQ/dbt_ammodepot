@@ -108,21 +108,6 @@ pdf_converter = DocumentConverter(pipeline_options=pdf_options)
 office_converter = DocumentConverter()
 ```
 
-## URL Support
-
-```python
-# Direct URL conversion
-converter = DocumentConverter()
-
-# PDF from arXiv
-result = converter.convert("https://arxiv.org/pdf/2408.09869")
-
-# Any accessible document URL
-result = converter.convert("https://example.com/document.pdf")
-
-# Note: Docling downloads and processes automatically
-```
-
 ## Common Mistakes
 
 ### Wrong
@@ -151,47 +136,6 @@ if file.endswith(".pdf"):
     result = pdf_converter.convert(file)
 else:
     result = office_converter.convert(file)
-```
-
-## Format Detection
-
-```python
-# Automatic format detection from extension
-converter = DocumentConverter()
-
-files = [
-    "doc1.pdf",
-    "doc2.docx",
-    "image.png",
-    "audio.mp3"
-]
-
-for file in files:
-    result = converter.convert(file)
-    print(f"{file}: {result.document.format}")
-```
-
-## Batch Multi-Format Processing
-
-```python
-from pathlib import Path
-from docling.document_converter import DocumentConverter
-
-converter = DocumentConverter()
-
-# Process all supported formats in directory
-document_dir = Path("./documents")
-supported_extensions = [".pdf", ".docx", ".pptx", ".xlsx", ".png", ".jpg", ".html"]
-
-for file_path in document_dir.iterdir():
-    if file_path.suffix.lower() in supported_extensions:
-        try:
-            result = converter.convert(str(file_path))
-            output = file_path.with_suffix(".md")
-            output.write_text(result.document.export_to_markdown())
-            print(f"Processed: {file_path.name}")
-        except Exception as e:
-            print(f"Failed {file_path.name}: {e}")
 ```
 
 ## Related

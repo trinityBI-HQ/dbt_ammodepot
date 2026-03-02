@@ -184,19 +184,6 @@ vars:
     count: 1
 ```
 
-## Example Usage
-
-```bash
-# Run all Elementary tests
-dbt test --select tag:elementary
-
-# Run tests for a specific model
-dbt test --select fct_orders
-
-# Generate report after tests
-edr report -d 14
-```
-
 ## See Also
 
 - [anomaly-detection](../concepts/anomaly-detection.md)

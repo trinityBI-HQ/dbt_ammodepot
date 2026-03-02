@@ -362,6 +362,6 @@ Use `/iterate` when:
 
 ## References
 
-- Command: `.claude/commands/workflow/build.md`
+- Skill: `.claude/skills/build/SKILL.md`
 - Template: `.claude/sdd/templates/BUILD_REPORT_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`

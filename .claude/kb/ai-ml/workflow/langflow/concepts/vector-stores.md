@@ -6,7 +6,7 @@
 
 ## Overview
 
-Vector stores in Langflow store embeddings (numerical representations of text) and enable similarity search for Retrieval-Augmented Generation (RAG). Langflow integrates with multiple vector databases through LangChain's vector store interfaces, supporting both managed services like Pinecone and self-hosted options like Chroma.
+Vector stores in Langflow store embeddings and enable similarity search for RAG. Langflow integrates with multiple vector databases through LangChain's interfaces, supporting managed services (Pinecone) and self-hosted options (Chroma).
 
 ## Supported Vector Stores
 
@@ -21,25 +21,16 @@ Vector stores in Langflow store embeddings (numerical representations of text) a
 ## Vector Store Component
 
 ```python
-# Pinecone configuration
 pinecone_component = {
-    "type": "Pinecone",
-    "api_key": "${PINECONE_API_KEY}",
-    "environment": "us-west1-gcp",
-    "index_name": "langflow-docs",
-    "namespace": "production",  # Optional isolation
-    "dimension": 1536,  # Must match embedding model
-    "metric": "cosine"  # Or dot_product, euclidean
+    "type": "Pinecone", "api_key": "${PINECONE_API_KEY}",
+    "environment": "us-west1-gcp", "index_name": "langflow-docs",
+    "namespace": "production", "dimension": 1536, "metric": "cosine"
 }
 
-# Weaviate configuration
 weaviate_component = {
-    "type": "Weaviate",
-    "url": "https://cluster.weaviate.network",
-    "api_key": "${WEAVIATE_API_KEY}",
-    "index_name": "LangflowDocs",
-    "text_key": "content",
-    "attributes": ["source", "timestamp"]  # Metadata
+    "type": "Weaviate", "url": "https://cluster.weaviate.network",
+    "api_key": "${WEAVIATE_API_KEY}", "index_name": "LangflowDocs",
+    "text_key": "content", "attributes": ["source", "timestamp"]
 }
 ```
 
@@ -55,102 +46,36 @@ weaviate_component = {
 ## RAG Flow Structure
 
 ```text
-┌─────────────────┐
-│ Document Loader │ → Load PDF/text/web
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│  Text Splitter  │ → Chunk into passages
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│   Embeddings    │ → Convert to vectors
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│  Vector Store   │ → Store for retrieval
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│   Retriever     │ ← User query
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│      LLM        │ → Generate answer with context
-└─────────────────┘
+Document Loader → Text Splitter → Embeddings → Vector Store → Retriever ← Query → LLM → Answer
 ```
 
 ## Retrieval Configuration
 
 ```python
-# Basic retrieval
-retriever = {
-    "vector_store": pinecone,
-    "search_type": "similarity",  # Or mmr, similarity_score_threshold
-    "k": 5,  # Top k results
-    "score_threshold": 0.7  # Minimum similarity
-}
+# Basic similarity retrieval
+retriever = {"vector_store": pinecone, "search_type": "similarity", "k": 5, "score_threshold": 0.7}
 
-# Maximum Marginal Relevance (MMR)
-# Balances relevance and diversity
-mmr_retriever = {
-    "search_type": "mmr",
-    "k": 5,
-    "fetch_k": 20,  # Fetch 20, rerank to 5
-    "lambda_mult": 0.5  # 0=diversity, 1=relevance
-}
+# MMR: balances relevance and diversity
+mmr_retriever = {"search_type": "mmr", "k": 5, "fetch_k": 20, "lambda_mult": 0.5}
 ```
 
 ## Metadata Filtering
 
 ```python
-# Filter by metadata during search
-filter_query = {
-    "source": "documentation",
-    "date": {"$gte": "2026-01-01"},
-    "category": {"$in": ["tutorial", "guide"]}
-}
-
-# Pinecone filter syntax
-results = vector_store.similarity_search(
-    query="What is Langflow?",
-    k=5,
-    filter=filter_query
-)
-
-# Returns only matching documents
+filter_query = {"source": "documentation", "date": {"$gte": "2026-01-01"}, "category": {"$in": ["tutorial", "guide"]}}
+results = vector_store.similarity_search(query="What is Langflow?", k=5, filter=filter_query)
 ```
 
 ## Common Mistakes
 
-### Wrong
-
 ```python
-# Dimension mismatch
+# Wrong: dimension mismatch, no chunking, hardcoded keys
 embeddings_model.dimension = 1536
 vector_store.dimension = 768  # Will fail
 
-# No chunking (too large docs)
-documents = [entire_pdf_content]  # Context window overflow
-
-# Hardcoded keys
-api_key = "pk_abc123..."  # Security risk
-```
-
-### Correct
-
-```python
-# Matching dimensions
-embeddings_model = "text-embedding-ada-002"  # 1536d
-vector_store.dimension = 1536
-
-# Proper chunking
-text_splitter = {
-    "chunk_size": 1000,
-    "chunk_overlap": 200
-}
-
-# Environment variables
+# Correct: matching dimensions, proper chunking, env vars
+vector_store.dimension = 1536  # Match embedding model
+text_splitter = {"chunk_size": 1000, "chunk_overlap": 200}
 api_key = "${PINECONE_API_KEY}"
 ```
 
@@ -165,35 +90,24 @@ api_key = "${PINECONE_API_KEY}"
 ## Performance Optimization
 
 ```python
-# Batch inserts for efficiency
-batch_size = 100
-for i in range(0, len(documents), batch_size):
-    batch = documents[i:i+batch_size]
-    vector_store.add_documents(batch)
+# Batch inserts
+for i in range(0, len(documents), 100):
+    vector_store.add_documents(documents[i:i+100])
 
-# Use namespace for isolation
+# Namespace isolation
 vector_store.namespace = f"user_{user_id}"
 
-# Enable caching for repeated queries
-cache_config = {
-    "enable": True,
-    "ttl": 3600  # 1 hour
-}
+# Caching
+cache_config = {"enable": True, "ttl": 3600}
 ```
 
 ## Hybrid Search
 
 ```python
-# Combine vector similarity with keyword search
 hybrid_retriever = {
-    "vector_store": weaviate,
-    "search_type": "hybrid",
-    "alpha": 0.5,  # 0=keyword, 1=vector, 0.5=balanced
-    "k": 10
+    "vector_store": weaviate, "search_type": "hybrid",
+    "alpha": 0.5, "k": 10  # 0=keyword, 1=vector, 0.5=balanced
 }
-
-# Best of both approaches
-# Semantic similarity + exact matches
 ```
 
 ## Related

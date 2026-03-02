@@ -7,14 +7,12 @@
 
 - Infrastructure as Code for Airbyte configurations
 - Multi-environment deployment (dev/staging/prod)
-- Version control for connections and sources
-- Automated testing and CI/CD pipelines
-- Consistent deployments across teams
+- Version control for connections, sources, destinations
+- CI/CD pipelines for Airbyte config changes
 
 ## Implementation
 
 ```hcl
-# terraform/main.tf
 terraform {
   required_providers {
     airbyte = {
@@ -25,43 +23,33 @@ terraform {
 }
 
 provider "airbyte" {
-  # Cloud
   bearer_auth = var.airbyte_api_key
-
-  # OSS (if self-hosted)
-  # server_url = "http://localhost:8001/api"
+  # server_url = "http://localhost:8001/api"  # For OSS
 }
 
-# Define Postgres source
 resource "airbyte_source_postgres" "production_db" {
   name         = "Production Postgres"
   workspace_id = var.workspace_id
-
   configuration = {
     host     = "prod-db.example.com"
     port     = 5432
     database = "production"
     username = "airbyte_readonly"
     password = var.postgres_password
-    ssl_mode = {
-      mode = "require"
-    }
+    ssl_mode = { mode = "require" }
     replication_method = {
       method = "CDC"
       plugin = "pgoutput"
-      replication_slot    = "airbyte_slot"
-      publication         = "airbyte_publication"
-      initial_waiting_seconds = 300
+      replication_slot = "airbyte_slot"
+      publication      = "airbyte_publication"
     }
     schemas = ["public", "analytics"]
   }
 }
 
-# Define Snowflake destination
 resource "airbyte_destination_snowflake" "data_warehouse" {
   name         = "Snowflake DW"
   workspace_id = var.workspace_id
-
   configuration = {
     host      = "account.snowflakecomputing.com"
     role      = "AIRBYTE_ROLE"
@@ -69,44 +57,28 @@ resource "airbyte_destination_snowflake" "data_warehouse" {
     database  = "ANALYTICS"
     schema    = "RAW"
     username  = "AIRBYTE_USER"
-    credentials = {
-      password = var.snowflake_password
-    }
+    credentials = { password = var.snowflake_password }
   }
 }
 
-# Create connection
 resource "airbyte_connection" "postgres_to_snowflake" {
-  name              = "Postgres → Snowflake"
-  source_id         = airbyte_source_postgres.production_db.source_id
-  destination_id    = airbyte_destination_snowflake.data_warehouse.destination_id
+  name                 = "Postgres -> Snowflake"
+  source_id            = airbyte_source_postgres.production_db.source_id
+  destination_id       = airbyte_destination_snowflake.data_warehouse.destination_id
   namespace_definition = "destination"
-  namespace_format = "raw"
-  prefix           = "postgres_"
-
+  namespace_format     = "raw"
+  prefix               = "postgres_"
   schedule = {
-    schedule_type = "cron"
-    cron_expression = "0 */6 * * *"  # Every 6 hours
+    schedule_type   = "cron"
+    cron_expression = "0 */6 * * *"
   }
-
   configurations = {
     streams = [
-      {
-        name = "users"
-        sync_mode = "incremental_append_deduped"
-        cursor_field = ["updated_at"]
-        primary_key  = [["id"]]
-      },
-      {
-        name = "orders"
-        sync_mode = "incremental_append_deduped"
-        cursor_field = ["updated_at"]
-        primary_key  = [["order_id"]]
-      },
-      {
-        name = "products"
-        sync_mode = "full_refresh_overwrite"
-      }
+      { name = "users", sync_mode = "incremental_append_deduped",
+        cursor_field = ["updated_at"], primary_key = [["id"]] },
+      { name = "orders", sync_mode = "incremental_append_deduped",
+        cursor_field = ["updated_at"], primary_key = [["order_id"]] },
+      { name = "products", sync_mode = "full_refresh_overwrite" }
     ]
   }
 }
@@ -114,80 +86,31 @@ resource "airbyte_connection" "postgres_to_snowflake" {
 
 ## Configuration
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `bearer_auth` | Required (Cloud) | Airbyte Cloud API key |
-| `server_url` | `http://localhost:8001/api` | Airbyte OSS API endpoint |
-| `workspace_id` | Required | Target workspace UUID |
+| Setting | Description |
+|---------|-------------|
+| `bearer_auth` | Airbyte Cloud API key (required for Cloud) |
+| `server_url` | OSS API endpoint (default: `http://localhost:8001/api`) |
+| `workspace_id` | Target workspace UUID |
 
 ## Multi-Environment Pattern
 
 ```hcl
-# terraform/environments/dev/terraform.tfvars
-workspace_id      = "dev-workspace-uuid"
-postgres_host     = "dev-db.example.com"
+# environments/dev/terraform.tfvars
+workspace_id       = "dev-workspace-uuid"
+postgres_host      = "dev-db.example.com"
 snowflake_database = "DEV_ANALYTICS"
-sync_schedule     = "0 */12 * * *"  # Every 12 hours
+sync_schedule      = "0 */12 * * *"
 
-# terraform/environments/prod/terraform.tfvars
-workspace_id      = "prod-workspace-uuid"
-postgres_host     = "prod-db.example.com"
+# environments/prod/terraform.tfvars
+workspace_id       = "prod-workspace-uuid"
+postgres_host      = "prod-db.example.com"
 snowflake_database = "PROD_ANALYTICS"
-sync_schedule     = "0 */2 * * *"   # Every 2 hours
-
-# terraform/main.tf
-variable "workspace_id" {}
-variable "postgres_host" {}
-variable "snowflake_database" {}
-variable "sync_schedule" {}
-
-resource "airbyte_source_postgres" "db" {
-  workspace_id = var.workspace_id
-  configuration = {
-    host = var.postgres_host
-    # ... other config
-  }
-}
-
-resource "airbyte_connection" "conn" {
-  schedule = {
-    cron_expression = var.sync_schedule
-  }
-}
+sync_schedule      = "0 */2 * * *"
 ```
 
-## Using Generic Resources
-
-For robustness across connector version changes:
+## State and Secret Management
 
 ```hcl
-# Use airbyte_source_custom instead of specific connector
-resource "airbyte_source_custom" "generic_postgres" {
-  name         = "Production Postgres"
-  workspace_id = var.workspace_id
-  source_definition_id = "decd338e-5647-4c0b-adf4-da0e75f5a750"  # Postgres
-
-  configuration_json = jsonencode({
-    host     = "prod-db.example.com"
-    port     = 5432
-    database = "production"
-    username = "airbyte_readonly"
-    password = var.postgres_password
-    ssl_mode = {
-      mode = "require"
-    }
-    replication_method = {
-      method = "CDC"
-      plugin = "pgoutput"
-    }
-  })
-}
-```
-
-## State Management
-
-```hcl
-# terraform/backend.tf
 terraform {
   backend "s3" {
     bucket         = "my-terraform-state"
@@ -197,99 +120,10 @@ terraform {
     dynamodb_table = "terraform-locks"
   }
 }
-```
 
-## Secret Management
-
-```hcl
-# Use AWS Secrets Manager
 data "aws_secretsmanager_secret_version" "postgres_password" {
   secret_id = "airbyte/postgres/password"
 }
-
-resource "airbyte_source_postgres" "db" {
-  configuration = {
-    password = data.aws_secretsmanager_secret_version.postgres_password.secret_string
-  }
-}
-
-# Or use environment variables
-variable "postgres_password" {
-  sensitive = true
-}
-
-# Export before terraform apply
-# export TF_VAR_postgres_password="secret"
-```
-
-## CI/CD Integration
-
-```yaml
-# .github/workflows/airbyte-deploy.yml
-name: Deploy Airbyte Config
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'terraform/airbyte/**'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.6.0
-
-      - name: Terraform Init
-        working-directory: terraform/airbyte
-        run: terraform init
-
-      - name: Terraform Plan
-        working-directory: terraform/airbyte
-        env:
-          TF_VAR_airbyte_api_key: ${{ secrets.AIRBYTE_API_KEY }}
-          TF_VAR_postgres_password: ${{ secrets.POSTGRES_PASSWORD }}
-        run: terraform plan -out=tfplan
-
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        working-directory: terraform/airbyte
-        run: terraform apply -auto-approve tfplan
-```
-
-## Import Existing Resources
-
-```bash
-# Import existing source
-terraform import airbyte_source_postgres.production_db source-uuid
-
-# Import existing connection
-terraform import airbyte_connection.postgres_to_snowflake connection-uuid
-
-# Generate configuration from import
-terraform state show airbyte_source_postgres.production_db
-```
-
-## Example Usage
-
-```bash
-# Initialize Terraform
-cd terraform/airbyte
-terraform init
-
-# Plan changes (dev environment)
-terraform plan -var-file=environments/dev/terraform.tfvars
-
-# Apply (prod environment)
-terraform apply -var-file=environments/prod/terraform.tfvars
-
-# Destroy (cleanup)
-terraform destroy -var-file=environments/dev/terraform.tfvars
 ```
 
 ## Module Pattern
@@ -303,27 +137,50 @@ variable "streams" {}
 resource "airbyte_connection" "this" {
   source_id      = var.source_id
   destination_id = var.destination_id
-  configurations = {
-    streams = var.streams
-  }
+  configurations = { streams = var.streams }
 }
 
-# terraform/main.tf
+# Usage
 module "customer_sync" {
-  source = "./modules/airbyte-connection"
-
+  source         = "./modules/airbyte-connection"
   source_id      = airbyte_source_postgres.db.source_id
   destination_id = airbyte_destination_snowflake.dw.destination_id
-
-  streams = [
-    {
-      name        = "customers"
-      sync_mode   = "incremental_append_deduped"
-      cursor_field = ["updated_at"]
-      primary_key  = [["customer_id"]]
-    }
-  ]
+  streams = [{
+    name = "customers", sync_mode = "incremental_append_deduped",
+    cursor_field = ["updated_at"], primary_key = [["customer_id"]]
+  }]
 }
+```
+
+## CI/CD Integration
+
+```yaml
+# .github/workflows/airbyte-deploy.yml
+on:
+  push:
+    branches: [main]
+    paths: ['terraform/airbyte/**']
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: hashicorp/setup-terraform@v2
+      - run: terraform init && terraform plan -out=tfplan
+        working-directory: terraform/airbyte
+        env:
+          TF_VAR_airbyte_api_key: ${{ secrets.AIRBYTE_API_KEY }}
+      - run: terraform apply -auto-approve tfplan
+        if: github.ref == 'refs/heads/main'
+        working-directory: terraform/airbyte
+```
+
+## Import Existing Resources
+
+```bash
+terraform import airbyte_source_postgres.production_db source-uuid
+terraform import airbyte_connection.postgres_to_snowflake connection-uuid
+terraform state show airbyte_source_postgres.production_db
 ```
 
 ## Anti-Patterns
@@ -331,9 +188,8 @@ module "customer_sync" {
 | Don't | Do |
 |-------|-----|
 | Hardcode secrets in .tf files | Use variables + secret managers |
-| Skip state locking | Use remote backend with locking |
+| Skip state locking | Remote backend with DynamoDB locking |
 | One giant main.tf | Modularize by domain/team |
-| Manual changes in UI | Everything as code |
 | No version pinning | Pin provider versions |
 
 ## See Also

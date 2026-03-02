@@ -312,7 +312,7 @@ BRANCH
 | `agents` | `.claude/agents/**` |
 | `kb` | `.claude/kb/**` |
 | `sdd` | `.claude/sdd/**` |
-| `commands` | `.claude/commands/**` |
+| `skills` | `.claude/skills/**` |
 | `parser` | `src/parsers/**` |
 | `pipeline` | `src/pipelines/**` |
 | `api` | `src/api/**` |
@@ -395,7 +395,7 @@ BRANCH
 
 ## Related
 
-- Review Command: `.claude/commands/review/review.md`
+- Review Command: `.claude/skills/review/SKILL.md`
 - Dual Reviewer Agent: `.claude/agents/code-quality/dual-reviewer.md`
 - CodeRabbit Config: `.coderabbit.yaml`
 - Template: `.github/PULL_REQUEST_TEMPLATE.md`

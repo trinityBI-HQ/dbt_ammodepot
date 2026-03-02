@@ -269,5 +269,5 @@ Each update adds to revision history:
 
 ## References
 
-- Command: `.claude/commands/workflow/iterate.md`
+- Skill: `.claude/skills/iterate/SKILL.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`

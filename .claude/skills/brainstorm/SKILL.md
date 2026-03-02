@@ -238,4 +238,4 @@ BAD:
 - Agent: `.claude/agents/workflow/brainstorm-agent.md`
 - Template: `.claude/sdd/templates/BRAINSTORM_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`
-- Next Phase: `.claude/commands/workflow/define.md`
+- Next Phase: `.claude/skills/define/SKILL.md`

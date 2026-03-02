@@ -1,0 +1,20 @@
+{
+  "technology": "Onehouse",
+  "category": "data-engineering",
+  "subcategory": "data-platforms",
+  "description": "Fully managed universal data lakehouse platform built on Apache Hudi with automated table management, incremental ETL, and multi-engine interoperability",
+  "version": "latest",
+  "mcp_validated": "2026-03-01",
+  "use_cases": [
+    "Managed lakehouse with Apache Hudi",
+    "CDC ingestion pipelines",
+    "Cross-format table interoperability (Hudi, Iceberg, Delta)",
+    "Automated table optimization and compaction",
+    "Multi-engine queries (Spark, Trino, Presto)"
+  ],
+  "related_technologies": [
+    "apache-iceberg",
+    "snowflake",
+    "s3"
+  ]
+}

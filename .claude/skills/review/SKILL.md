@@ -393,4 +393,4 @@ Comparing: HEAD vs develop
 
 - Agent: `.claude/agents/code-quality/dual-reviewer.md`
 - Config: `.coderabbit.yaml`
-- Create PR: `.claude/commands/workflow/create-pr.md`
+- Create PR: `.claude/skills/create-pr/SKILL.md`

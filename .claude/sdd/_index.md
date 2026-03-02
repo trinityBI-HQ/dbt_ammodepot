@@ -273,7 +273,7 @@ AgentSpec 4.2 adds Agent Matching (Design phase) and Agent Delegation (Build pha
 
 | Resource | Location |
 |----------|----------|
-| Commands | `.claude/commands/workflow/` |
+| Skills | `.claude/skills/` |
 | Agents | `.claude/agents/workflow/` |
 | Templates | `.claude/sdd/templates/` |
 | Contracts | `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml` |

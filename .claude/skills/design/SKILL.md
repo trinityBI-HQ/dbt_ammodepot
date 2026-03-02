@@ -172,4 +172,4 @@ Before saving, verify:
 - Agent: `.claude/agents/workflow/design-agent.md`
 - Template: `.claude/sdd/templates/DESIGN_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`
-- Next Phase: `.claude/commands/workflow/build.md`
+- Next Phase: `.claude/skills/build/SKILL.md`
