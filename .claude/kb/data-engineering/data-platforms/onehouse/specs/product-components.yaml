@@ -1,0 +1,191 @@
+schema_version: "1.0"
+domain: onehouse
+file_type: product-registry
+last_validated: "2026-03-01"
+source: "onehouse.ai product documentation, web search validation"
+
+platform:
+  name: Onehouse
+  type: Managed Universal Data Lakehouse
+  founded_by: Vinoth Chandar (Apache Hudi creator)
+  website: https://www.onehouse.ai
+  open_source_projects:
+    - name: Apache Hudi
+      url: https://hudi.apache.org
+      role: Core table format and lakehouse engine
+    - name: Apache XTable (Incubating)
+      url: https://xtable.apache.org
+      role: Cross-format metadata interoperability
+  compliance:
+    - SOC2 Type I
+    - SOC2 Type II
+    - PCI DSS
+  deployment_model: BYOC (Bring Your Own Cloud)
+  supported_clouds:
+    - AWS
+    - GCP
+    - Azure
+
+products:
+  oneflow:
+    name: OneFlow
+    category: Data Ingestion
+    description: Managed CDC, streaming, and file ingestion into lakehouse tables
+    source_types:
+      databases:
+        - PostgreSQL
+        - MySQL
+        - SQL Server
+        - MongoDB
+      streaming:
+        - Apache Kafka (all flavors)
+        - Confluent Kafka
+      file_sources:
+        - S3
+        - GCS
+        file_formats:
+          - Avro
+          - CSV
+          - JSON
+          - Parquet
+          - Proto
+          - XML
+    target_formats:
+      - Apache Hudi
+      - Apache Iceberg (via XTable)
+      - Delta Lake (via XTable)
+    features:
+      - Minute-level ingestion latency
+      - Automatic schema evolution
+      - Bad record quarantine
+      - Auto-discovery of source changes
+      - Low-code/no-code transformations
+      - Custom code support (VPC deployed)
+      - Incremental processing
+
+  table_optimizer:
+    name: Table Optimizer
+    category: Table Management
+    description: Automated compaction, clustering, and cleaning for lakehouse tables
+    supported_formats:
+      - Apache Hudi
+      - Apache Iceberg
+      - Delta Lake
+    operations:
+      compaction:
+        description: Merge log files into base Parquet files (MoR tables)
+        config_options:
+          - frequency (time or commit based)
+          - bytes_per_compaction
+      clustering:
+        description: Reorganize data layout by key columns for query optimization
+        config_options:
+          - clustering_keys
+          - layout_strategy
+          - frequency
+        mode: incremental (only new data)
+      cleaning:
+        description: Remove files beyond retention policies
+        config_options:
+          - frequency
+          - retention_window
+
+  onesync:
+    name: OneSync
+    category: Catalog Synchronization
+    description: Multi-catalog sync for cross-engine data access
+    supported_catalogs:
+      - name: Snowflake Catalog
+        read_format: Iceberg
+      - name: Databricks Unity Catalog
+        read_format: Delta Lake or Iceberg
+      - name: Google Data Catalog
+        read_format: Iceberg (BigLake)
+      - name: AWS Glue Data Catalog
+        read_format: Hudi or Iceberg
+      - name: Hive Metastore
+        read_format: Hudi, Iceberg, or Delta
+    features:
+      - Multi-select catalog targets per pipeline
+      - Automatic schema evolution propagation
+      - Deletion handling across catalogs
+      - Zero data duplication
+
+  lakeview:
+    name: LakeView
+    category: Observability
+    description: Free metadata-only observability for Hudi lakehouse tables
+    pricing: Free (no cost)
+    requirements:
+      - Hudi tables with metadata access
+      - No compute infrastructure needed
+      - No Parquet file access required
+    features:
+      - Interactive metrics and charts
+      - Pre-built dashboards
+      - Compaction backlog monitoring
+      - Data skew detection
+      - Searchable operation timeline
+      - Weekly email health summaries
+      - Configurable Slack and email alerts
+      - Optimization recommendations
+    github: https://github.com/onehouseinc/LakeView
+
+  ocr:
+    name: Onehouse Compute Runtime (OCR)
+    category: Compute
+    description: Serverless Spark runtime for lakehouse workloads
+    launched: "2025-01-16"
+    components:
+      serverless_compute_manager:
+        description: Auto-provisioning and scaling of Spark clusters
+        deployment: Customer VPC (BYOC)
+      adaptive_workload_optimizer:
+        description: Multiplexed job scheduling with lag-aware latency
+      quanton_engine:
+        description: SQL and Spark execution engine
+        compatibility: 100% OSS Apache Spark compatible
+      high_performance_io:
+        description: Vectorized columnar merging and parallel pipelining
+    performance:
+      query_acceleration: 2x to 30x
+      cost_savings: 20% to 80%
+      write_speed: Up to 10x faster upserts
+
+  lakebase:
+    name: LakeBase
+    category: Storage
+    description: Foundation lakehouse storage and management layer
+
+query_engine_integrations:
+  - engine: Snowflake
+    access_via: OneSync (Snowflake Catalog)
+    format: Iceberg
+  - engine: Databricks
+    access_via: OneSync (Unity Catalog)
+    format: Delta Lake or Iceberg
+  - engine: BigQuery
+    access_via: OneSync (Google Data Catalog)
+    format: Iceberg (BigLake)
+  - engine: Amazon Athena
+    access_via: OneSync (AWS Glue)
+    format: Hudi or Iceberg
+  - engine: Amazon Redshift
+    access_via: Redshift Spectrum + Glue
+    format: Hudi or Iceberg
+  - engine: Trino
+    access_via: Hive Metastore
+    format: Hudi, Iceberg, or Delta
+  - engine: ClickHouse
+    access_via: Direct or Hive Metastore
+    format: Iceberg
+  - engine: Apache Spark
+    access_via: Direct or Hive Metastore
+    format: Hudi (native), Iceberg, or Delta
+
+pricing:
+  model: Usage-based (compute-hours)
+  metering: Compute hours consumed by OCR services
+  lakeview: Free
+  contact: gtm@onehouse.ai
+  marketplace: AWS Marketplace available

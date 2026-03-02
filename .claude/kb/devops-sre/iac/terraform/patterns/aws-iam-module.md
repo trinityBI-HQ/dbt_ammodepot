@@ -189,16 +189,6 @@ module "parser_role" {
 }
 ```
 
-## Best Practices
-
-| Practice | Why |
-|----------|-----|
-| Use specific resource ARNs, never `*` | Least privilege |
-| Prefer OIDC over access keys in CI | No long-lived credentials |
-| Use `external_id` for cross-account | Prevent confused deputy |
-| Separate read/write policy statements | Clear audit trail |
-| Use `managed_policy_arns` for AWS-managed | Maintained by AWS |
-
 ## Related
 
 - [AWS IAM KB](../../../../cloud/aws/iam/) | [Lambda Module](./aws-lambda-module.md) | [GCP IAM Module](./iam-module.md)

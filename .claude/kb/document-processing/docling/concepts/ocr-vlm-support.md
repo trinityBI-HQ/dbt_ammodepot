@@ -133,44 +133,6 @@ def get_converter(is_scanned: bool, is_complex: bool):
     return DocumentConverter(pipeline_options=options)
 ```
 
-## Automatic OCR Detection
-
-```python
-# Docling can auto-detect scanned content
-converter = DocumentConverter()
-
-# If PDF contains scanned pages, OCR is triggered
-result = converter.convert("mixed_content.pdf")
-
-# Check if OCR was used
-if result.document.metadata.get("ocr_used"):
-    print("OCR was automatically applied")
-```
-
-## Performance Considerations
-
-```python
-from docling.document_converter import DocumentConverter, PdfPipelineOptions
-from docling.datamodel.base_models import PipelineType
-
-# For batch processing, separate by type
-standard_converter = DocumentConverter()
-ocr_converter = DocumentConverter(
-    pipeline_options=PdfPipelineOptions(do_ocr=True)
-)
-vlm_converter = DocumentConverter(
-    pipeline_options=PdfPipelineOptions(pipeline_type=PipelineType.VLM)
-)
-
-for doc in documents:
-    if doc.is_scanned:
-        result = ocr_converter.convert(doc.path)
-    elif doc.has_complex_layout:
-        result = vlm_converter.convert(doc.path)
-    else:
-        result = standard_converter.convert(doc.path)
-```
-
 ## Related
 
 - [concepts/pipeline-architecture.md](pipeline-architecture.md) - Pipeline selection

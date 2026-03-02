@@ -1,0 +1,20 @@
+{
+  "technology": "DuckDB",
+  "category": "data-engineering",
+  "subcategory": "data-platforms",
+  "description": "In-process analytical database for local analytics, ETL, and embeddable OLAP with multi-format data access",
+  "version": "1.2.x",
+  "mcp_validated": "2026-03-01",
+  "use_cases": [
+    "Local analytics and ad-hoc queries",
+    "ETL processing without external databases",
+    "Embedded OLAP in Python applications",
+    "Multi-format data access (Parquet, CSV, JSON, Iceberg)",
+    "dbt development with dbt-duckdb adapter"
+  ],
+  "related_technologies": [
+    "apache-iceberg",
+    "dbt-core",
+    "snowflake"
+  ]
+}

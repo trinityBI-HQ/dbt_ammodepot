@@ -262,6 +262,6 @@ Built 4 Cloud Run functions for automated invoice processing with Gemini extract
 
 ## References
 
-- Command: `.claude/commands/workflow/ship.md`
+- Skill: `.claude/skills/ship/SKILL.md`
 - Template: `.claude/sdd/templates/SHIPPED_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`

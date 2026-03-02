@@ -106,35 +106,6 @@ for page in json_data["pages"]:
 | JSON | `export_to_dict()` | Everything | Processing, archives |
 | DocTags | `export_to_doctags()` | Custom tags | Specialized formatting |
 
-## Format Comparison
-
-```python
-from docling.document_converter import DocumentConverter
-
-converter = DocumentConverter()
-result = converter.convert("sample.pdf")
-doc = result.document
-
-# Markdown: Clean, readable
-md = doc.export_to_markdown()
-print(md)
-# ## Introduction
-# This is a paragraph.
-# | Col1 | Col2 |
-# |------|------|
-# | A    | B    |
-
-# HTML: Full styling
-html = doc.export_to_html()
-# <h2>Introduction</h2>
-# <p>This is a paragraph.</p>
-# <table><tr><th>Col1</th><th>Col2</th></tr>...</table>
-
-# JSON: Structured
-json_data = doc.export_to_dict()
-# {"pages": [{"elements": [{"label": "section_header", ...}]}]}
-```
-
 ## Common Mistakes
 
 ### Wrong
@@ -157,38 +128,6 @@ tables = [t for t in json_data["tables"]]  # Direct access
 tables = doc.tables
 for table in tables:
     df = table.export_to_dataframe()
-```
-
-## Use Case Examples
-
-```python
-# RAG System: Markdown export
-def ingest_to_vectordb(pdf_path: str):
-    converter = DocumentConverter()
-    result = converter.convert(pdf_path)
-    markdown = result.document.export_to_markdown()
-
-    # Split into chunks
-    chunks = markdown.split("\n\n")
-    for chunk in chunks:
-        vectordb.add(chunk)
-
-# Document Archive: JSON export
-def archive_document(pdf_path: str):
-    converter = DocumentConverter()
-    result = converter.convert(pdf_path)
-    json_data = result.document.export_to_dict()
-
-    # Store with full structure
-    import json
-    with open(f"{pdf_path}.json", "w") as f:
-        json.dump(json_data, f, indent=2)
-
-# Web Preview: HTML export
-def generate_preview(pdf_path: str) -> str:
-    converter = DocumentConverter()
-    result = converter.convert(pdf_path)
-    return result.document.export_to_html()
 ```
 
 ## Related

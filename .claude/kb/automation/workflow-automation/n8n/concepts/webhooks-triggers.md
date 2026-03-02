@@ -118,21 +118,13 @@ Webhook Trigger
 
 ## Common Mistakes
 
-### Wrong
 ```javascript
-// No authentication on production webhook
+// WRONG: No auth on production webhook; using Webhook for AI chat
 Webhook: /production, Authentication: None  // Open to abuse
-
-// Using Webhook for AI chat
 Webhook → AI Agent  // No conversation UI or memory
-```
 
-### Correct
-```javascript
-// Secured webhook
+// CORRECT: Secured webhook; Chat Trigger for AI conversations
 Webhook, Authentication: Header Auth, IP Whitelist: "known.ips"
-
-// Use Chat Trigger for AI conversations
 Chat Trigger → AI Agent + Memory  // Built-in chat UI
 ```
 

@@ -75,7 +75,7 @@ workflow:
 brainstorm:
   command:
     name: "/brainstorm"
-    file: ".claude/commands/workflow/brainstorm.md"
+    file: ".claude/skills/brainstorm/SKILL.md"
     args: "<idea-or-request>"
     examples:
       - '/brainstorm "Build a user notification system"'
@@ -198,7 +198,7 @@ brainstorm:
 define:
   command:
     name: "/define"
-    file: ".claude/commands/workflow/define.md"
+    file: ".claude/skills/define/SKILL.md"
     args: "<input>"
     examples:
       - "/define notes/meeting-notes.md"
@@ -314,7 +314,7 @@ define:
 design:
   command:
     name: "/design"
-    file: ".claude/commands/workflow/design.md"
+    file: ".claude/skills/design/SKILL.md"
     args: "<define-file>"
     examples:
       - "/design .claude/sdd/features/DEFINE_USER_NOTIFICATIONS.md"
@@ -400,7 +400,7 @@ design:
 build:
   command:
     name: "/build"
-    file: ".claude/commands/workflow/build.md"
+    file: ".claude/skills/build/SKILL.md"
     args: "<design-file>"
     examples:
       - "/build .claude/sdd/features/DESIGN_USER_NOTIFICATIONS.md"
@@ -462,7 +462,7 @@ build:
 ship:
   command:
     name: "/ship"
-    file: ".claude/commands/workflow/ship.md"
+    file: ".claude/skills/ship/SKILL.md"
     args: "<define-file>"
     examples:
       - "/ship .claude/sdd/features/DEFINE_USER_NOTIFICATIONS.md"
@@ -515,7 +515,7 @@ ship:
 iterate:
   command:
     name: "/iterate"
-    file: ".claude/commands/workflow/iterate.md"
+    file: ".claude/skills/iterate/SKILL.md"
     args: '<file> "<change-description>"'
     examples:
       - '/iterate DEFINE_DATA_EXPORT.md "Add support for CSV format"'

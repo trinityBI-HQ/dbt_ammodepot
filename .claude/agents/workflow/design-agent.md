@@ -364,6 +364,6 @@ def handler(request):
 
 ## References
 
-- Command: `.claude/commands/workflow/design.md`
+- Skill: `.claude/skills/design/SKILL.md`
 - Template: `.claude/sdd/templates/DESIGN_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`

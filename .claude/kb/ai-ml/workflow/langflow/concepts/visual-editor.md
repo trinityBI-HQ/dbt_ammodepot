@@ -6,25 +6,22 @@
 
 ## Overview
 
-Langflow's visual editor provides a low-code interface for creating AI workflows without writing extensive code. The editor features a component library, canvas for building flows, property inspector for configuration, and integrated playground for testing. All flows are visual representations that compile to executable code.
+Langflow's visual editor provides a low-code interface for creating AI workflows. Features a component library, canvas for building flows, property inspector for configuration, and integrated playground for testing. All flows compile to executable code.
 
 ## Editor Layout
 
 ```text
 ┌─────────────────────────────────────────────────────┐
-│ Top Bar: Save | Export | Deploy | Settings          │
+│ Top Bar: Save | Export | Deploy | Settings           │
 ├──────────┬──────────────────────────────────────────┤
-│          │                                           │
-│ Component│         Canvas (Flow Builder)            │
-│ Library  │                                           │
-│          │  [Comp1] ──→ [Comp2] ──→ [Comp3]        │
-│ - Models │         ╲                                 │
-│ - Agents │          ╲──→ [Comp4]                    │
+│ Component│         Canvas (Flow Builder)             │
+│ Library  │  [Comp1] ──→ [Comp2] ──→ [Comp3]        │
+│ - Models │         ╲──→ [Comp4]                     │
+│ - Agents │                                           │
 │ - Vectors│                                           │
 │ - Tools  │                                           │
-│          │                                           │
 ├──────────┴──────────────────────────────────────────┤
-│ Property Inspector: Component Configuration         │
+│ Property Inspector: Component Configuration          │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -40,35 +37,29 @@ Langflow's visual editor provides a low-code interface for creating AI workflows
 
 ## Building a Flow
 
-```python
-# Step-by-step flow creation
+```text
 1. Drag component from library to canvas
-2. Click component to open properties
-3. Configure parameters (API keys, settings)
-4. Drag from output handle to input handle
-5. Repeat to build complete flow
-6. Click "Play" to test
+2. Click component to open properties panel
+3. Configure parameters (API keys, model settings)
+4. Connect output handle → input handle
+5. Click "Play" to test in playground
 
-# Example: Simple chatbot
-Text Input → Prompt Template → OpenAI LLM → Text Output
+Example: Text Input → Prompt Template → OpenAI LLM → Text Output
 ```
 
 ## Component Configuration
 
 ```yaml
-# Example: OpenAI LLM component
 component: "OpenAI"
 properties:
   model: "gpt-4"
   temperature: 0.7
   max_tokens: 500
-  api_key: "${OPENAI_API_KEY}"  # Environment variable
-
+  api_key: "${OPENAI_API_KEY}"
 inputs:
   - name: "prompt"
     type: "string"
     required: true
-
 outputs:
   - name: "text"
     type: "string"
@@ -76,58 +67,31 @@ outputs:
 
 ## Testing with Playground
 
-```python
-# Built-in testing environment
-# 1. Open playground panel (bottom of screen)
-# 2. Enter test inputs
-# 3. Click "Run"
-# 4. View outputs and intermediate results
-
-# Example test
-input: "What is Langflow?"
-output: "Langflow is a visual framework..."
-
-# Inspect each component's output
-# Debug step-by-step execution
-# Validate data flow
+```text
+1. Open playground panel (bottom of screen)
+2. Enter test inputs → Click "Run"
+3. View outputs and intermediate results
+4. Inspect each component's output for debugging
 ```
 
 ## Sharing Flows
 
 ```bash
-# Export flow as JSON
-File → Export → flow.json
-
-# Share via URL (Langflow Cloud)
-Share → Generate Link → https://langflow.app/flows/abc123
-
-# Import flow
-File → Import → Select flow.json
-
-# Version control
-git add flows/my-flow.json
-git commit -m "Add RAG chatbot flow"
+# Export: File → Export → flow.json
+# Import: File → Import → Select flow.json
+# Share via URL (Cloud): Share → Generate Link
+# Version control: git add flows/my-flow.json
 ```
 
 ## Common Mistakes
 
-### Wrong
-
 ```python
-# Forgetting to connect components
+# Wrong: Unconnected components, hardcoded secrets
 LLM component with no prompt input  # Will fail
-
-# Hardcoding secrets
 api_key = "sk-abc123..."  # Security risk
-```
 
-### Correct
-
-```python
-# All required inputs connected
-Prompt → LLM → Output
-
-# Use environment variables
+# Correct: All inputs connected, env vars
+# Prompt → LLM → Output
 api_key = "${OPENAI_API_KEY}"
 ```
 
@@ -136,35 +100,18 @@ api_key = "${OPENAI_API_KEY}"
 | Shortcut | Action |
 |----------|--------|
 | `Ctrl+S` | Save flow |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
-| `Delete` | Delete selected component |
-| `Ctrl+C/V` | Copy/paste components |
-| `Ctrl+D` | Duplicate component |
-
-## Component Search
-
-```python
-# Quick component search
-# Press "/" in component library
-# Type component name
-# Press Enter to add to canvas
-
-# Example: "/openai" → finds OpenAI components
-```
+| `Ctrl+Z/Y` | Undo/Redo |
+| `Delete` | Delete selected |
+| `Ctrl+C/V` | Copy/paste |
+| `Ctrl+D` | Duplicate |
+| `/` | Quick component search |
 
 ## Flow Validation
 
-```python
-# Automatic validation checks
-✓ All required inputs connected
-✓ No circular dependencies
-✓ Compatible data types
-✓ Required parameters set
-
-# Warnings displayed in editor
-⚠ Missing API key
-⚠ Component not configured
+```text
+Automatic checks: required inputs connected, no circular dependencies,
+compatible data types, required parameters set.
+Warnings: missing API key, unconfigured component.
 ```
 
 ## Related

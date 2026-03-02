@@ -181,4 +181,4 @@ If you encounter issues:
 - Agent: `.claude/agents/workflow/build-agent.md`
 - Template: `.claude/sdd/templates/BUILD_REPORT_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`
-- Next Phase: `.claude/commands/workflow/ship.md`
+- Next Phase: `.claude/skills/ship/SKILL.md`

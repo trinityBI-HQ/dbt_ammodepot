@@ -1,8 +1,8 @@
 # Knowledge Base Index
 # Machine-readable registry for KB domains
 
-version: "1.0"
-last_updated: "2026-02-25"
+version: "2.0"
+last_updated: "2026-03-02"
 
 # File Size Limits (SINGLE SOURCE OF TRUTH)
 limits:
@@ -23,817 +23,867 @@ templates:
   - name: quick-reference
     path: _templates/quick-reference.md.template
   - name: spec
-    path: _templates/spec.yaml.template
+    path: _templates/spec.md.template
   - name: test-case
-    path: _templates/test-case.json.template
+    path: _templates/test-case.md.template
   - name: domain-manifest
-    path: _templates/domain-manifest.yaml.template
+    path: _templates/domain-manifest.md.template
 
-# Domain Registry
+# Domain Registry (45 technologies)
 domains:
-  pydantic:
-    name: Pydantic
-    description: Python data validation for LLM output parsing and structured extraction
-    path: pydantic/
-    mcp_validated: "2026-01-25"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: base-model
-        path: concepts/base-model.md
-        confidence: 0.95
-      - name: field-types
-        path: concepts/field-types.md
-        confidence: 0.95
-      - name: validators
-        path: concepts/validators.md
-        confidence: 0.95
-      - name: nested-models
-        path: concepts/nested-models.md
-        confidence: 0.95
-    patterns:
-      - name: llm-output-validation
-        path: patterns/llm-output-validation.md
-      - name: extraction-schema
-        path: patterns/extraction-schema.md
-      - name: error-handling
-        path: patterns/error-handling.md
-      - name: custom-validators
-        path: patterns/custom-validators.md
-    specs:
-      - name: invoice-schema
-        path: specs/invoice-schema.yaml
-
-  gcp:
-    name: GCP Serverless Data Engineering
-    description: Google Cloud Platform serverless services for event-driven data pipelines
-    path: gcp/
-    mcp_validated: "2026-01-25"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: cloud-run
-        path: concepts/cloud-run.md
-        confidence: 0.95
-      - name: pubsub
-        path: concepts/pubsub.md
-        confidence: 0.95
-      - name: gcs
-        path: concepts/gcs.md
-        confidence: 0.95
-      - name: bigquery
-        path: concepts/bigquery.md
-        confidence: 0.95
-      - name: iam
-        path: concepts/iam.md
-        confidence: 0.95
-      - name: secret-manager
-        path: concepts/secret-manager.md
-        confidence: 0.95
-    patterns:
-      - name: event-driven-pipeline
-        path: patterns/event-driven-pipeline.md
-      - name: multi-bucket-pipeline
-        path: patterns/multi-bucket-pipeline.md
-      - name: pubsub-fanout
-        path: patterns/pubsub-fanout.md
-      - name: cloud-run-scaling
-        path: patterns/cloud-run-scaling.md
-      - name: gcs-triggered-workflow
-        path: patterns/gcs-triggered-workflow.md
-
   gemini:
     name: Gemini
-    description: Google's multimodal LLM for document extraction and vision tasks
-    path: gemini/
-    mcp_validated: "2026-01-25"
+    description: Gemini knowledge base
+    path: ai-ml/llm-platforms/gemini/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
       - name: model-capabilities
         path: concepts/model-capabilities.md
-        confidence: 0.95
-      - name: vertex-ai-integration
-        path: concepts/vertex-ai-integration.md
-        confidence: 0.95
       - name: multimodal-prompting
         path: concepts/multimodal-prompting.md
-        confidence: 0.95
-      - name: token-limits-pricing
-        path: concepts/token-limits-pricing.md
-        confidence: 0.95
-      - name: structured-output
-        path: concepts/structured-output.md
-        confidence: 0.95
       - name: safety-settings
         path: concepts/safety-settings.md
-        confidence: 0.95
+      - name: structured-output
+        path: concepts/structured-output.md
+      - name: token-limits-pricing
+        path: concepts/token-limits-pricing.md
+      - name: vertex-ai-integration
+        path: concepts/vertex-ai-integration.md
     patterns:
-      - name: invoice-extraction
-        path: patterns/invoice-extraction.md
-      - name: structured-json-output
-        path: patterns/structured-json-output.md
-      - name: openrouter-fallback
-        path: patterns/openrouter-fallback.md
       - name: batch-processing
         path: patterns/batch-processing.md
       - name: error-handling-retries
         path: patterns/error-handling-retries.md
+      - name: invoice-extraction
+        path: patterns/invoice-extraction.md
+      - name: openrouter-fallback
+        path: patterns/openrouter-fallback.md
       - name: prompt-versioning
         path: patterns/prompt-versioning.md
-
-  langfuse:
-    name: Langfuse
-    description: LLMOps observability platform for tracking LLM calls, costs, latency, and quality
-    path: langfuse/
-    mcp_validated: "2026-01-25"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: traces-spans
-        path: concepts/traces-spans.md
-        confidence: 0.95
-      - name: generations
-        path: concepts/generations.md
-        confidence: 0.95
-      - name: cost-tracking
-        path: concepts/cost-tracking.md
-        confidence: 0.95
-      - name: scoring
-        path: concepts/scoring.md
-        confidence: 0.95
-      - name: prompt-management
-        path: concepts/prompt-management.md
-        confidence: 0.95
-      - name: model-comparison
-        path: concepts/model-comparison.md
-        confidence: 0.95
-    patterns:
-      - name: python-sdk-integration
-        path: patterns/python-sdk-integration.md
-      - name: cloud-run-instrumentation
-        path: patterns/cloud-run-instrumentation.md
-      - name: quality-feedback-loops
-        path: patterns/quality-feedback-loops.md
-      - name: cost-alerting
-        path: patterns/cost-alerting.md
-      - name: trace-linking
-        path: patterns/trace-linking.md
-      - name: dashboard-metrics
-        path: patterns/dashboard-metrics.md
-
-  terraform:
-    name: Terraform for GCP
-    description: Infrastructure as Code for GCP serverless architecture with module patterns
-    path: terraform/
-    mcp_validated: "2026-01-25"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: resources
-        path: concepts/resources.md
-        confidence: 0.95
-      - name: modules
-        path: concepts/modules.md
-        confidence: 0.95
-      - name: providers
-        path: concepts/providers.md
-        confidence: 0.95
-      - name: state
-        path: concepts/state.md
-        confidence: 0.95
-      - name: variables
-        path: concepts/variables.md
-        confidence: 0.95
-      - name: workspaces
-        path: concepts/workspaces.md
-        confidence: 0.95
-    patterns:
-      - name: cloud-run-module
-        path: patterns/cloud-run-module.md
-      - name: pubsub-module
-        path: patterns/pubsub-module.md
-      - name: gcs-module
-        path: patterns/gcs-module.md
-      - name: bigquery-module
-        path: patterns/bigquery-module.md
-      - name: iam-module
-        path: patterns/iam-module.md
-      - name: remote-state
-        path: patterns/remote-state.md
-
-  terragrunt:
-    name: Terragrunt
-    description: Terraform wrapper for multi-environment orchestration, DRY configurations, and dependency management
-    path: terragrunt/
-    mcp_validated: "2026-01-25"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: terragrunt-blocks
-        path: concepts/terragrunt-blocks.md
-        confidence: 0.95
-      - name: root-configuration
-        path: concepts/root-configuration.md
-        confidence: 0.95
-      - name: environment-hierarchy
-        path: concepts/environment-hierarchy.md
-        confidence: 0.95
-      - name: generate-blocks
-        path: concepts/generate-blocks.md
-        confidence: 0.95
-      - name: dependency-graphs
-        path: concepts/dependency-graphs.md
-        confidence: 0.95
-      - name: hooks
-        path: concepts/hooks.md
-        confidence: 0.95
-    patterns:
-      - name: multi-environment-config
-        path: patterns/multi-environment-config.md
-      - name: dry-hierarchies
-        path: patterns/dry-hierarchies.md
-      - name: dependency-management
-        path: patterns/dependency-management.md
-      - name: state-bucket-per-env
-        path: patterns/state-bucket-per-env.md
-      - name: environment-promotion
-        path: patterns/environment-promotion.md
-    specs:
-      - name: gcp-project-structure
-        path: specs/gcp-project-structure.yaml
-
-  crewai:
-    name: CrewAI
-    description: Multi-agent AI orchestration framework for autonomous DataOps monitoring and self-healing pipelines
-    path: crewai/
-    mcp_validated: "2026-01-25"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: agents
-        path: concepts/agents.md
-        confidence: 0.95
-      - name: crews
-        path: concepts/crews.md
-        confidence: 0.95
-      - name: tasks
-        path: concepts/tasks.md
-        confidence: 0.95
-      - name: tools
-        path: concepts/tools.md
-        confidence: 0.95
-      - name: memory
-        path: concepts/memory.md
-        confidence: 0.95
-      - name: processes
-        path: concepts/processes.md
-        confidence: 0.95
-    patterns:
-      - name: triage-investigation-report
-        path: patterns/triage-investigation-report.md
-      - name: log-analysis-agent
-        path: patterns/log-analysis-agent.md
-      - name: escalation-workflow
-        path: patterns/escalation-workflow.md
-      - name: slack-integration
-        path: patterns/slack-integration.md
-      - name: circuit-breaker
-        path: patterns/circuit-breaker.md
-      - name: crew-coordination
-        path: patterns/crew-coordination.md
+      - name: structured-json-output
+        path: patterns/structured-json-output.md
 
   openrouter:
     name: OpenRouter
-    description: Unified LLM API gateway providing access to 400+ AI models with automatic fallback, load balancing, and cost optimization
-    path: openrouter/
-    mcp_validated: "2026-01-28"
+    description: OpenRouter knowledge base
+    path: ai-ml/llm-platforms/openrouter/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
       - name: api-basics
         path: concepts/api-basics.md
-        confidence: 0.95
       - name: authentication
         path: concepts/authentication.md
-        confidence: 0.95
       - name: model-selection
         path: concepts/model-selection.md
-        confidence: 0.95
-      - name: streaming
-        path: concepts/streaming.md
-        confidence: 0.95
       - name: rate-limits
         path: concepts/rate-limits.md
-        confidence: 0.95
+      - name: streaming
+        path: concepts/streaming.md
     patterns:
-      - name: python-sdk-integration
-        path: patterns/python-sdk-integration.md
       - name: cost-optimization
         path: patterns/cost-optimization.md
       - name: error-handling
         path: patterns/error-handling.md
+      - name: langchain-integration
+        path: patterns/langchain-integration.md
       - name: provider-routing
         path: patterns/provider-routing.md
-      - name: langchain-integration
-        path: patterns/langchain-integration.md
+      - name: python-sdk-integration
+        path: patterns/python-sdk-integration.md
 
-  snowflake:
-    name: Snowflake
-    description: Cloud data warehouse platform for scalable analytics, AI-powered development, low-latency interactive queries, and managed data integration
-    path: snowflake/
-    mcp_validated: "2026-02-25"
+  crewai:
+    name: CrewAI
+    description: CrewAI knowledge base
+    path: ai-ml/multi-agent/crewai/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: virtual-warehouses
-        path: concepts/virtual-warehouses.md
-        confidence: 0.95
-      - name: databases-schemas
-        path: concepts/databases-schemas.md
-        confidence: 0.95
-      - name: stages
-        path: concepts/stages.md
-        confidence: 0.95
-      - name: tables-views
-        path: concepts/tables-views.md
-        confidence: 0.95
-      - name: variant-data
-        path: concepts/variant-data.md
-        confidence: 0.95
-      - name: roles-privileges
-        path: concepts/roles-privileges.md
-        confidence: 0.95
-      - name: interactive-tables
-        path: concepts/interactive-tables.md
-        confidence: 0.95
-      - name: cortex-code
-        path: concepts/cortex-code.md
-        confidence: 0.95
-      - name: openflow
-        path: concepts/openflow.md
-        confidence: 0.95
+      - name: agents
+        path: concepts/agents.md
+      - name: crews
+        path: concepts/crews.md
+      - name: memory
+        path: concepts/memory.md
+      - name: processes
+        path: concepts/processes.md
+      - name: tasks
+        path: concepts/tasks.md
+      - name: tools
+        path: concepts/tools.md
     patterns:
-      - name: copy-into-loading
-        path: patterns/copy-into-loading.md
-      - name: snowpipe-streaming
-        path: patterns/snowpipe-streaming.md
-      - name: semi-structured-queries
-        path: patterns/semi-structured-queries.md
-      - name: performance-optimization
-        path: patterns/performance-optimization.md
-      - name: python-connector
-        path: patterns/python-connector.md
-      - name: spark-connector
-        path: patterns/spark-connector.md
-      - name: interactive-analytics
-        path: patterns/interactive-analytics.md
-      - name: cortex-code-workflows
-        path: patterns/cortex-code-workflows.md
-      - name: openflow-integration
-        path: patterns/openflow-integration.md
+      - name: circuit-breaker
+        path: patterns/circuit-breaker.md
+      - name: crew-coordination
+        path: patterns/crew-coordination.md
+      - name: escalation-workflow
+        path: patterns/escalation-workflow.md
+      - name: log-analysis-agent
+        path: patterns/log-analysis-agent.md
+      - name: slack-integration
+        path: patterns/slack-integration.md
+      - name: triage-investigation-report
+        path: patterns/triage-investigation-report.md
 
-  dbt-cloud:
-    name: dbt Cloud
-    description: Cloud-based data transformation platform for analytics engineering with SQL/Python models, testing, CI/CD, and semantic layer
-    path: dbt-cloud/
-    mcp_validated: "2026-02-03"
+  langfuse:
+    name: LangFuse
+    description: LangFuse knowledge base
+    path: ai-ml/observability/langfuse/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: projects-environments
-        path: concepts/projects-environments.md
-        confidence: 0.95
-      - name: models-materializations
-        path: concepts/models-materializations.md
-        confidence: 0.95
-      - name: sources-seeds
-        path: concepts/sources-seeds.md
-        confidence: 0.95
-      - name: testing
-        path: concepts/testing.md
-        confidence: 0.95
-      - name: snapshots
-        path: concepts/snapshots.md
-        confidence: 0.95
-      - name: jinja-macros
-        path: concepts/jinja-macros.md
-        confidence: 0.95
-      - name: jobs-scheduling
-        path: concepts/jobs-scheduling.md
-        confidence: 0.95
+      - name: cost-tracking
+        path: concepts/cost-tracking.md
+      - name: generations
+        path: concepts/generations.md
+      - name: model-comparison
+        path: concepts/model-comparison.md
+      - name: prompt-management
+        path: concepts/prompt-management.md
+      - name: scoring
+        path: concepts/scoring.md
+      - name: traces-spans
+        path: concepts/traces-spans.md
     patterns:
-      - name: incremental-models
-        path: patterns/incremental-models.md
-      - name: ci-cd-workflow
-        path: patterns/ci-cd-workflow.md
-      - name: testing-strategy
-        path: patterns/testing-strategy.md
-      - name: dbt-mesh
-        path: patterns/dbt-mesh.md
+      - name: cloud-run-instrumentation
+        path: patterns/cloud-run-instrumentation.md
+      - name: cost-alerting
+        path: patterns/cost-alerting.md
+      - name: dashboard-metrics
+        path: patterns/dashboard-metrics.md
+      - name: python-sdk-integration
+        path: patterns/python-sdk-integration.md
+      - name: quality-feedback-loops
+        path: patterns/quality-feedback-loops.md
+      - name: trace-linking
+        path: patterns/trace-linking.md
 
-  dbt-core:
-    name: dbt-core
-    description: Open-source CLI tool for SQL-based data transformation in analytics engineering with Jinja templating
-    path: dbt-core/
-    mcp_validated: "2026-02-04"
+  pydantic:
+    name: Pydantic
+    description: Pydantic knowledge base
+    path: ai-ml/validation/pydantic/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: models
-        path: concepts/models.md
-        confidence: 0.95
-      - name: sources
-        path: concepts/sources.md
-        confidence: 0.95
-      - name: refs
-        path: concepts/refs.md
-        confidence: 0.95
-      - name: tests
-        path: concepts/tests.md
-        confidence: 0.95
-      - name: materializations
-        path: concepts/materializations.md
-        confidence: 0.95
-      - name: jinja-macros
-        path: concepts/jinja-macros.md
-        confidence: 0.95
+      - name: base-model
+        path: concepts/base-model.md
+      - name: field-types
+        path: concepts/field-types.md
+      - name: nested-models
+        path: concepts/nested-models.md
+      - name: validators
+        path: concepts/validators.md
     patterns:
-      - name: incremental-models
-        path: patterns/incremental-models.md
-      - name: snapshots
-        path: patterns/snapshots.md
-      - name: testing-strategy
-        path: patterns/testing-strategy.md
-      - name: custom-macros
-        path: patterns/custom-macros.md
-      - name: project-structure
-        path: patterns/project-structure.md
-
-  dagster:
-    name: Dagster
-    description: Data orchestration platform for building, running, and observing data pipelines using software-defined assets
-    path: dagster/
-    mcp_validated: "2026-02-04"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: software-defined-assets
-        path: concepts/software-defined-assets.md
-        confidence: 0.95
-      - name: definitions
-        path: concepts/definitions.md
-        confidence: 0.95
-      - name: resources
-        path: concepts/resources.md
-        confidence: 0.95
-      - name: io-managers
-        path: concepts/io-managers.md
-        confidence: 0.95
-      - name: jobs-ops-graphs
-        path: concepts/jobs-ops-graphs.md
-        confidence: 0.95
-      - name: schedules-sensors
-        path: concepts/schedules-sensors.md
-        confidence: 0.95
-      - name: partitions
-        path: concepts/partitions.md
-        confidence: 0.95
-      - name: dagster-cloud
-        path: concepts/dagster-cloud.md
-        confidence: 0.95
-    patterns:
-      - name: dbt-integration
-        path: patterns/dbt-integration.md
-      - name: testing-assets
-        path: patterns/testing-assets.md
-      - name: project-structure
-        path: patterns/project-structure.md
-      - name: kubernetes-deployment
-        path: patterns/kubernetes-deployment.md
-      - name: cloud-integrations
-        path: patterns/cloud-integrations.md
-
-  airbyte:
-    name: Airbyte
-    description: Open-source data integration platform for ELT workflows with 350+ connectors
-    path: airbyte/
-    mcp_validated: "2026-02-05"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: connectors
-        path: concepts/connectors.md
-        confidence: 0.95
-      - name: sync-modes
-        path: concepts/sync-modes.md
-        confidence: 0.95
-      - name: connections
-        path: concepts/connections.md
-        confidence: 0.95
-      - name: normalization
-        path: concepts/normalization.md
-        confidence: 0.95
-      - name: python-cdk
-        path: concepts/python-cdk.md
-        confidence: 0.95
-      - name: cloud-vs-oss
-        path: concepts/cloud-vs-oss.md
-        confidence: 0.95
-      - name: airbyte-api
-        path: concepts/airbyte-api.md
-        confidence: 0.95
-      - name: catalog-schema
-        path: concepts/catalog-schema.md
-        confidence: 0.95
-    patterns:
-      - name: terraform-orchestration
-        path: patterns/terraform-orchestration.md
-      - name: api-triggered-syncs
-        path: patterns/api-triggered-syncs.md
-      - name: custom-python-connector
-        path: patterns/custom-python-connector.md
-      - name: incremental-dedup-pattern
-        path: patterns/incremental-dedup-pattern.md
-      - name: multi-environment-setup
-        path: patterns/multi-environment-setup.md
-      - name: monitoring-observability
-        path: patterns/monitoring-observability.md
+      - name: custom-validators
+        path: patterns/custom-validators.md
+      - name: error-handling
+        path: patterns/error-handling.md
+      - name: extraction-schema
+        path: patterns/extraction-schema.md
+      - name: llm-output-validation
+        path: patterns/llm-output-validation.md
+    specs:
+      - name: invoice-schema
+        path: specs/invoice-schema.yaml
 
   langflow:
-    name: Langflow
-    description: Visual low-code builder for AI agents, RAG pipelines, and multi-agent workflows using drag-and-drop components
-    path: langflow/
-    mcp_validated: "2026-02-06"
+    name: LangFlow
+    description: LangFlow knowledge base
+    path: ai-ml/workflow/langflow/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: flows-components
-        path: concepts/flows-components.md
-        confidence: 0.95
-      - name: visual-editor
-        path: concepts/visual-editor.md
-        confidence: 0.95
       - name: agents-tools
         path: concepts/agents-tools.md
-        confidence: 0.95
-      - name: vector-stores
-        path: concepts/vector-stores.md
-        confidence: 0.95
-      - name: language-models
-        path: concepts/language-models.md
-        confidence: 0.95
-      - name: data-loaders
-        path: concepts/data-loaders.md
-        confidence: 0.95
       - name: api-deployment
         path: concepts/api-deployment.md
-        confidence: 0.95
+      - name: data-loaders
+        path: concepts/data-loaders.md
+      - name: flows-components
+        path: concepts/flows-components.md
+      - name: language-models
+        path: concepts/language-models.md
       - name: mcp-server
         path: concepts/mcp-server.md
-        confidence: 0.95
+      - name: vector-stores
+        path: concepts/vector-stores.md
+      - name: visual-editor
+        path: concepts/visual-editor.md
     patterns:
-      - name: vector-rag-chatbot
-        path: patterns/vector-rag-chatbot.md
-      - name: multi-agent-workflow
-        path: patterns/multi-agent-workflow.md
-      - name: custom-components
-        path: patterns/custom-components.md
       - name: api-integration
         path: patterns/api-integration.md
+      - name: custom-components
+        path: patterns/custom-components.md
       - name: langchain-integration
         path: patterns/langchain-integration.md
+      - name: multi-agent-workflow
+        path: patterns/multi-agent-workflow.md
       - name: production-deployment
         path: patterns/production-deployment.md
+      - name: vector-rag-chatbot
+        path: patterns/vector-rag-chatbot.md
+
+  mermaid:
+    name: Mermaid
+    description: Mermaid knowledge base
+    path: automation/diagramming/mermaid/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: configuration
+        path: concepts/configuration.md
+      - name: diagram-types
+        path: concepts/diagram-types.md
+      - name: syntax-fundamentals
+        path: concepts/syntax-fundamentals.md
+      - name: theming-styling
+        path: concepts/theming-styling.md
+    patterns:
+      - name: architecture-diagrams
+        path: patterns/architecture-diagrams.md
+      - name: ci-cd-diagrams
+        path: patterns/ci-cd-diagrams.md
+      - name: data-flow-diagrams
+        path: patterns/data-flow-diagrams.md
+      - name: integration-patterns
+        path: patterns/integration-patterns.md
 
   n8n:
     name: n8n
-    description: Open-source workflow automation tool with visual interface for building workflows that integrate with 400+ apps and services
-    path: n8n/
-    mcp_validated: "2026-02-06"
+    description: n8n knowledge base
+    path: automation/workflow-automation/n8n/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: nodes-workflows
-        path: concepts/nodes-workflows.md
-        confidence: 0.95
+      - name: ai-agents
+        path: concepts/ai-agents.md
       - name: credentials-auth
         path: concepts/credentials-auth.md
-        confidence: 0.95
-      - name: expressions-variables
-        path: concepts/expressions-variables.md
-        confidence: 0.95
       - name: error-handling
         path: concepts/error-handling.md
-        confidence: 0.95
+      - name: expressions-variables
+        path: concepts/expressions-variables.md
+      - name: nodes-workflows
+        path: concepts/nodes-workflows.md
       - name: webhooks-triggers
         path: concepts/webhooks-triggers.md
-        confidence: 0.95
     patterns:
+      - name: ai-agent-workflows
+        path: patterns/ai-agent-workflows.md
+      - name: api-integration
+        path: patterns/api-integration.md
       - name: common-workflows
         path: patterns/common-workflows.md
       - name: data-transformation
         path: patterns/data-transformation.md
-      - name: api-integration
-        path: patterns/api-integration.md
       - name: error-recovery
         path: patterns/error-recovery.md
 
-  docling:
-    name: Docling
-    description: Open-source document processing framework for parsing PDFs, Office docs, images, and audio into structured formats for GenAI workflows
-    path: docling/
-    mcp_validated: "2026-02-06"
+  athena:
+    name: AWS Athena
+    description: Serverless interactive query service for analyzing data in Amazon S3 using standard SQL, powered by Trino and Apache Spark
+    path: cloud/aws/athena/
+    mcp_validated: "2026-02-19"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: document-converter
-        path: concepts/document-converter.md
-        confidence: 0.95
-      - name: docling-document
-        path: concepts/docling-document.md
-        confidence: 0.95
-      - name: pipeline-architecture
-        path: concepts/pipeline-architecture.md
-        confidence: 0.95
-      - name: export-formats
-        path: concepts/export-formats.md
-        confidence: 0.95
-      - name: ocr-vlm-support
-        path: concepts/ocr-vlm-support.md
-        confidence: 0.95
-      - name: supported-formats
-        path: concepts/supported-formats.md
-        confidence: 0.95
+      - name: data-formats
+        path: concepts/data-formats.md
+      - name: partitions
+        path: concepts/partitions.md
+      - name: query-engine
+        path: concepts/query-engine.md
+      - name: tables-views
+        path: concepts/tables-views.md
+      - name: workgroups
+        path: concepts/workgroups.md
     patterns:
-      - name: basic-conversion
-        path: patterns/basic-conversion.md
-      - name: batch-processing
-        path: patterns/batch-processing.md
-      - name: advanced-pdf-parsing
-        path: patterns/advanced-pdf-parsing.md
-      - name: langchain-integration
-        path: patterns/langchain-integration.md
-      - name: custom-pipeline-config
-        path: patterns/custom-pipeline-config.md
-      - name: cli-usage
-        path: patterns/cli-usage.md
+      - name: cost-management
+        path: patterns/cost-management.md
+      - name: iceberg-tables
+        path: patterns/iceberg-tables.md
+      - name: integration-patterns
+        path: patterns/integration-patterns.md
+      - name: query-optimization
+        path: patterns/query-optimization.md
 
-  railway:
-    name: Railway
-    description: Modern cloud deployment platform with automatic deployments, managed databases, and zero-configuration setup
-    path: railway/
-    mcp_validated: "2026-02-06"
+  cloudwatch:
+    name: AWS CloudWatch
+    description: Full-stack observability service for monitoring AWS resources and applications with metrics, logs, alarms, dashboards, synthetics, and application performance monitoring
+    path: cloud/aws/cloudwatch/
+    mcp_validated: "2026-02-19"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: projects
-        path: concepts/projects.md
-        confidence: 0.95
-      - name: services
-        path: concepts/services.md
-        confidence: 0.95
-      - name: deployments
-        path: concepts/deployments.md
-        confidence: 0.95
-      - name: environments
-        path: concepts/environments.md
-        confidence: 0.95
-      - name: databases
-        path: concepts/databases.md
-        confidence: 0.95
-      - name: railway-config
-        path: concepts/railway-config.md
-        confidence: 0.95
-      - name: cli
-        path: concepts/cli.md
-        confidence: 0.95
-      - name: variables
-        path: concepts/variables.md
-        confidence: 0.95
+      - name: alarms
+        path: concepts/alarms.md
+      - name: dashboards
+        path: concepts/dashboards.md
+      - name: events-eventbridge
+        path: concepts/events-eventbridge.md
+      - name: logs
+        path: concepts/logs.md
+      - name: metrics
+        path: concepts/metrics.md
+      - name: synthetics
+        path: concepts/synthetics.md
     patterns:
-      - name: deployment-strategies
-        path: patterns/deployment-strategies.md
-      - name: database-setup
-        path: patterns/database-setup.md
-      - name: monorepo-handling
-        path: patterns/monorepo-handling.md
-      - name: environment-management
-        path: patterns/environment-management.md
-      - name: custom-domains
-        path: patterns/custom-domains.md
-      - name: private-networking
-        path: patterns/private-networking.md
+      - name: alerting-notifications
+        path: patterns/alerting-notifications.md
+      - name: cost-optimization
+        path: patterns/cost-optimization.md
+      - name: custom-metrics
+        path: patterns/custom-metrics.md
+      - name: lambda-monitoring
+        path: patterns/lambda-monitoring.md
+      - name: log-aggregation
+        path: patterns/log-aggregation.md
 
-  uv:
-    name: uv (Astral)
-    description: Ultra-fast Python package and project manager written in Rust, replacing pip, poetry, pyenv, and more
-    path: uv/
-    mcp_validated: "2026-02-09"
+  emr:
+    name: AWS EMR
+    description: Managed big data platform for running Apache Spark, Hive, Presto, and other distributed frameworks on EC2, EKS, or Serverless
+    path: cloud/aws/emr/
+    mcp_validated: "2026-03-01"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: installation
-        path: concepts/installation.md
-        confidence: 0.95
-      - name: projects
-        path: concepts/projects.md
-        confidence: 0.95
-      - name: dependencies
-        path: concepts/dependencies.md
-        confidence: 0.95
-      - name: python-management
-        path: concepts/python-management.md
-        confidence: 0.95
-      - name: scripts-tools
-        path: concepts/scripts-tools.md
-        confidence: 0.95
-      - name: workspaces
-        path: concepts/workspaces.md
-        confidence: 0.95
+      - name: cluster-architecture
+        path: concepts/cluster-architecture.md
+      - name: emr-on-eks
+        path: concepts/emr-on-eks.md
+      - name: emr-serverless
+        path: concepts/emr-serverless.md
+      - name: security
+        path: concepts/security.md
+      - name: spark-on-emr
+        path: concepts/spark-on-emr.md
+      - name: storage-options
+        path: concepts/storage-options.md
     patterns:
-      - name: migration-from-pip
-        path: patterns/migration-from-pip.md
-      - name: docker-integration
-        path: patterns/docker-integration.md
-      - name: ci-cd-integration
-        path: patterns/ci-cd-integration.md
-      - name: monorepo-workspaces
-        path: patterns/monorepo-workspaces.md
+      - name: cluster-provisioning
+        path: patterns/cluster-provisioning.md
+      - name: cost-optimization
+        path: patterns/cost-optimization.md
+      - name: integration-patterns
+        path: patterns/integration-patterns.md
+      - name: spark-submit-patterns
+        path: patterns/spark-submit-patterns.md
+
+  fargate:
+    name: AWS Fargate
+    description: Serverless compute engine for containers that removes the need to manage servers or clusters, running on Amazon ECS and Amazon EKS
+    path: cloud/aws/fargate/
+    mcp_validated: "2026-03-01"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: ecs-vs-eks
+        path: concepts/ecs-vs-eks.md
+      - name: networking
+        path: concepts/networking.md
+      - name: pricing-model
+        path: concepts/pricing-model.md
+      - name: task-definitions
+        path: concepts/task-definitions.md
+    patterns:
+      - name: auto-scaling
+        path: patterns/auto-scaling.md
+      - name: cicd-pipeline
+        path: patterns/cicd-pipeline.md
+      - name: service-deployment
+        path: patterns/service-deployment.md
+      - name: task-scheduling
+        path: patterns/task-scheduling.md
+
+  glue:
+    name: AWS Glue
+    description: Serverless data integration service for discovering, preparing, moving, and integrating data from multiple sources for analytics, ML, and application development
+    path: cloud/aws/glue/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: connections
+        path: concepts/connections.md
+      - name: crawlers
+        path: concepts/crawlers.md
+      - name: data-catalog
+        path: concepts/data-catalog.md
+      - name: data-quality
+        path: concepts/data-quality.md
+      - name: etl-jobs
+        path: concepts/etl-jobs.md
+      - name: glue-studio
+        path: concepts/glue-studio.md
+    patterns:
+      - name: catalog-management
+        path: patterns/catalog-management.md
+      - name: etl-patterns
+        path: patterns/etl-patterns.md
+      - name: integration-patterns
+        path: patterns/integration-patterns.md
+      - name: performance-optimization
+        path: patterns/performance-optimization.md
+
+  iam:
+    name: AWS IAM
+    description: AWS Identity and Access Management -- securely control access to AWS resources with users, roles, policies, and permissions boundaries
+    path: cloud/aws/iam/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: conditions
+        path: concepts/conditions.md
+      - name: permissions-boundaries
+        path: concepts/permissions-boundaries.md
+      - name: policies
+        path: concepts/policies.md
+      - name: principals-identities
+        path: concepts/principals-identities.md
+      - name: roles
+        path: concepts/roles.md
+      - name: sts-federation
+        path: concepts/sts-federation.md
+    patterns:
+      - name: cross-account-access
+        path: patterns/cross-account-access.md
+      - name: least-privilege
+        path: patterns/least-privilege.md
+      - name: service-roles
+        path: patterns/service-roles.md
+      - name: terraform-iam
+        path: patterns/terraform-iam.md
+
+  kms:
+    name: AWS KMS
+    description: AWS Key Management Service -- create, manage, and control cryptographic keys for encryption across AWS services and applications
+    path: cloud/aws/kms/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: aliases
+        path: concepts/aliases.md
+      - name: envelope-encryption
+        path: concepts/envelope-encryption.md
+      - name: key-policies
+        path: concepts/key-policies.md
+      - name: key-rotation
+        path: concepts/key-rotation.md
+      - name: key-types
+        path: concepts/key-types.md
+      - name: multi-region-keys
+        path: concepts/multi-region-keys.md
+    patterns:
+      - name: application-encryption
+        path: patterns/application-encryption.md
+      - name: s3-encryption
+        path: patterns/s3-encryption.md
+      - name: service-integration
+        path: patterns/service-integration.md
+      - name: terraform-kms
+        path: patterns/terraform-kms.md
+
+  s3-tables:
+    name: AWS S3 Tables
+    description: Fully managed Apache Iceberg tables on S3 with built-in compaction, snapshot management, and analytics engine integration via AWS Glue Data Catalog
+    path: cloud/aws/s3-tables/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: iceberg-integration
+        path: concepts/iceberg-integration.md
+      - name: maintenance-compaction
+        path: concepts/maintenance-compaction.md
+      - name: security-access
+        path: concepts/security-access.md
+      - name: table-buckets-namespaces
+        path: concepts/table-buckets-namespaces.md
+    patterns:
+      - name: analytics-integration
+        path: patterns/analytics-integration.md
+      - name: data-lake-medallion
+        path: patterns/data-lake-medallion.md
+      - name: terraform-setup
+        path: patterns/terraform-setup.md
+
+  s3:
+    name: AWS S3
+    description: Amazon Simple Storage Service - scalable object storage with industry-leading durability, availability, performance, security, and virtually unlimited scalability
+    path: cloud/aws/s3/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: buckets-objects
+        path: concepts/buckets-objects.md
+      - name: event-notifications
+        path: concepts/event-notifications.md
+      - name: security-access
+        path: concepts/security-access.md
+      - name: storage-classes
+        path: concepts/storage-classes.md
+      - name: versioning-lifecycle
+        path: concepts/versioning-lifecycle.md
+    patterns:
+      - name: cross-region-replication
+        path: patterns/cross-region-replication.md
+      - name: data-lake-pattern
+        path: patterns/data-lake-pattern.md
+      - name: performance-optimization
+        path: patterns/performance-optimization.md
+      - name: static-hosting
+        path: patterns/static-hosting.md
+
+  secrets-manager:
+    name: AWS Secrets Manager
+    description: AWS service for securely storing, rotating, and managing secrets such as database credentials, API keys, and tokens with KMS encryption and Lambda-based rotation
+    path: cloud/aws/secrets-manager/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: encryption-kms
+        path: concepts/encryption-kms.md
+      - name: replication
+        path: concepts/replication.md
+      - name: resource-policies
+        path: concepts/resource-policies.md
+      - name: rotation
+        path: concepts/rotation.md
+      - name: secrets-overview
+        path: concepts/secrets-overview.md
+      - name: versioning
+        path: concepts/versioning.md
+    patterns:
+      - name: boto3-integration
+        path: patterns/boto3-integration.md
+      - name: caching-pattern
+        path: patterns/caching-pattern.md
+      - name: cross-account-access
+        path: patterns/cross-account-access.md
+      - name: lambda-rotation
+        path: patterns/lambda-rotation.md
+      - name: terraform-setup
+        path: patterns/terraform-setup.md
+
+  gcp:
+    name: Google Cloud Platform (GCP)
+    description: Google Cloud Platform (GCP) knowledge base
+    path: cloud/gcp/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: bigquery
+        path: concepts/bigquery.md
+      - name: cloud-run
+        path: concepts/cloud-run.md
+      - name: gcs
+        path: concepts/gcs.md
+      - name: iam
+        path: concepts/iam.md
+      - name: pubsub
+        path: concepts/pubsub.md
+      - name: secret-manager
+        path: concepts/secret-manager.md
+    patterns:
+      - name: cloud-run-scaling
+        path: patterns/cloud-run-scaling.md
+      - name: event-driven-pipeline
+        path: patterns/event-driven-pipeline.md
+      - name: gcs-triggered-workflow
+        path: patterns/gcs-triggered-workflow.md
+      - name: multi-bucket-pipeline
+        path: patterns/multi-bucket-pipeline.md
+      - name: pubsub-fanout
+        path: patterns/pubsub-fanout.md
 
   flake8:
     name: Flake8
-    description: Python linting tool wrapping PyFlakes, pycodestyle, and McCabe for style enforcement, bug detection, and complexity checking
+    description: Flake8 knowledge base
     path: data-engineering/code-quality/flake8/
-    mcp_validated: "2026-02-13"
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
       - name: architecture
         path: concepts/architecture.md
-        confidence: 0.95
-      - name: error-codes
-        path: concepts/error-codes.md
-        confidence: 0.95
       - name: configuration
         path: concepts/configuration.md
-        confidence: 0.95
-      - name: plugins
-        path: concepts/plugins.md
-        confidence: 0.95
+      - name: error-codes
+        path: concepts/error-codes.md
       - name: inline-control
         path: concepts/inline-control.md
-        confidence: 0.95
+      - name: plugins
+        path: concepts/plugins.md
     patterns:
-      - name: project-configuration
-        path: patterns/project-configuration.md
       - name: ci-cd-integration
         path: patterns/ci-cd-integration.md
-      - name: plugin-stack
-        path: patterns/plugin-stack.md
       - name: migration-to-ruff
         path: patterns/migration-to-ruff.md
+      - name: plugin-stack
+        path: patterns/plugin-stack.md
+      - name: project-configuration
+        path: patterns/project-configuration.md
 
-  soda:
-    name: Soda
-    description: Data quality testing platform using SodaCL checks language for validation, monitoring, and data contracts
-    path: data-engineering/data-quality/soda/
-    mcp_validated: "2026-02-19"
+  data-contracts:
+    name: Data Contracts
+    description: Data Contracts knowledge base
+    path: data-engineering/data-governance/data-contracts/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: sodacl
-        path: concepts/sodacl.md
-        confidence: 0.95
-      - name: checks
-        path: concepts/checks.md
-        confidence: 0.95
+      - name: data-mesh-integration
+        path: concepts/data-mesh-integration.md
+      - name: fundamentals
+        path: concepts/fundamentals.md
+      - name: ownership-and-slas
+        path: concepts/ownership-and-slas.md
+      - name: schema-definition
+        path: concepts/schema-definition.md
+      - name: versioning
+        path: concepts/versioning.md
+    patterns:
+      - name: datacontract-cli
+        path: patterns/datacontract-cli.md
+      - name: odcs-specification
+        path: patterns/odcs-specification.md
+      - name: pipeline-enforcement
+        path: patterns/pipeline-enforcement.md
+      - name: testing-and-cicd
+        path: patterns/testing-and-cicd.md
+
+  openmetadata:
+    name: OpenMetadata
+    description: OpenMetadata knowledge base
+    path: data-engineering/data-governance/openmetadata/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: architecture
+        path: concepts/architecture.md
+      - name: data-assets
+        path: concepts/data-assets.md
+      - name: data-lineage
+        path: concepts/data-lineage.md
+      - name: data-quality
+        path: concepts/data-quality.md
+      - name: governance-classification
+        path: concepts/governance-classification.md
+      - name: metadata-ingestion
+        path: concepts/metadata-ingestion.md
+    patterns:
+      - name: deployment-patterns
+        path: patterns/deployment-patterns.md
+      - name: governance-workflows
+        path: patterns/governance-workflows.md
+      - name: ingestion-patterns
+        path: patterns/ingestion-patterns.md
+      - name: integration-patterns
+        path: patterns/integration-patterns.md
+
+  duckdb:
+    name: duckdb
+    description: duckdb knowledge base
+    path: data-engineering/data-platforms/duckdb/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: architecture
+        path: concepts/architecture.md
+      - name: data-import-export
+        path: concepts/data-import-export.md
+      - name: extensions
+        path: concepts/extensions.md
+      - name: performance
+        path: concepts/performance.md
+      - name: python-api
+        path: concepts/python-api.md
+      - name: sql-dialect
+        path: concepts/sql-dialect.md
+    patterns:
+      - name: dbt-duckdb
+        path: patterns/dbt-duckdb.md
+      - name: etl-processing
+        path: patterns/etl-processing.md
+      - name: local-analytics
+        path: patterns/local-analytics.md
+      - name: performance-tuning
+        path: patterns/performance-tuning.md
+      - name: python-data-science
+        path: patterns/python-data-science.md
+      - name: remote-files
+        path: patterns/remote-files.md
+
+  onehouse:
+    name: onehouse
+    description: onehouse knowledge base
+    path: data-engineering/data-platforms/onehouse/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: compute-runtime
+        path: concepts/compute-runtime.md
+      - name: lakeview-observability
+        path: concepts/lakeview-observability.md
+      - name: oneflow-ingestion
+        path: concepts/oneflow-ingestion.md
+      - name: onesync-catalog
+        path: concepts/onesync-catalog.md
+      - name: platform-architecture
+        path: concepts/platform-architecture.md
+      - name: table-optimizer
+        path: concepts/table-optimizer.md
+      - name: xtable-interoperability
+        path: concepts/xtable-interoperability.md
+    patterns:
+      - name: cdc-ingestion-pipeline
+        path: patterns/cdc-ingestion-pipeline.md
+      - name: incremental-etl
+        path: patterns/incremental-etl.md
+      - name: multi-engine-query
+        path: patterns/multi-engine-query.md
+      - name: table-optimization
+        path: patterns/table-optimization.md
+    specs:
+      - name: product-components
+        path: specs/product-components.yaml
+
+  snowflake:
+    name: Snowflake
+    description: Snowflake knowledge base
+    path: data-engineering/data-platforms/snowflake/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: cortex-code
+        path: concepts/cortex-code.md
+      - name: databases-schemas
+        path: concepts/databases-schemas.md
+      - name: interactive-tables
+        path: concepts/interactive-tables.md
+      - name: openflow
+        path: concepts/openflow.md
+      - name: roles-privileges
+        path: concepts/roles-privileges.md
+      - name: stages
+        path: concepts/stages.md
+      - name: tables-views
+        path: concepts/tables-views.md
+      - name: variant-data
+        path: concepts/variant-data.md
+      - name: virtual-warehouses
+        path: concepts/virtual-warehouses.md
+    patterns:
+      - name: copy-into-loading
+        path: patterns/copy-into-loading.md
+      - name: cortex-code-workflows
+        path: patterns/cortex-code-workflows.md
+      - name: interactive-analytics
+        path: patterns/interactive-analytics.md
+      - name: openflow-integration
+        path: patterns/openflow-integration.md
+      - name: performance-optimization
+        path: patterns/performance-optimization.md
+      - name: python-connector
+        path: patterns/python-connector.md
+      - name: semi-structured-queries
+        path: patterns/semi-structured-queries.md
+      - name: snowpipe-streaming
+        path: patterns/snowpipe-streaming.md
+      - name: spark-connector
+        path: patterns/spark-connector.md
+
+  great-expectations:
+    name: Great Expectations
+    description: Great Expectations knowledge base
+    path: data-engineering/data-quality/great-expectations/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: checkpoints
+        path: concepts/checkpoints.md
+      - name: data-context
+        path: concepts/data-context.md
+      - name: data-docs
+        path: concepts/data-docs.md
       - name: data-sources
         path: concepts/data-sources.md
-        confidence: 0.95
+      - name: expectation-suites
+        path: concepts/expectation-suites.md
+      - name: expectations
+        path: concepts/expectations.md
+    patterns:
+      - name: checkpoint-actions
+        path: patterns/checkpoint-actions.md
+      - name: custom-expectations
+        path: patterns/custom-expectations.md
+      - name: pipeline-integration
+        path: patterns/pipeline-integration.md
+      - name: spark-validation
+        path: patterns/spark-validation.md
+
+  soda:
+    name: Soda
+    description: Soda knowledge base
+    path: data-engineering/data-quality/soda/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: checks
+        path: concepts/checks.md
+      - name: data-sources
+        path: concepts/data-sources.md
       - name: soda-cloud
         path: concepts/soda-cloud.md
-        confidence: 0.95
+      - name: sodacl
+        path: concepts/sodacl.md
     patterns:
       - name: check-patterns
         path: patterns/check-patterns.md
@@ -842,107 +892,605 @@ domains:
       - name: monitoring-alerting
         path: patterns/monitoring-alerting.md
 
-  openmetadata:
-    name: OpenMetadata
-    description: Open-source metadata platform for data discovery, lineage, quality, governance, and observability with 80+ connectors
-    path: data-engineering/data-governance/openmetadata/
+  airbyte:
+    name: Airbyte
+    description: Airbyte knowledge base
+    path: data-engineering/elt/airbyte/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: airbyte-api
+        path: concepts/airbyte-api.md
+      - name: catalog-schema
+        path: concepts/catalog-schema.md
+      - name: cloud-vs-oss
+        path: concepts/cloud-vs-oss.md
+      - name: connections
+        path: concepts/connections.md
+      - name: connectors
+        path: concepts/connectors.md
+      - name: normalization
+        path: concepts/normalization.md
+      - name: python-cdk
+        path: concepts/python-cdk.md
+      - name: sync-modes
+        path: concepts/sync-modes.md
+    patterns:
+      - name: api-triggered-syncs
+        path: patterns/api-triggered-syncs.md
+      - name: custom-python-connector
+        path: patterns/custom-python-connector.md
+      - name: incremental-dedup-pattern
+        path: patterns/incremental-dedup-pattern.md
+      - name: monitoring-observability
+        path: patterns/monitoring-observability.md
+      - name: multi-environment-setup
+        path: patterns/multi-environment-setup.md
+      - name: terraform-orchestration
+        path: patterns/terraform-orchestration.md
+
+  finops:
+    name: FinOps
+    description: FinOps knowledge base
+    path: data-engineering/finops/finops/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: budgets-forecasting
+        path: concepts/budgets-forecasting.md
+      - name: cloud-billing
+        path: concepts/cloud-billing.md
+      - name: cost-allocation
+        path: concepts/cost-allocation.md
+      - name: framework
+        path: concepts/framework.md
+      - name: governance
+        path: concepts/governance.md
+      - name: unit-economics
+        path: concepts/unit-economics.md
+    patterns:
+      - name: data-pipeline-optimization
+        path: patterns/data-pipeline-optimization.md
+      - name: monitoring-alerting
+        path: patterns/monitoring-alerting.md
+      - name: storage-optimization
+        path: patterns/storage-optimization.md
+      - name: warehouse-cost-management
+        path: patterns/warehouse-cost-management.md
+
+  data-vault:
+    name: Data Vault 2.0
+    description: Enterprise data warehouse modeling methodology using Hubs, Links, and Satellites with insert-only patterns for full auditability
+    path: data-engineering/modeling/data-vault/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: hash-keys
+        path: concepts/hash-keys.md
+      - name: hubs
+        path: concepts/hubs.md
+      - name: links
+        path: concepts/links.md
+      - name: satellites
+        path: concepts/satellites.md
+    patterns:
+      - name: business-vault
+        path: patterns/business-vault.md
+      - name: dbt-integration
+        path: patterns/dbt-integration.md
+      - name: loading-patterns
+        path: patterns/loading-patterns.md
+
+  elementary:
+    name: Elementary
+    description: Elementary knowledge base
+    path: data-engineering/observability/elementary/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: anomaly-detection
+        path: concepts/anomaly-detection.md
+      - name: data-monitors
+        path: concepts/data-monitors.md
+      - name: dbt-package
+        path: concepts/dbt-package.md
+      - name: elementary-cli
+        path: concepts/elementary-cli.md
+      - name: elementary-cloud
+        path: concepts/elementary-cloud.md
+      - name: test-results
+        path: concepts/test-results.md
+    patterns:
+      - name: alerting-notifications
+        path: patterns/alerting-notifications.md
+      - name: anomaly-monitoring
+        path: patterns/anomaly-monitoring.md
+      - name: custom-tests
+        path: patterns/custom-tests.md
+      - name: dagster-integration
+        path: patterns/dagster-integration.md
+      - name: dbt-integration
+        path: patterns/dbt-integration.md
+
+  dagster:
+    name: Dagster
+    description: Dagster knowledge base
+    path: data-engineering/orchestration/dagster/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: dagster-cloud
+        path: concepts/dagster-cloud.md
+      - name: definitions
+        path: concepts/definitions.md
+      - name: io-managers
+        path: concepts/io-managers.md
+      - name: jobs-ops-graphs
+        path: concepts/jobs-ops-graphs.md
+      - name: partitions
+        path: concepts/partitions.md
+      - name: resources
+        path: concepts/resources.md
+      - name: schedules-sensors
+        path: concepts/schedules-sensors.md
+      - name: software-defined-assets
+        path: concepts/software-defined-assets.md
+    patterns:
+      - name: cloud-integrations
+        path: patterns/cloud-integrations.md
+      - name: dbt-integration
+        path: patterns/dbt-integration.md
+      - name: kubernetes-deployment
+        path: patterns/kubernetes-deployment.md
+      - name: project-structure
+        path: patterns/project-structure.md
+      - name: testing-assets
+        path: patterns/testing-assets.md
+
+  apache-iceberg:
+    name: Apache Iceberg
+    description: Open table format for huge analytic datasets with ACID transactions, schema evolution, hidden partitioning, time travel, and Format Spec v3 (deletion vectors, variant type, nanosecond timestamps)
+    path: data-engineering/table-formats/apache-iceberg/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: catalog
+        path: concepts/catalog.md
+      - name: partitioning
+        path: concepts/partitioning.md
+      - name: schema-evolution
+        path: concepts/schema-evolution.md
+      - name: snapshots-time-travel
+        path: concepts/snapshots-time-travel.md
+      - name: table-format
+        path: concepts/table-format.md
+    patterns:
+      - name: migration-from-hive
+        path: patterns/migration-from-hive.md
+      - name: performance-tuning
+        path: patterns/performance-tuning.md
+      - name: spark-integration
+        path: patterns/spark-integration.md
+      - name: table-maintenance
+        path: patterns/table-maintenance.md
+
+  dbt-cloud:
+    name: dbt Cloud
+    description: dbt Cloud knowledge base
+    path: data-engineering/transformation/dbt-cloud/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: jinja-macros
+        path: concepts/jinja-macros.md
+      - name: jobs-scheduling
+        path: concepts/jobs-scheduling.md
+      - name: models-materializations
+        path: concepts/models-materializations.md
+      - name: projects-environments
+        path: concepts/projects-environments.md
+      - name: snapshots
+        path: concepts/snapshots.md
+      - name: sources-seeds
+        path: concepts/sources-seeds.md
+      - name: testing
+        path: concepts/testing.md
+    patterns:
+      - name: ci-cd-workflow
+        path: patterns/ci-cd-workflow.md
+      - name: dbt-mesh
+        path: patterns/dbt-mesh.md
+      - name: incremental-models
+        path: patterns/incremental-models.md
+      - name: testing-strategy
+        path: patterns/testing-strategy.md
+
+  dbt-core:
+    name: dbt Core
+    description: dbt Core knowledge base
+    path: data-engineering/transformation/dbt-core/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: jinja-macros
+        path: concepts/jinja-macros.md
+      - name: materializations
+        path: concepts/materializations.md
+      - name: models
+        path: concepts/models.md
+      - name: refs
+        path: concepts/refs.md
+      - name: sources
+        path: concepts/sources.md
+      - name: tests
+        path: concepts/tests.md
+    patterns:
+      - name: best-practices
+        path: patterns/best-practices.md
+      - name: custom-macros
+        path: patterns/custom-macros.md
+      - name: incremental-models
+        path: patterns/incremental-models.md
+      - name: project-structure
+        path: patterns/project-structure.md
+      - name: snapshots
+        path: patterns/snapshots.md
+      - name: style-guide
+        path: patterns/style-guide.md
+      - name: testing-strategy
+        path: patterns/testing-strategy.md
+
+  docker-compose:
+    name: Docker Compose
+    description: Docker Compose knowledge base
+    path: devops-sre/containerization/docker-compose/
     mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: compose-file
+        path: concepts/compose-file.md
+      - name: environment
+        path: concepts/environment.md
+      - name: lifecycle
+        path: concepts/lifecycle.md
+      - name: networking
+        path: concepts/networking.md
+      - name: services
+        path: concepts/services.md
+      - name: volumes
+        path: concepts/volumes.md
+    patterns:
+      - name: database-services
+        path: patterns/database-services.md
+      - name: development-workflow
+        path: patterns/development-workflow.md
+      - name: multi-environment
+        path: patterns/multi-environment.md
+      - name: production-deployment
+        path: patterns/production-deployment.md
+
+  kubernetes:
+    name: Kubernetes
+    description: Kubernetes knowledge base
+    path: devops-sre/containerization/kubernetes/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
       - name: architecture
         path: concepts/architecture.md
-        confidence: 0.95
-      - name: data-assets
-        path: concepts/data-assets.md
-        confidence: 0.95
-      - name: metadata-ingestion
-        path: concepts/metadata-ingestion.md
-        confidence: 0.95
-      - name: data-lineage
-        path: concepts/data-lineage.md
-        confidence: 0.95
-      - name: data-quality
-        path: concepts/data-quality.md
-        confidence: 0.95
-      - name: governance-classification
-        path: concepts/governance-classification.md
-        confidence: 0.95
+      - name: configuration
+        path: concepts/configuration.md
+      - name: networking
+        path: concepts/networking.md
+      - name: security
+        path: concepts/security.md
+      - name: storage
+        path: concepts/storage.md
+      - name: workloads
+        path: concepts/workloads.md
     patterns:
-      - name: deployment-patterns
-        path: patterns/deployment-patterns.md
-      - name: ingestion-patterns
-        path: patterns/ingestion-patterns.md
-      - name: governance-workflows
-        path: patterns/governance-workflows.md
-      - name: integration-patterns
-        path: patterns/integration-patterns.md
+      - name: deployment-strategies
+        path: patterns/deployment-strategies.md
+      - name: helm-kustomize
+        path: patterns/helm-kustomize.md
+      - name: production-best-practices
+        path: patterns/production-best-practices.md
+      - name: scaling-autoscaling
+        path: patterns/scaling-autoscaling.md
 
-  grafana:
-    name: Grafana
-    description: Open-source observability platform for metrics visualization, alerting, log exploration, and dashboard-as-code
-    path: devops-sre/monitoring/grafana/
-    mcp_validated: "2026-02-19"
+  terraform:
+    name: Terraform
+    description: Terraform knowledge base
+    path: devops-sre/iac/terraform/
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: dashboards-panels
-        path: concepts/dashboards-panels.md
-        confidence: 0.95
-      - name: data-sources
-        path: concepts/data-sources.md
-        confidence: 0.95
+      - name: import-moved
+        path: concepts/import-moved.md
+      - name: modules
+        path: concepts/modules.md
+      - name: providers
+        path: concepts/providers.md
+      - name: resources
+        path: concepts/resources.md
+      - name: state
+        path: concepts/state.md
+      - name: testing
+        path: concepts/testing.md
+      - name: variables
+        path: concepts/variables.md
+      - name: workspaces
+        path: concepts/workspaces.md
+    patterns:
+      - name: aws-iam-module
+        path: patterns/aws-iam-module.md
+      - name: aws-lambda-module
+        path: patterns/aws-lambda-module.md
+      - name: aws-s3-module
+        path: patterns/aws-s3-module.md
+      - name: bigquery-module
+        path: patterns/bigquery-module.md
+      - name: cloud-run-module
+        path: patterns/cloud-run-module.md
+      - name: gcs-module
+        path: patterns/gcs-module.md
+      - name: iam-module
+        path: patterns/iam-module.md
+      - name: multi-cloud-structure
+        path: patterns/multi-cloud-structure.md
+      - name: pubsub-module
+        path: patterns/pubsub-module.md
+      - name: remote-state
+        path: patterns/remote-state.md
+
+  terragrunt:
+    name: Terragrunt
+    description: Terragrunt knowledge base
+    path: devops-sre/iac/terragrunt/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: dependency-graphs
+        path: concepts/dependency-graphs.md
+      - name: environment-hierarchy
+        path: concepts/environment-hierarchy.md
+      - name: generate-blocks
+        path: concepts/generate-blocks.md
+      - name: hooks
+        path: concepts/hooks.md
+      - name: root-configuration
+        path: concepts/root-configuration.md
+      - name: terragrunt-blocks
+        path: concepts/terragrunt-blocks.md
+    patterns:
+      - name: dependency-management
+        path: patterns/dependency-management.md
+      - name: dry-hierarchies
+        path: patterns/dry-hierarchies.md
+      - name: environment-promotion
+        path: patterns/environment-promotion.md
+      - name: multi-environment-config
+        path: patterns/multi-environment-config.md
+      - name: state-bucket-per-env
+        path: patterns/state-bucket-per-env.md
+    specs:
+      - name: gcp-project-structure
+        path: specs/gcp-project-structure.yaml
+
+  grafana:
+    name: Grafana
+    description: Grafana knowledge base
+    path: devops-sre/monitoring/grafana/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
       - name: alerting
         path: concepts/alerting.md
-        confidence: 0.95
+      - name: dashboards-panels
+        path: concepts/dashboards-panels.md
+      - name: data-sources
+        path: concepts/data-sources.md
       - name: provisioning
         path: concepts/provisioning.md
-        confidence: 0.95
     patterns:
-      - name: infrastructure-monitoring
-        path: patterns/infrastructure-monitoring.md
       - name: application-monitoring
         path: patterns/application-monitoring.md
       - name: dashboard-as-code
         path: patterns/dashboard-as-code.md
+      - name: infrastructure-monitoring
+        path: patterns/infrastructure-monitoring.md
       - name: log-monitoring
         path: patterns/log-monitoring.md
 
   prometheus:
     name: Prometheus
-    description: Open-source monitoring and alerting toolkit with pull-based metrics collection, powerful PromQL query language, and multi-dimensional data model
+    description: Prometheus knowledge base
     path: devops-sre/monitoring/prometheus/
-    mcp_validated: "2026-02-20"
+    mcp_validated: "2026-03-02"
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
     concepts:
-      - name: architecture
-        path: concepts/architecture.md
-        confidence: 0.95
-      - name: data-model
-        path: concepts/data-model.md
-        confidence: 0.95
-      - name: promql
-        path: concepts/promql.md
-        confidence: 0.95
-      - name: service-discovery
-        path: concepts/service-discovery.md
-        confidence: 0.95
       - name: alerting
         path: concepts/alerting.md
-        confidence: 0.95
+      - name: architecture
+        path: concepts/architecture.md
+      - name: data-model
+        path: concepts/data-model.md
+      - name: promql
+        path: concepts/promql.md
+      - name: service-discovery
+        path: concepts/service-discovery.md
       - name: storage
         path: concepts/storage.md
-        confidence: 0.95
     patterns:
-      - name: kubernetes-monitoring
-        path: patterns/kubernetes-monitoring.md
       - name: alerting-patterns
         path: patterns/alerting-patterns.md
-      - name: recording-rules
-        path: patterns/recording-rules.md
       - name: federation-scaling
         path: patterns/federation-scaling.md
+      - name: kubernetes-monitoring
+        path: patterns/kubernetes-monitoring.md
+      - name: recording-rules
+        path: patterns/recording-rules.md
+
+  railway:
+    name: Railway
+    description: Railway knowledge base
+    path: devops-sre/platform/railway/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: cli
+        path: concepts/cli.md
+      - name: databases
+        path: concepts/databases.md
+      - name: deployments
+        path: concepts/deployments.md
+      - name: environments
+        path: concepts/environments.md
+      - name: projects
+        path: concepts/projects.md
+      - name: railway-config
+        path: concepts/railway-config.md
+      - name: services
+        path: concepts/services.md
+      - name: variables
+        path: concepts/variables.md
+    patterns:
+      - name: custom-domains
+        path: patterns/custom-domains.md
+      - name: database-setup
+        path: patterns/database-setup.md
+      - name: deployment-strategies
+        path: patterns/deployment-strategies.md
+      - name: environment-management
+        path: patterns/environment-management.md
+      - name: monorepo-handling
+        path: patterns/monorepo-handling.md
+      - name: private-networking
+        path: patterns/private-networking.md
+
+  uv:
+    name: uv
+    description: Ultra-fast Python package and project manager written in Rust, replacing pip, poetry, pyenv, and more
+    path: devops-sre/python-tooling/uv/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: dependencies
+        path: concepts/dependencies.md
+      - name: installation
+        path: concepts/installation.md
+      - name: projects
+        path: concepts/projects.md
+      - name: python-management
+        path: concepts/python-management.md
+      - name: scripts-tools
+        path: concepts/scripts-tools.md
+      - name: workspaces
+        path: concepts/workspaces.md
+    patterns:
+      - name: ci-cd-integration
+        path: patterns/ci-cd-integration.md
+      - name: docker-integration
+        path: patterns/docker-integration.md
+      - name: migration-from-pip
+        path: patterns/migration-from-pip.md
+      - name: monorepo-workspaces
+        path: patterns/monorepo-workspaces.md
+
+  github:
+    name: github
+    description: Cloud-based Git hosting platform with pull requests, Actions CI/CD, security scanning, project management, and the gh CLI for end-to-end developer workflows
+    path: devops-sre/version-control/github/
+    mcp_validated: "2026-02-19"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: actions
+        path: concepts/actions.md
+      - name: issues-projects
+        path: concepts/issues-projects.md
+      - name: permissions
+        path: concepts/permissions.md
+      - name: pull-requests
+        path: concepts/pull-requests.md
+      - name: repositories
+        path: concepts/repositories.md
+      - name: security
+        path: concepts/security.md
+    patterns:
+      - name: branching-strategies
+        path: patterns/branching-strategies.md
+      - name: ci-cd-workflows
+        path: patterns/ci-cd-workflows.md
+      - name: code-review
+        path: patterns/code-review.md
+      - name: release-management
+        path: patterns/release-management.md
+
+  docling:
+    name: Docling
+    description: Docling knowledge base
+    path: document-processing/docling/
+    mcp_validated: "2026-03-02"
+    entry_points:
+      index: index.md
+      quick_reference: quick-reference.md
+    concepts:
+      - name: docling-document
+        path: concepts/docling-document.md
+      - name: document-converter
+        path: concepts/document-converter.md
+      - name: export-formats
+        path: concepts/export-formats.md
+      - name: ocr-vlm-support
+        path: concepts/ocr-vlm-support.md
+      - name: pipeline-architecture
+        path: concepts/pipeline-architecture.md
+      - name: supported-formats
+        path: concepts/supported-formats.md
+    patterns:
+      - name: advanced-pdf-parsing
+        path: patterns/advanced-pdf-parsing.md
+      - name: basic-conversion
+        path: patterns/basic-conversion.md
+      - name: batch-processing
+        path: patterns/batch-processing.md
+      - name: cli-usage
+        path: patterns/cli-usage.md
+      - name: custom-pipeline-config
+        path: patterns/custom-pipeline-config.md
+      - name: langchain-integration
+        path: patterns/langchain-integration.md

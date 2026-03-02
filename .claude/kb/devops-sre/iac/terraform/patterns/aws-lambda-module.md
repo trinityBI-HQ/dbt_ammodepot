@@ -190,48 +190,6 @@ output "role_name" {
 }
 ```
 
-## Usage
-
-```hcl
-module "file_parser" {
-  source = "./modules/aws-lambda"
-
-  function_name = "${var.project}-${var.environment}-file-parser"
-  description   = "Parses uploaded files from S3"
-  source_path   = "${path.module}/dist/parser.zip"
-  memory_size   = 512
-  timeout       = 60
-
-  environment_variables = {
-    OUTPUT_BUCKET = module.output_bucket.bucket_id
-    LOG_LEVEL     = "INFO"
-  }
-
-  s3_trigger = {
-    bucket_arn    = module.input_bucket.bucket_arn
-    bucket_id     = module.input_bucket.bucket_id
-    filter_suffix = ".csv"
-  }
-
-  tags = local.common_tags
-}
-
-# Attach additional S3 permissions
-resource "aws_iam_role_policy" "s3_access" {
-  name = "s3-access"
-  role = module.file_parser.role_name
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["s3:GetObject", "s3:PutObject"]
-      Resource = ["${module.input_bucket.bucket_arn}/*", "${module.output_bucket.bucket_arn}/*"]
-    }]
-  })
-}
-```
-
 ## Related
 
 - [AWS IAM Module](./aws-iam-module.md) | [AWS S3 Module](./aws-s3-module.md) | [Cloud Run Module](./cloud-run-module.md)

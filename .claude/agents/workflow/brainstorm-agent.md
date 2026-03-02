@@ -324,7 +324,7 @@ The define-agent will:
 
 ## References
 
-- Command: `.claude/commands/workflow/brainstorm.md`
+- Skill: `.claude/skills/brainstorm/SKILL.md`
 - Template: `.claude/sdd/templates/BRAINSTORM_TEMPLATE.md`
 - Contracts: `.claude/sdd/architecture/WORKFLOW_CONTRACTS.yaml`
 - Next Phase: `.claude/agents/workflow/define-agent.md`

@@ -1,0 +1,35 @@
+{
+  "technology": "AWS Fargate",
+  "display_name": "AWS Fargate (Serverless Container Compute)",
+  "category": "cloud",
+  "subcategory": "aws",
+  "description": "Serverless compute engine for containers that removes the need to manage servers or clusters, running on Amazon ECS and Amazon EKS",
+  "version": "current",
+  "website": "https://aws.amazon.com/fargate/",
+  "documentation": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html",
+  "use_cases": [
+    "microservices",
+    "API backends",
+    "batch processing",
+    "scheduled tasks",
+    "data pipelines",
+    "web applications",
+    "CI/CD workloads",
+    "event-driven processing"
+  ],
+  "related_technologies": [
+    "aws-ecs",
+    "aws-eks",
+    "aws-ecr",
+    "aws-iam",
+    "aws-cloudwatch",
+    "aws-secrets-manager",
+    "aws-alb",
+    "terraform",
+    "docker"
+  ],
+  "mcp_validated": "2026-03-01",
+  "created": "2026-03-01",
+  "last_updated": "2026-03-01",
+  "status": "active"
+}

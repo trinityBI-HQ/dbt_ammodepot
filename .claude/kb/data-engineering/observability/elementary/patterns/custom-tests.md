@@ -132,28 +132,6 @@ models:
                 }
 ```
 
-### Exposure Validation
-
-```yaml
-# Validate that models referenced by exposures haven't broken
-exposures:
-  - name: revenue_dashboard
-    type: dashboard
-    owner:
-      name: Analytics Team
-      email: analytics@company.com
-    depends_on:
-      - ref('fct_revenue')
-      - ref('dim_customers')
-
-# In schema.yml
-models:
-  - name: fct_revenue
-    tests:
-      - elementary.exposure_validation:
-          exposure_name: revenue_dashboard
-```
-
 ### Combining Elementary with Standard dbt Tests
 
 ```yaml
@@ -200,37 +178,6 @@ models:
 | `dimensions` | Required (dim) | Columns for dimension monitoring |
 | `json_schema` | Required (json) | JSON schema definition |
 | `exposure_name` | Required (exp) | Name of exposure to validate |
-
-## Available Column Anomaly Metrics
-
-| Category | Metrics |
-|----------|---------|
-| **Nulls** | `null_count`, `null_percent`, `not_null_percent` |
-| **Zeros** | `zero_count`, `zero_percent`, `not_zero_percent` |
-| **Numeric** | `average`, `min`, `max`, `sum`, `standard_deviation`, `variance` |
-| **Cardinality** | `count_distinct`, `count_distinct_percent` |
-| **Missing** | `missing_count`, `missing_percent` |
-| **Length** | `average_length`, `max_length`, `min_length` |
-
-## Tagging Strategy
-
-```yaml
-# Use tags to organize and filter tests
-tests:
-  - elementary.volume_anomalies:
-      tags: ["elementary", "critical", "tier-1"]
-  - elementary.column_anomalies:
-      column_anomalies: [average]
-      tags: ["elementary", "tier-2"]
-```
-
-```bash
-# Run only critical Elementary tests
-dbt test --select tag:critical
-
-# Generate report for tier-1 tests only
-edr report --select tag:tier-1
-```
 
 ## See Also
 
