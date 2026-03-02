@@ -71,7 +71,7 @@ def orders_stream_sensor(context, snowflake: SnowflakeResource):
                 triggered_sources.append(source_name)
                 # Consume stream → advance offset + audit log
                 cursor.execute(f"""
-                    INSERT INTO THERAICE.DBT_PROD_bronze._DAGSTER_STREAM_LOG
+                    INSERT INTO THERAICE.DBT_DEV._DAGSTER_STREAM_LOG
                         (stream_name, detected_at, row_count)
                     SELECT '{stream_fqn}', CURRENT_TIMESTAMP(), COUNT(*)
                     FROM {stream_fqn}
