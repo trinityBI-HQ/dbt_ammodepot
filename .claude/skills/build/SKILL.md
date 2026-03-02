@@ -1,3 +1,9 @@
+---
+name: build
+description: Execute implementation with on-the-fly task generation (Phase 3 of SDD workflow)
+argument-hint: "<design-file>"
+---
+
 # Build Command
 
 > Execute implementation with on-the-fly task generation (Phase 3)

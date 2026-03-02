@@ -1,3 +1,9 @@
+---
+name: create-agent
+description: Create a new specialized subagent from the standard template
+argument-hint: "<agent-name>"
+---
+
 # Create Agent Command
 
 > Create a new specialized subagent from the standard template.

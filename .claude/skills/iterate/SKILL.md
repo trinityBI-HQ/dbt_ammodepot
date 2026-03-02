@@ -1,3 +1,9 @@
+---
+name: iterate
+description: Update any phase document when requirements or design changes (Cross-Phase)
+argument-hint: "<file> \"<change-description>\""
+---
+
 # Iterate Command
 
 > Update any phase document when requirements or design changes (Cross-Phase)

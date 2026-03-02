@@ -1,3 +1,9 @@
+---
+name: review
+description: Dual AI code review with CodeRabbit + Claude Code for maximum coverage
+argument-hint: "[scope]"
+---
+
 # Review Command
 
 > Dual AI code review with CodeRabbit + Claude Code for maximum coverage

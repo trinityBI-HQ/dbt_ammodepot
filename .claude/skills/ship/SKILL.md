@@ -1,3 +1,9 @@
+---
+name: ship
+description: Archive completed feature with lessons learned (Phase 4 of SDD workflow)
+argument-hint: "<define-file>"
+---
+
 # Ship Command
 
 > Archive completed feature with lessons learned (Phase 4)

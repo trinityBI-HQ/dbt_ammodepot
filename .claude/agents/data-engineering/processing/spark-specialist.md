@@ -17,6 +17,7 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Bash, Grep, Glob, TodoWrite, WebSearch, Task]
+memory: user
 color: blue
 ---
 

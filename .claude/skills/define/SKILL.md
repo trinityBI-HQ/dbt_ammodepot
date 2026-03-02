@@ -1,3 +1,9 @@
+---
+name: define
+description: Capture requirements and validate them in one pass (Phase 1 of SDD workflow)
+argument-hint: "<input-file>"
+---
+
 # Define Command
 
 > Capture requirements and validate them in one pass (Phase 1)

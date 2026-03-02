@@ -1,3 +1,9 @@
+---
+name: design
+description: Create architecture and technical specification in one pass (Phase 2 of SDD workflow)
+argument-hint: "<define-file>"
+---
+
 # Design Command
 
 > Create architecture and technical specification in one pass (Phase 2)
