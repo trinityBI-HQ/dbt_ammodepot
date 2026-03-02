@@ -326,7 +326,11 @@ select
     l.vendor                                as VENDOR,
     l.customer_id                           as CUSTOMER_ID,
     cu.rank_id                              as RANK_ID,
-    COALESCE(l.part_qty_sold, l.qty_ordered) as PART_QTY_SOLD
+    COALESCE(l.part_qty_sold, l.qty_ordered) as PART_QTY_SOLD,
+    null                                    as TESTC,
+    null                                    as TESTR,
+    null                                    as TESTFR,
+    null                                    as TESTFC
 from last as l
 left join filtered_cost_final as fcf
   on fcf.product_id = l.product_id

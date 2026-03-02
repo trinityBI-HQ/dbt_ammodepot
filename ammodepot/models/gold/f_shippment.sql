@@ -154,6 +154,7 @@ f_ship as (
       on cast(so.quote_id            as varchar) = cast(q.entity_id            as varchar)
     left join freeoptions                             as fo
       on so.quote_id = fo.quote_id
+    where so.order_id is not null
 )
 
 select
