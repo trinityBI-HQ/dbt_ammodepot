@@ -70,6 +70,13 @@ models:
                 to: ref('d_store')
                 field: 'STORE_ID'
               severity: warn
+      - name: STOREFRONT
+        description: "Sales channel identifier derived from order prefix (e.g. GunBroker for GB-prefixed orders, Website for standard Magento orders)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['GunBroker', 'Website']
+              severity: warn
       - name: STATUS
         description: "Magento order status."
         tests:

@@ -68,6 +68,11 @@ vars:
   ammodepot_receipt_status_received: 10
   ammodepot_receipt_status_reconciled: 40
 
+  # Storefront identification (order prefix → channel name)
+  ammodepot_gunbroker_order_prefix: 'GB'
+  ammodepot_gunbroker_store_name: 'GunBroker'
+  ammodepot_default_store_name: 'Website'
+
   # Lead time ranking limit
   ammodepot_lead_time_rank_limit: 3
 

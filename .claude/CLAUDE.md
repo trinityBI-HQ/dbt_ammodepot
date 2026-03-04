@@ -11,9 +11,23 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
 - **Redshift** (`projects/ammodepot/`): Production — dbt Cloud scheduled runs, 95 models
 - **Snowflake** (`ammodepot/`): Operational — 98 models, all passing (3 new Gold models)
-- **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys)
+- **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys, Power BI access)
 - **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 7 Airbyte connections)
+- **Power BI migration**: `docs/POWERBI_MIGRATION_PLAN.md` (3-phase plan: source swap → consolidate → retire)
 - **Adapters**: dbt-redshift 1.10.1 (Redshift) + dbt-snowflake 1.11.2 (Snowflake)
+
+### Snowflake Database Architecture
+
+```
+AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
+├── AD_FISHBOWL (35 tables)        ├── SILVER (78 views)
+├── AD_MAGENTO (30 tables)          └── GOLD (13 tables + 7 views)
+└── airbyte_internal                     ↑ Power BI reads here
+```
+
+- **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI)
+- **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `SVC_POWERBI` (password)
+- **Warehouse**: `ETL_WH` (XSMALL, shared by all three roles)
 
 ---
 
@@ -101,7 +115,7 @@ ammodepot/
 │   └── json_extract_text.sql   # Cross-dialect JSON extraction macro
 ├── tests/generic/              # 16 custom generic tests (same as Redshift)
 ├── models/
-│   ├── bronze/                 # Source definitions (AD_AIRBYTE database)
+│   ├── bronze/                 # Source definitions (reads from AD_AIRBYTE database)
 │   │   ├── fishbowl/           # schema: AD_FISHBOWL (35 source tables)
 │   │   └── magento/            # schema: AD_MAGENTO (30 source tables)
 │   ├── silver/                 # 78 view models (same as Redshift)
@@ -122,9 +136,11 @@ ammodepot/
 
 ```
 docs/
-├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA key-pair setup
+├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access (section 11)
+├── POWERBI_MIGRATION_PLAN.md          # 3-phase Power BI migration: Redshift → Snowflake AD_ANALYTICS.GOLD
 ├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
 └── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
+DISCOVERY_POWERBI.md                   # (root) Power BI dataflow-to-source mapping
 ```
 
 ---
@@ -236,7 +252,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 8. **Generic tests in `tests/generic/`** -- 16 reusable test macros using `{% test %}` wrapper syntax.
 
-9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). Uses `AD_AIRBYTE` database (sources in AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database (SILVER/GOLD schemas). `TRANSFORMER_ROLE` for dbt, RSA key-pair auth. Cross-dialect `json_extract_text` macro handles Snowflake vs Redshift JSON syntax.
+9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI). Power BI migration plan in `docs/POWERBI_MIGRATION_PLAN.md`. Cross-dialect `json_extract_text` macro handles Snowflake vs Redshift JSON syntax.
 
 10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/PIPELINE_ASSESSMENT.md` for pipeline details.
 
@@ -285,15 +301,15 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ---
 
-## Knowledge Base (53 technologies in 6 categories)
+## Knowledge Base (46 registered + 9 placeholder in 6 categories)
 
 | Category | Full | Placeholder | Key Technologies |
 |---|---|---|---|
 | data-engineering | 16 | 3 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, Onehouse |
-| cloud | 11 | 0 | S3, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, S3 Tables, GCP, EMR, Fargate |
-| devops-sre | 9 | 4 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus |
+| cloud | 11 | 1 | S3, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, S3 Tables, GCP, EMR, Fargate |
+| devops-sre | 9 | 4 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, railway, github |
 | ai-ml | 6 | 0 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
-| automation | 2 | 1 | mermaid, n8n |
+| automation | 3 | 1 | mermaid, n8n, Streamlit |
 | document-processing | 1 | 0 | docling |
 
 Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.

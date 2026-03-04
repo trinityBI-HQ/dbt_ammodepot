@@ -364,6 +364,17 @@ ALTER USER <SVC_AIRBYTE or SVC_DBT> UNSET RSA_PUBLIC_KEY_2;
 | Auth Policy | KEYPAIR only (programmatic clients) |
 | Query Tag | `dbt-transformation` |
 
+### Power BI (consumption)
+
+| Component | Value |
+|---|---|
+| User | `SVC_POWERBI` |
+| Auth | Password (Power BI Service does not support key-pair natively) |
+| Role | `POWERBI_ROLE` |
+| Warehouse | `ETL_WH` (shared, XSMALL, auto-suspend 120s) |
+| Access | SELECT on `AD_ANALYTICS.GOLD` (tables and views, current and future) |
+| Query Tag | `powerbi-dataflow-refresh` |
+
 ### Why OWNERSHIP instead of individual GRANTs
 
 Airbyte internally uses stages, file formats, and temp tables for bulk loading (COPY INTO). These require OWNERSHIP-level privileges. Individual `GRANT ALL` on schemas is not sufficient and syncs will fail.
@@ -383,9 +394,11 @@ ACCOUNTADMIN
 ├── SECURITYADMIN         → Roles, users, auth policies
 └── SYSADMIN              → Warehouses, grants
     ├── AIRBYTE_ROLE      → OWNERSHIP on AD_AIRBYTE database
-    │   └── SVC_AIRBYTE   → Airbyte CDC ingestion
-    └── TRANSFORMER_ROLE  → OWNERSHIP on SILVER/GOLD schemas, SELECT on sources
-        └── SVC_DBT       → dbt transformation
+    │   └── SVC_AIRBYTE   → Airbyte CDC ingestion (key-pair auth)
+    ├── TRANSFORMER_ROLE  → OWNERSHIP on AD_ANALYTICS SILVER/GOLD, SELECT on AD_AIRBYTE
+    │   └── SVC_DBT       → dbt transformation (key-pair auth)
+    └── POWERBI_ROLE      → SELECT on AD_ANALYTICS.GOLD (read-only)
+        └── SVC_POWERBI   → Power BI dataflows (password auth)
 ```
 
 ### Role usage reference
@@ -396,15 +409,120 @@ ACCOUNTADMIN
 | `SYSADMIN` | Create warehouses, grant warehouse access |
 | `ACCOUNTADMIN` | Transfer database ownership (one-time), object tags |
 | `AIRBYTE_ROLE` | CDC ingestion, owns `AD_AIRBYTE` database |
-| `TRANSFORMER_ROLE` | dbt transformation, owns `SILVER` and `GOLD` schemas |
+| `TRANSFORMER_ROLE` | dbt transformation, owns `AD_ANALYTICS` SILVER/GOLD schemas |
+| `POWERBI_ROLE` | Power BI read-only access, SELECT on `AD_ANALYTICS.GOLD` |
 
 ### Future considerations
 
 - **Programmatic Access Tokens (PATs):** Snowflake PATs offer scoped, short-lived authentication as an alternative to key-pair. When Airbyte adds PAT support, consider migrating for simpler credential management.
-- **POWERBI_ROLE:** Add a read-only role for Power BI using the same future grants pattern from step 4.
+- ~~**POWERBI_ROLE:**~~ Implemented in section 11 below.
 - **Network policy:** If you need IP-based access restriction in the future, apply per-user network policies (not account-level) to avoid locking yourself out.
 - **Resource monitor:** If credit consumption grows, add per-warehouse resource monitors with `ON 100 PERCENT DO SUSPEND` to cap spend.
 - **Warehouse split:** If Airbyte syncs and dbt runs start competing for resources (queued queries, slow syncs), split `ETL_WH` into dedicated `AIRBYTE_WH` + `TRANSFORMER_WH` with workload-specific settings.
+
+---
+
+## 11. Power BI access (read-only)
+
+POWERBI_ROLE provides read-only SELECT access to `AD_ANALYTICS.GOLD` for Power BI dataflow refreshes. Unlike AIRBYTE_ROLE and TRANSFORMER_ROLE, this role uses password authentication (not key-pair) because Power BI Service does not support key-pair natively without an on-premises data gateway.
+
+### 11.1 Create role
+
+```sql
+USE ROLE SECURITYADMIN;
+
+CREATE ROLE IF NOT EXISTS POWERBI_ROLE
+    COMMENT = 'Read-only role for Power BI - SELECT on AD_ANALYTICS.GOLD only';
+
+-- Maintain role hierarchy
+GRANT ROLE POWERBI_ROLE TO ROLE SYSADMIN;
+```
+
+### 11.2 Grant warehouse access
+
+Power BI shares `ETL_WH` with Airbyte and dbt. At XSMALL scale, workloads don't compete meaningfully. Cost attribution is handled via `QUERY_TAG` per service account — filter `QUERY_HISTORY` by `powerbi-dataflow-refresh` to isolate Power BI costs. If workloads diverge in the future, split into a dedicated `POWERBI_WH`.
+
+```sql
+USE ROLE SYSADMIN;
+
+GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE POWERBI_ROLE;
+```
+
+### 11.3 Grant read-only access to Gold schema
+
+POWERBI_ROLE only needs SELECT on `AD_ANALYTICS.GOLD`. No access to Silver, source schemas, or AD_AIRBYTE.
+
+```sql
+USE ROLE SYSADMIN;
+
+-- Database and schema access
+GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE POWERBI_ROLE;
+GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_ROLE;
+
+-- Current objects
+GRANT SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_ROLE;
+
+-- Future objects (auto-grant when dbt creates new Gold models)
+GRANT SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_ROLE;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_ROLE;
+```
+
+### 11.4 Create service account
+
+SVC_POWERBI uses password authentication. Unlike SVC_AIRBYTE and SVC_DBT (TYPE = SERVICE with key-pair), this account needs password auth for Power BI Service compatibility.
+
+```sql
+USE ROLE SECURITYADMIN;
+
+CREATE USER IF NOT EXISTS SVC_POWERBI
+    PASSWORD = '<strong-password>'
+    DEFAULT_ROLE = POWERBI_ROLE
+    DEFAULT_WAREHOUSE = ETL_WH
+    DEFAULT_NAMESPACE = AD_ANALYTICS.GOLD
+    COMMENT = 'Power BI service account - read-only access to Gold schema';
+
+GRANT ROLE POWERBI_ROLE TO USER SVC_POWERBI;
+ALTER USER SVC_POWERBI SET QUERY_TAG = 'powerbi-dataflow-refresh';
+```
+
+> Store the password in Power BI Service data source credentials. Rotate per your organization's password policy (minimum every 90 days).
+
+### 11.5 Validate
+
+```sql
+USE ROLE POWERBI_ROLE;
+USE WAREHOUSE ETL_WH;
+
+-- Verify Gold tables are visible
+SHOW TABLES IN SCHEMA AD_ANALYTICS.GOLD;
+SHOW VIEWS IN SCHEMA AD_ANALYTICS.GOLD;
+
+-- Verify SELECT works
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.D_STORE;
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
+
+-- Verify no access to source schemas
+SHOW TABLES IN SCHEMA AD_AIRBYTE.AD_FISHBOWL;
+-- Expected: error (no USAGE on AD_AIRBYTE)
+
+SELECT CURRENT_ROLE(), CURRENT_WAREHOUSE(), CURRENT_DATABASE();
+-- Expected: POWERBI_ROLE, ETL_WH, AD_ANALYTICS
+```
+
+### 11.6 Power BI connection details
+
+| Parameter | Value |
+|---|---|
+| Server | `iwb48385.us-east-1.snowflakecomputing.com` |
+| Warehouse | `ETL_WH` |
+| Database | `AD_ANALYTICS` |
+| Schema | `GOLD` |
+| Role | `POWERBI_ROLE` |
+| User | `SVC_POWERBI` |
+| Auth | Username/Password |
+
+> See [POWERBI_MIGRATION_PLAN.md](POWERBI_MIGRATION_PLAN.md) for the full dataflow migration plan.
 
 ---
 
