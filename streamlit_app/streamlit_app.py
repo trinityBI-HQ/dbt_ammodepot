@@ -1,11 +1,15 @@
-"""Local development entrypoint.
+"""Ammunition Depot Analytics — Streamlit App
 
-Run: streamlit run app.py (from streamlit_app/ directory)
-SiS entrypoint is streamlit_app.py (Snowflake convention).
+Multi-page dashboard replacing Power BI reports.
+Reads from Snowflake AD_ANALYTICS.GOLD layer.
+
+Entrypoint for both Streamlit in Snowflake (SiS) and local development.
+SiS convention: entrypoint must be named streamlit_app.py.
 """
 
 import streamlit as st
 
+# st.set_page_config is not supported in SiS — wrap for compatibility
 try:
     st.set_page_config(
         page_title="Ammunition Depot",
