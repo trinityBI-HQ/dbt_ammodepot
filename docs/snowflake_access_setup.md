@@ -375,16 +375,17 @@ ALTER USER <SVC_AIRBYTE or SVC_DBT> UNSET RSA_PUBLIC_KEY_2;
 | Access | SELECT on `AD_ANALYTICS.GOLD` (tables and views, current and future) |
 | Query Tag | `powerbi-dataflow-refresh` |
 
-### Streamlit (dashboards)
+### Streamlit in Snowflake (dashboards)
 
 | Component | Value |
 |---|---|
-| User | `SVC_STREAMLIT` |
-| Auth | RSA key-pair (`streamlit_rsa_key.p8`) |
-| Role | `STREAMLIT_ROLE` |
+| App owner role | `STREAMLIT_ROLE` |
+| Viewer role | `DASHBOARD_VIEWER` |
+| Auth (viewers) | SSO via SAML 2.0 (company email) |
+| Auth (owner) | Owner's rights model — app queries run as `STREAMLIT_ROLE` |
 | Warehouse | `ETL_WH` (shared, XSMALL, auto-suspend 120s) |
-| Access | SELECT on `AD_ANALYTICS.GOLD` (tables and views, current and future) |
-| Query Tag | `streamlit-dashboard` |
+| Access | SELECT on `AD_ANALYTICS.GOLD` + CREATE STREAMLIT |
+| Runtime | Warehouse (per-viewer instances, auto-suspend) |
 
 ### Why OWNERSHIP instead of individual GRANTs
 
@@ -410,8 +411,10 @@ ACCOUNTADMIN
     │   └── SVC_DBT       → dbt transformation (key-pair auth)
     ├── POWERBI_ROLE      → SELECT on AD_ANALYTICS.GOLD (read-only)
     │   └── SVC_POWERBI   → Power BI dataflows (password auth)
-    └── STREAMLIT_ROLE    → SELECT on AD_ANALYTICS.GOLD (read-only)
-        └── SVC_STREAMLIT → Streamlit dashboards (key-pair auth)
+    ├── STREAMLIT_ROLE    → Owns Streamlit apps, SELECT on AD_ANALYTICS.GOLD
+    │   └── (app runs with this role's privileges — owner's rights)
+    └── DASHBOARD_VIEWER  → USAGE on Streamlit apps (viewer access)
+        └── SSO users     → Company email login via SAML 2.0
 ```
 
 ### Role usage reference
@@ -424,7 +427,8 @@ ACCOUNTADMIN
 | `AIRBYTE_ROLE` | CDC ingestion, owns `AD_AIRBYTE` database |
 | `TRANSFORMER_ROLE` | dbt transformation, owns `AD_ANALYTICS` SILVER/GOLD schemas |
 | `POWERBI_ROLE` | Power BI read-only access, SELECT on `AD_ANALYTICS.GOLD` |
-| `STREAMLIT_ROLE` | Streamlit dashboard read-only access, SELECT on `AD_ANALYTICS.GOLD` |
+| `STREAMLIT_ROLE` | Owns Streamlit apps, SELECT on `AD_ANALYTICS.GOLD`, CREATE STREAMLIT |
+| `DASHBOARD_VIEWER` | Views Streamlit apps via SSO, USAGE on Streamlit objects only |
 
 ### Future considerations
 
@@ -540,35 +544,45 @@ SELECT CURRENT_ROLE(), CURRENT_WAREHOUSE(), CURRENT_DATABASE();
 
 ---
 
-## 12. Streamlit app access (read-only)
+## 12. Streamlit in Snowflake (native deployment)
 
-STREAMLIT_ROLE provides read-only SELECT access to `AD_ANALYTICS.GOLD` for the Streamlit dashboard app. Uses key-pair authentication (same pattern as SVC_DBT) since Streamlit is a Python app with full snowflake-connector-python support.
+The Streamlit dashboard runs natively inside Snowflake (SiS). No external hosting, no service accounts — the app is a Snowflake object owned by STREAMLIT_ROLE. Users access it via SSO with their company email.
 
-### 12.1 Create role
+**How it works:**
+- App runs under **owner's rights** — SQL queries execute with STREAMLIT_ROLE's privileges (SELECT on Gold)
+- Viewers only need USAGE on the Streamlit object — they don't need direct table access
+- Snowflake handles authentication, scaling, and lifecycle
+
+### 12.1 Create roles
 
 ```sql
 USE ROLE SECURITYADMIN;
 
+-- App owner role (creates and owns Streamlit apps)
 CREATE ROLE IF NOT EXISTS STREAMLIT_ROLE
-    COMMENT = 'Read-only role for Streamlit dashboards - SELECT on AD_ANALYTICS.GOLD only';
+    COMMENT = 'Owns Streamlit apps - SELECT on AD_ANALYTICS.GOLD + CREATE STREAMLIT';
+
+-- Viewer role (end users who view dashboards via SSO)
+CREATE ROLE IF NOT EXISTS DASHBOARD_VIEWER
+    COMMENT = 'Views Streamlit dashboards - USAGE on Streamlit objects only';
 
 -- Maintain role hierarchy
 GRANT ROLE STREAMLIT_ROLE TO ROLE SYSADMIN;
+GRANT ROLE DASHBOARD_VIEWER TO ROLE SYSADMIN;
 ```
 
 ### 12.2 Grant warehouse access
 
-Streamlit shares `ETL_WH` with other services. Cost attribution via `QUERY_TAG = 'streamlit-dashboard'`.
+Both roles share `ETL_WH`. Streamlit warehouse runtime spins up per-viewer instances that auto-suspend when idle.
 
 ```sql
 USE ROLE SYSADMIN;
 
 GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE STREAMLIT_ROLE;
+GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE DASHBOARD_VIEWER;
 ```
 
-### 12.3 Grant read-only access to Gold schema
-
-Same pattern as POWERBI_ROLE — SELECT only on `AD_ANALYTICS.GOLD`.
+### 12.3 Grant STREAMLIT_ROLE data access + app creation
 
 ```sql
 USE ROLE SYSADMIN;
@@ -577,78 +591,231 @@ USE ROLE SYSADMIN;
 GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE STREAMLIT_ROLE;
 GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
 
--- Current objects
+-- Read-only on Gold (same as POWERBI_ROLE)
 GRANT SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
 GRANT SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
-
--- Future objects (auto-grant when dbt creates new Gold models)
 GRANT SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
 GRANT SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+
+-- Streamlit app creation privileges
+GRANT CREATE STREAMLIT ON SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+GRANT CREATE STAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
 ```
 
-### 12.4 Create service account with key-pair auth
+### 12.4 Grant DASHBOARD_VIEWER access to Streamlit apps
+
+Viewers need USAGE on the database, schema, and Streamlit object — but NOT on the underlying tables.
 
 ```sql
-USE ROLE SECURITYADMIN;
+USE ROLE SYSADMIN;
 
-CREATE USER IF NOT EXISTS SVC_STREAMLIT
-    TYPE = SERVICE
-    DEFAULT_ROLE = STREAMLIT_ROLE
-    DEFAULT_WAREHOUSE = ETL_WH
-    DEFAULT_NAMESPACE = AD_ANALYTICS.GOLD
-    COMMENT = 'Streamlit dashboard service account - read-only access to Gold schema';
+-- Database and schema navigation (required to reach the Streamlit object)
+GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE DASHBOARD_VIEWER;
+GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER;
 
-GRANT ROLE STREAMLIT_ROLE TO USER SVC_STREAMLIT;
-ALTER USER SVC_STREAMLIT SET QUERY_TAG = 'streamlit-dashboard';
+-- Access to all current and future Streamlit apps
+GRANT USAGE ON ALL STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER;
+GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER;
 ```
 
-### 12.5 Generate and assign RSA key-pair
+### 12.5 Enable viewer identity (READ SESSION)
 
-```bash
-# Generate private key (encrypted with passphrase)
-openssl genrsa 2048 | openssl pkcs8 -topk8 -v2 aes-256-cbc -inform PEM -out streamlit_rsa_key.p8
-
-# Extract public key
-openssl rsa -in streamlit_rsa_key.p8 -pubout -out streamlit_rsa_key.pub
-
-# Get the key body (strip headers) for Snowflake
-grep -v "BEGIN\|END" streamlit_rsa_key.pub | tr -d '\n'
-```
+This allows the app to identify who is viewing it via `CURRENT_USER()`, enabling audit logging and (future) row-level security.
 
 ```sql
-USE ROLE SECURITYADMIN;
+USE ROLE ACCOUNTADMIN;
 
-ALTER USER SVC_STREAMLIT SET RSA_PUBLIC_KEY = '<paste-public-key-body-here>';
+GRANT READ SESSION ON ACCOUNT TO ROLE STREAMLIT_ROLE;
 ```
 
-### 12.6 Validate
+### 12.6 Create internal stage for app files
 
 ```sql
 USE ROLE STREAMLIT_ROLE;
 USE WAREHOUSE ETL_WH;
 
-SHOW TABLES IN SCHEMA AD_ANALYTICS.GOLD;
-SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
-
--- Verify no access to source schemas
-SHOW TABLES IN SCHEMA AD_AIRBYTE.AD_FISHBOWL;
--- Expected: error (no USAGE on AD_AIRBYTE)
+CREATE STAGE IF NOT EXISTS AD_ANALYTICS.GOLD.STREAMLIT_STAGE
+    DIRECTORY = (ENABLE = TRUE)
+    COMMENT = 'Stage for Streamlit app source files';
 ```
 
-### 12.7 Streamlit connection details
+### 12.7 Upload and deploy the app
 
-| Parameter | Value |
-|---|---|
-| Account | `iwb48385.us-east-1` |
-| Warehouse | `ETL_WH` |
-| Database | `AD_ANALYTICS` |
-| Schema | `GOLD` |
-| Role | `STREAMLIT_ROLE` |
-| User | `SVC_STREAMLIT` |
-| Auth | RSA key-pair (`streamlit_rsa_key.p8`) |
-| Query Tag | `streamlit-dashboard` |
+Upload files using Snowflake CLI (`snow`) or `PUT`:
 
-Store the private key file and passphrase in the Streamlit app's environment (`.env` or `.streamlit/secrets.toml`). Never commit private keys to git.
+```bash
+# Option A: Snowflake CLI (recommended)
+snow streamlit deploy \
+  --database AD_ANALYTICS \
+  --schema GOLD \
+  --query-warehouse ETL_WH \
+  --replace
+
+# Option B: Manual PUT + CREATE STREAMLIT
+# Upload files to stage
+snow stage copy streamlit_app.py @AD_ANALYTICS.GOLD.STREAMLIT_STAGE/app/ --overwrite
+snow stage copy pages/ @AD_ANALYTICS.GOLD.STREAMLIT_STAGE/app/pages/ --overwrite
+snow stage copy utils/ @AD_ANALYTICS.GOLD.STREAMLIT_STAGE/app/utils/ --overwrite
+snow stage copy environment.yml @AD_ANALYTICS.GOLD.STREAMLIT_STAGE/app/ --overwrite
+```
+
+```sql
+-- Create the Streamlit app object
+USE ROLE STREAMLIT_ROLE;
+
+CREATE OR REPLACE STREAMLIT AD_ANALYTICS.GOLD.AMMODEPOT_DASHBOARD
+    FROM '@AD_ANALYTICS.GOLD.STREAMLIT_STAGE/app/'
+    MAIN_FILE = 'streamlit_app.py'
+    QUERY_WAREHOUSE = 'ETL_WH'
+    TITLE = 'Ammunition Depot Analytics';
+
+-- Activate the live version
+ALTER STREAMLIT AD_ANALYTICS.GOLD.AMMODEPOT_DASHBOARD ADD LIVE VERSION FROM LAST;
+```
+
+### 12.8 Validate
+
+```sql
+-- As STREAMLIT_ROLE: verify app exists
+USE ROLE STREAMLIT_ROLE;
+SHOW STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD;
+
+-- As DASHBOARD_VIEWER: verify access
+USE ROLE DASHBOARD_VIEWER;
+SHOW STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD;
+-- Should see AMMODEPOT_DASHBOARD
+
+-- Verify viewers cannot access tables directly
+USE ROLE DASHBOARD_VIEWER;
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
+-- Expected: error (no SELECT privilege — data is only accessible through the app)
+```
+
+### 12.9 App file structure
+
+```
+streamlit_app/
+├── streamlit_app.py          # Entrypoint (renamed from app.py for SiS convention)
+├── pages/
+│   ├── today_yesterday.py
+│   ├── sales_overview.py
+│   └── inventory.py
+├── utils/
+│   ├── __init__.py
+│   └── db.py                 # Dual-mode: get_active_session() in SiS, connector for local dev
+└── environment.yml           # Warehouse runtime dependencies (Snowflake Anaconda channel)
+```
+
+```yaml
+# environment.yml
+name: sf_env
+channels:
+  - snowflake
+dependencies:
+  - plotly
+  - pandas
+```
+
+---
+
+## 13. SSO setup (company email authentication)
+
+Snowflake supports SAML 2.0 federated authentication with identity providers (IdP). This allows team members to log into Snowflake — and access the Streamlit dashboard — using their company email.
+
+### 13.1 Choose your identity provider
+
+| Provider | Setup complexity | Notes |
+|---|---|---|
+| **Google Workspace** | Medium | Create custom SAML app in Admin Console |
+| **Microsoft Entra ID** (Azure AD) | Low | Native Snowflake integration in gallery |
+| **Okta** | Low | Native Snowflake integration |
+| **Any SAML 2.0 IdP** | Medium | Custom configuration |
+
+### 13.2 Create SAML 2.0 security integration
+
+Replace the placeholder values with your IdP's actual SAML metadata.
+
+```sql
+USE ROLE ACCOUNTADMIN;
+
+CREATE SECURITY INTEGRATION IF NOT EXISTS AMMODEPOT_SSO
+    TYPE = SAML2
+    ENABLED = TRUE
+    SAML2_ISSUER = '<your-idp-issuer-url>'
+    SAML2_SSO_URL = '<your-idp-sso-url>'
+    SAML2_PROVIDER = 'CUSTOM'
+    SAML2_X509_CERT = '<base64-encoded-idp-certificate>'
+    SAML2_SNOWFLAKE_ISSUER_URL = 'https://iwb48385.us-east-1.snowflakecomputing.com'
+    SAML2_SNOWFLAKE_ACS_URL = 'https://iwb48385.us-east-1.snowflakecomputing.com/fed/login'
+    SAML2_ENABLE_SP_INITIATED = TRUE
+    SAML2_SP_INITIATED_LOGIN_PAGE_LABEL = 'AmmoDepot SSO'
+    ALLOWED_USER_DOMAINS = ('ammodepot.com');
+```
+
+**IdP-specific guides:**
+- **Google Workspace**: Admin Console > Apps > Web and mobile apps > Add app > Search "Snowflake"
+- **Microsoft Entra ID**: Azure Portal > Enterprise Applications > New > Search "Snowflake"
+- **Okta**: Applications > Add Application > Search "Snowflake"
+
+### 13.3 Create SSO users
+
+Each team member who needs dashboard access gets a Snowflake user mapped to their company email. The `TYPE = PERSON` allows interactive login.
+
+```sql
+USE ROLE SECURITYADMIN;
+
+-- Example: create a dashboard viewer user
+CREATE USER IF NOT EXISTS john_doe
+    LOGIN_NAME = 'john.doe@ammodepot.com'
+    DISPLAY_NAME = 'John Doe'
+    EMAIL = 'john.doe@ammodepot.com'
+    DEFAULT_ROLE = DASHBOARD_VIEWER
+    DEFAULT_WAREHOUSE = ETL_WH
+    MUST_CHANGE_PASSWORD = FALSE
+    COMMENT = 'Dashboard viewer - SSO via company email';
+
+GRANT ROLE DASHBOARD_VIEWER TO USER john_doe;
+```
+
+**To add multiple users**, repeat the CREATE USER + GRANT ROLE pattern for each team member. Only the `LOGIN_NAME` and `EMAIL` need to match the IdP's SAML assertion.
+
+### 13.4 Validate SSO login
+
+1. Navigate to `https://iwb48385.us-east-1.snowflakecomputing.com`
+2. Click "AmmoDepot SSO" on the login page
+3. Authenticate with company email via your IdP
+4. After login, navigate to **Projects > Streamlit > AMMODEPOT_DASHBOARD**
+
+```sql
+-- Verify SSO integration is active
+USE ROLE ACCOUNTADMIN;
+DESCRIBE SECURITY INTEGRATION AMMODEPOT_SSO;
+
+-- Check user's federated login status
+DESCRIBE USER john_doe;
+-- Look for HAS_SAML_IDENTITY = TRUE
+```
+
+### 13.5 SSO + Streamlit access flow
+
+```text
+User (company email)
+  │
+  ▼
+Identity Provider (Google/Azure AD/Okta)
+  │ SAML 2.0 assertion
+  ▼
+Snowflake Login (AMMODEPOT_SSO integration)
+  │ Authenticated as john.doe@ammodepot.com
+  ▼
+DASHBOARD_VIEWER role (default)
+  │ USAGE on AMMODEPOT_DASHBOARD
+  ▼
+Streamlit App (runs as STREAMLIT_ROLE — owner's rights)
+  │ SELECT on AD_ANALYTICS.GOLD
+  ▼
+Dashboard data (F_SALES, D_PRODUCT, etc.)
+```
 
 ---
 
