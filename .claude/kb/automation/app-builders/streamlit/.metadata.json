@@ -1,0 +1,28 @@
+{
+  "technology": "Streamlit",
+  "category": "automation",
+  "subcategory": "app-builders",
+  "version": "1.54.x",
+  "last_updated": "2026-03-03",
+  "primary_use_cases": [
+    "Interactive data dashboards",
+    "ML model demos and prototypes",
+    "Internal data tools",
+    "LLM chat interfaces",
+    "Data exploration and visualization",
+    "Form-based data entry apps",
+    "Real-time monitoring dashboards"
+  ],
+  "related_technologies": [
+    "Snowflake",
+    "Pandas",
+    "Plotly",
+    "Altair",
+    "SQLAlchemy",
+    "OpenAI",
+    "Docker",
+    "Pydantic"
+  ],
+  "expertise_level": "beginner",
+  "external_docs": "https://docs.streamlit.io/"
+}

@@ -286,6 +286,11 @@ select
     l.telephone                             as TELEPHONE,
     l.customer_name                         as CUSTOMER_NAME,
     l.store_id                              as STORE_ID,
+    case
+        when l.increment_id like '{{ var("ammodepot_gunbroker_order_prefix") }}%'
+        then '{{ var("ammodepot_gunbroker_store_name") }}'
+        else '{{ var("ammodepot_default_store_name") }}'
+    end                                     as STOREFRONT,
     l.status                                as STATUS,
     l.row_total                             as ROW_TOTAL,
     coalesce(l.cost, fcf.cost * l.qty_ordered) as COST,
