@@ -375,6 +375,17 @@ ALTER USER <SVC_AIRBYTE or SVC_DBT> UNSET RSA_PUBLIC_KEY_2;
 | Access | SELECT on `AD_ANALYTICS.GOLD` (tables and views, current and future) |
 | Query Tag | `powerbi-dataflow-refresh` |
 
+### Streamlit (dashboards)
+
+| Component | Value |
+|---|---|
+| User | `SVC_STREAMLIT` |
+| Auth | RSA key-pair (`streamlit_rsa_key.p8`) |
+| Role | `STREAMLIT_ROLE` |
+| Warehouse | `ETL_WH` (shared, XSMALL, auto-suspend 120s) |
+| Access | SELECT on `AD_ANALYTICS.GOLD` (tables and views, current and future) |
+| Query Tag | `streamlit-dashboard` |
+
 ### Why OWNERSHIP instead of individual GRANTs
 
 Airbyte internally uses stages, file formats, and temp tables for bulk loading (COPY INTO). These require OWNERSHIP-level privileges. Individual `GRANT ALL` on schemas is not sufficient and syncs will fail.
@@ -397,8 +408,10 @@ ACCOUNTADMIN
     │   └── SVC_AIRBYTE   → Airbyte CDC ingestion (key-pair auth)
     ├── TRANSFORMER_ROLE  → OWNERSHIP on AD_ANALYTICS SILVER/GOLD, SELECT on AD_AIRBYTE
     │   └── SVC_DBT       → dbt transformation (key-pair auth)
-    └── POWERBI_ROLE      → SELECT on AD_ANALYTICS.GOLD (read-only)
-        └── SVC_POWERBI   → Power BI dataflows (password auth)
+    ├── POWERBI_ROLE      → SELECT on AD_ANALYTICS.GOLD (read-only)
+    │   └── SVC_POWERBI   → Power BI dataflows (password auth)
+    └── STREAMLIT_ROLE    → SELECT on AD_ANALYTICS.GOLD (read-only)
+        └── SVC_STREAMLIT → Streamlit dashboards (key-pair auth)
 ```
 
 ### Role usage reference
@@ -411,6 +424,7 @@ ACCOUNTADMIN
 | `AIRBYTE_ROLE` | CDC ingestion, owns `AD_AIRBYTE` database |
 | `TRANSFORMER_ROLE` | dbt transformation, owns `AD_ANALYTICS` SILVER/GOLD schemas |
 | `POWERBI_ROLE` | Power BI read-only access, SELECT on `AD_ANALYTICS.GOLD` |
+| `STREAMLIT_ROLE` | Streamlit dashboard read-only access, SELECT on `AD_ANALYTICS.GOLD` |
 
 ### Future considerations
 
@@ -523,6 +537,118 @@ SELECT CURRENT_ROLE(), CURRENT_WAREHOUSE(), CURRENT_DATABASE();
 | Auth | Username/Password |
 
 > See [POWERBI_MIGRATION_PLAN.md](POWERBI_MIGRATION_PLAN.md) for the full dataflow migration plan.
+
+---
+
+## 12. Streamlit app access (read-only)
+
+STREAMLIT_ROLE provides read-only SELECT access to `AD_ANALYTICS.GOLD` for the Streamlit dashboard app. Uses key-pair authentication (same pattern as SVC_DBT) since Streamlit is a Python app with full snowflake-connector-python support.
+
+### 12.1 Create role
+
+```sql
+USE ROLE SECURITYADMIN;
+
+CREATE ROLE IF NOT EXISTS STREAMLIT_ROLE
+    COMMENT = 'Read-only role for Streamlit dashboards - SELECT on AD_ANALYTICS.GOLD only';
+
+-- Maintain role hierarchy
+GRANT ROLE STREAMLIT_ROLE TO ROLE SYSADMIN;
+```
+
+### 12.2 Grant warehouse access
+
+Streamlit shares `ETL_WH` with other services. Cost attribution via `QUERY_TAG = 'streamlit-dashboard'`.
+
+```sql
+USE ROLE SYSADMIN;
+
+GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE STREAMLIT_ROLE;
+```
+
+### 12.3 Grant read-only access to Gold schema
+
+Same pattern as POWERBI_ROLE — SELECT only on `AD_ANALYTICS.GOLD`.
+
+```sql
+USE ROLE SYSADMIN;
+
+-- Database and schema access
+GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE STREAMLIT_ROLE;
+GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+
+-- Current objects
+GRANT SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+
+-- Future objects (auto-grant when dbt creates new Gold models)
+GRANT SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
+```
+
+### 12.4 Create service account with key-pair auth
+
+```sql
+USE ROLE SECURITYADMIN;
+
+CREATE USER IF NOT EXISTS SVC_STREAMLIT
+    TYPE = SERVICE
+    DEFAULT_ROLE = STREAMLIT_ROLE
+    DEFAULT_WAREHOUSE = ETL_WH
+    DEFAULT_NAMESPACE = AD_ANALYTICS.GOLD
+    COMMENT = 'Streamlit dashboard service account - read-only access to Gold schema';
+
+GRANT ROLE STREAMLIT_ROLE TO USER SVC_STREAMLIT;
+ALTER USER SVC_STREAMLIT SET QUERY_TAG = 'streamlit-dashboard';
+```
+
+### 12.5 Generate and assign RSA key-pair
+
+```bash
+# Generate private key (encrypted with passphrase)
+openssl genrsa 2048 | openssl pkcs8 -topk8 -v2 aes-256-cbc -inform PEM -out streamlit_rsa_key.p8
+
+# Extract public key
+openssl rsa -in streamlit_rsa_key.p8 -pubout -out streamlit_rsa_key.pub
+
+# Get the key body (strip headers) for Snowflake
+grep -v "BEGIN\|END" streamlit_rsa_key.pub | tr -d '\n'
+```
+
+```sql
+USE ROLE SECURITYADMIN;
+
+ALTER USER SVC_STREAMLIT SET RSA_PUBLIC_KEY = '<paste-public-key-body-here>';
+```
+
+### 12.6 Validate
+
+```sql
+USE ROLE STREAMLIT_ROLE;
+USE WAREHOUSE ETL_WH;
+
+SHOW TABLES IN SCHEMA AD_ANALYTICS.GOLD;
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
+
+-- Verify no access to source schemas
+SHOW TABLES IN SCHEMA AD_AIRBYTE.AD_FISHBOWL;
+-- Expected: error (no USAGE on AD_AIRBYTE)
+```
+
+### 12.7 Streamlit connection details
+
+| Parameter | Value |
+|---|---|
+| Account | `iwb48385.us-east-1` |
+| Warehouse | `ETL_WH` |
+| Database | `AD_ANALYTICS` |
+| Schema | `GOLD` |
+| Role | `STREAMLIT_ROLE` |
+| User | `SVC_STREAMLIT` |
+| Auth | RSA key-pair (`streamlit_rsa_key.p8`) |
+| Query Tag | `streamlit-dashboard` |
+
+Store the private key file and passphrase in the Streamlit app's environment (`.env` or `.streamlit/secrets.toml`). Never commit private keys to git.
 
 ---
 

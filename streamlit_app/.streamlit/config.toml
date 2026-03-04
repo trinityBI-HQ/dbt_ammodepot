@@ -1,0 +1,9 @@
+[server]
+headless = true
+
+[theme]
+base = "dark"
+primaryColor = "#00d4aa"
+
+[browser]
+gatherUsageStats = false
