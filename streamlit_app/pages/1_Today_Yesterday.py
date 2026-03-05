@@ -10,7 +10,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
-from utils.db import run_query
+from utils.db import run_query, debug_dataframe
+
+# --- Clear stale cache (TEMPORARY — remove after debugging) ---
+st.cache_data.clear()
 
 # --- Page config ---
 st.title("SALES OVERVIEW: TODAY / YESTERDAY")
@@ -149,6 +152,18 @@ statuses = tuple(order_status) if order_status else ("complete",)
 df_target = load_sales(target_date, statuses)
 df_compare = load_sales(compare_date, statuses)
 df_last_month = load_last_month_sales(statuses)
+
+# --- DEBUG: Remove after verifying SiS dtype fix ---
+debug_dataframe(df_target, f"df_target ({target_date})")
+if not df_target.empty:
+    with st.expander("DEBUG: groupby test", expanded=False):
+        hourly_sum = df_target.groupby("HOUR_NUM")["NET_SALES"].sum()
+        st.write(f"KPI total: {df_target['NET_SALES'].sum()}")
+        st.write(f"Groupby hourly total: {hourly_sum.sum()}")
+        st.write(f"HOUR_NUM dtype: {df_target['HOUR_NUM'].dtype}")
+        st.write(f"NET_SALES dtype: {df_target['NET_SALES'].dtype}")
+        st.dataframe(hourly_sum.reset_index())
+# --- END DEBUG ---
 
 # --- Storefront filter (always show Website + GunBroker) ---
 STOREFRONTS = ["Website", "GunBroker"]
