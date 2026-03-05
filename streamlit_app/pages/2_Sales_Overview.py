@@ -15,6 +15,19 @@ from utils.db import run_query
 # --- Page config ---
 st.title("SALES OVERVIEW")
 
+# Statuses to exclude by default (matches Power BI default filter)
+EXCLUDED_STATUSES = {"CLOSED", "HOLDED", "CANCELED", "FRAUD"}
+
+
+@st.cache_data(ttl=3600)
+def load_order_statuses() -> list:
+    df = run_query("select distinct upper(STATUS) as STATUS from F_SALES order by STATUS")
+    return df["STATUS"].tolist() if not df.empty else []
+
+
+all_statuses = load_order_statuses()
+default_statuses = [s for s in all_statuses if s not in EXCLUDED_STATUSES]
+
 # --- Category pages (mirrors Power BI 9-page structure) ---
 CATEGORIES = [
     "General",
@@ -70,7 +83,6 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
           and f.STATUS in ({status_list})
-          and f.STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
     """
     return run_query(sql)
 
@@ -84,8 +96,8 @@ with filter_cols[1]:
 with filter_cols[2]:
     order_status = st.multiselect(
         "Order Status",
-        ["COMPLETE", "PROCESSING"],
-        default=["COMPLETE", "PROCESSING"],
+        all_statuses,
+        default=default_statuses,
     )
 with filter_cols[3]:
     metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
@@ -145,13 +157,8 @@ if selected_storefronts and not df_target.empty:
     df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
     df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
 
-# --- Store filter (customer-facing stores only, matching Power BI 5-store bar) ---
-EXCLUDED_STORES = {"Admin", "Marketing Promotions Store View"}
-if not store_df.empty:
-    customer_stores = store_df[~store_df["NAME"].isin(EXCLUDED_STORES)].copy()
-else:
-    customer_stores = store_df
-store_names = customer_stores["NAME"].tolist() if not customer_stores.empty else []
+# --- Store filter (all stores, matching Power BI) ---
+store_names = store_df["NAME"].tolist() if not store_df.empty else []
 if store_names:
     store_cols = st.columns(len(store_names) + 1)
     with store_cols[0]:
@@ -160,7 +167,7 @@ if store_names:
     for i, name in enumerate(store_names):
         with store_cols[i + 1]:
             if st.checkbox(name, value=True, key=f"so_store_{name}"):
-                sid = customer_stores[customer_stores["NAME"] == name]["STORE_ID"].values[0]
+                sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
                 selected_store_ids.append(sid)
 
     if selected_store_ids and not df_target.empty:
@@ -235,16 +242,19 @@ with kpi_cols[0]:
     st.metric("Net Sales ($)", f"${kpi['net_sales']:,.0f}", pct_delta(kpi["net_sales"], kpi_prev["net_sales"]))
     st.caption(f"Avg Ticket: ${avg_ticket:,.2f}")
 with kpi_cols[1]:
-    st.metric("Gross Profit ($)", f"${kpi['gross_profit']:,.0f}", pct_delta(kpi["gross_profit"], kpi_prev["gross_profit"]))
+    gp_delta = pct_delta(kpi["gross_profit"], kpi_prev["gross_profit"])
+    st.metric("Gross Profit ($)", f"${kpi['gross_profit']:,.0f}", gp_delta)
     st.caption(f"Margin: {margin:.1f}%")
 with kpi_cols[2]:
     st.metric("Orders", f"{kpi['orders']:,}", pct_delta(kpi["orders"], kpi_prev["orders"]))
 with kpi_cols[3]:
-    st.metric("Shipping Revenue ($)", f"${kpi['freight_rev']:,.0f}", pct_delta(kpi["freight_rev"], kpi_prev["freight_rev"]))
+    fr_delta = pct_delta(kpi["freight_rev"], kpi_prev["freight_rev"])
+    st.metric("Shipping Revenue ($)", f"${kpi['freight_rev']:,.0f}", fr_delta)
     shipping_ns_pct = (kpi["freight_rev"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
     st.caption(f"Shipping/NS: {shipping_ns_pct:.1f}%")
 with kpi_cols[4]:
-    st.metric("GP After Variable Cost", f"${kpi['gp_after_var']:,.0f}", pct_delta(kpi["gp_after_var"], kpi_prev["gp_after_var"]))
+    gpa_delta = pct_delta(kpi["gp_after_var"], kpi_prev["gp_after_var"])
+    st.metric("GP After Variable Cost", f"${kpi['gp_after_var']:,.0f}", gpa_delta)
     contrib_margin = (kpi["gp_after_var"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
     st.caption(f"Contribution Margin: {contrib_margin:.1f}%")
 
@@ -254,10 +264,13 @@ st.divider()
 chart_cols = st.columns([3, 3, 3, 3])
 
 # Helper: compute GP column and aggregate by metric
+
+
 def _add_gp(df):
     df = df.copy()
     df["GP"] = df["NET_SALES"] - df["COST"]
     return df
+
 
 def _agg_metric(df, group_col, metric):
     if df.empty:
@@ -273,6 +286,7 @@ def _agg_metric(df, group_col, metric):
     r.columns = [group_col, "VALUE"]
     return r.sort_values("VALUE", ascending=False)
 
+
 # Helper: aggregate by time bucket (Series-based groupby)
 def _agg_time_metric(df, time_series, metric):
     if df.empty:
@@ -287,6 +301,7 @@ def _agg_time_metric(df, time_series, metric):
         r = df.groupby(time_series)[col].sum()
     return r.reset_index().set_axis(["BUCKET", "VALUE"], axis=1)
 
+
 # Hourly/Daily chart — metric-aware
 with chart_cols[0]:
     if period == "TODAY":
@@ -294,11 +309,22 @@ with chart_cols[0]:
         if not df_target.empty:
             hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=hourly_target["BUCKET"], y=hourly_target["VALUE"], name="Today", marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(
+                x=hourly_target["BUCKET"], y=hourly_target["VALUE"],
+                name="Today", marker_color="#00d4aa",
+            ))
             if not df_compare.empty:
-                hourly_compare = _agg_time_metric(df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle)
-                fig.add_trace(go.Scatter(x=hourly_compare["BUCKET"], y=hourly_compare["VALUE"], name="Yesterday", line=dict(color="gray", dash="dash")))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
+                hourly_compare = _agg_time_metric(
+                    df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle,
+                )
+                fig.add_trace(go.Scatter(
+                    x=hourly_compare["BUCKET"], y=hourly_compare["VALUE"],
+                    name="Yesterday", line=dict(color="gray", dash="dash"),
+                ))
+            fig.update_layout(
+                height=300, margin=dict(l=0, r=0, t=10, b=0),
+                showlegend=True, legend=dict(orientation="h"),
+            )
             fig.update_xaxes(title="Hour", dtick=2)
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
@@ -309,8 +335,14 @@ with chart_cols[0]:
         if not df_target.empty:
             daily_target = _agg_time_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=daily_target["BUCKET"], y=daily_target["VALUE"], name=period_label, marker_color="#00d4aa"))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
+            fig.add_trace(go.Bar(
+                x=daily_target["BUCKET"], y=daily_target["VALUE"],
+                name=period_label, marker_color="#00d4aa",
+            ))
+            fig.update_layout(
+                height=300, margin=dict(l=0, r=0, t=10, b=0),
+                showlegend=True, legend=dict(orientation="h"),
+            )
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -335,7 +367,10 @@ with chart_cols[1]:
         if not df_target.empty:
             gp_agg = _agg_metric(df_target, "GENERAL_PURPOSE", metric_toggle).head(8)
             if not gp_agg.empty:
-                fig = px.bar(gp_agg, x="VALUE", y="GENERAL_PURPOSE", orientation="h", color_discrete_sequence=["#00d4aa"])
+                fig = px.bar(
+                    gp_agg, x="VALUE", y="GENERAL_PURPOSE",
+                    orientation="h", color_discrete_sequence=["#00d4aa"],
+                )
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -450,4 +485,7 @@ st.divider()
 if not df_target.empty:
     last_order_time = df_target["CREATED_AT"].max()
     row_count = len(df_target)
-    st.caption(f"Last Order: {last_order_time} | {row_count:,} line items | {period_label} vs {compare_label} | Data cached for 5 minutes")
+    st.caption(
+        f"Last Order: {last_order_time} | {row_count:,} line items"
+        f" | {period_label} vs {compare_label} | Data cached 5 min"
+    )

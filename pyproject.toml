@@ -7,6 +7,7 @@ dependencies = [
     "dbt-redshift>=1.10.1",
     "dbt-snowflake>=1.11.2",
     "openpyxl>=3.1.5",
+    "pgeocode>=0.5.0",
     "plotly>=6.6.0",
     "python-dotenv>=1.2.1",
     "snowflake-connector-python>=4.3.0",
