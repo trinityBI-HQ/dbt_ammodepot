@@ -88,10 +88,30 @@ def _convert_timestamp_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert Decimal/object numeric columns to native float/int.
+
+    Snowpark to_pandas() can return NUMBER columns as Python Decimal objects
+    (object dtype). Plotly and groupby aggregations need native numeric types.
+    """
+    for col in df.columns:
+        if df[col].dtype == "object" and len(df) > 0:
+            sample = df[col].dropna().head(5)
+            if len(sample) > 0:
+                try:
+                    converted = pd.to_numeric(sample)
+                    if converted.dtype in ("int64", "float64"):
+                        df[col] = pd.to_numeric(df[col], errors="coerce")
+                except (ValueError, TypeError):
+                    pass
+    return df
+
+
 def run_query(sql: str, params: dict | None = None) -> pd.DataFrame:
     """Execute a query and return a pandas DataFrame."""
     if _is_sis:
         df = _session.sql(sql).to_pandas()
+        df = _coerce_numeric_columns(df)
         return _convert_timestamp_columns(df)
 
     conn = get_connection()
