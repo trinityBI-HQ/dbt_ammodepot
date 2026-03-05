@@ -93,17 +93,15 @@ def _coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     Snowpark to_pandas() can return NUMBER columns as Python Decimal objects
     (object dtype). Plotly and groupby aggregations need native numeric types.
+    pd.to_numeric() cannot convert Decimal objects, so we detect them by type.
     """
+    from decimal import Decimal
+
     for col in df.columns:
         if df[col].dtype == "object" and len(df) > 0:
-            sample = df[col].dropna().head(5)
-            if len(sample) > 0:
-                try:
-                    converted = pd.to_numeric(sample)
-                    if converted.dtype in ("int64", "float64"):
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
-                except (ValueError, TypeError):
-                    pass
+            first = df[col].dropna().iloc[0] if df[col].notna().any() else None
+            if isinstance(first, Decimal):
+                df[col] = df[col].astype(float)
     return df
 
 
