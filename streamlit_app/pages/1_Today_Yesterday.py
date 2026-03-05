@@ -28,6 +28,15 @@ with filter_cols[1]:
 with filter_cols[2]:
     metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
 
+# Metric mapping: toggle value → (column, format, label)
+METRIC_MAP = {
+    "$": ("NET_SALES", "${:,.0f}", "Sales ($)"),
+    "GP ($)": ("GP", "${:,.0f}", "Gross Profit ($)"),
+    "Orders": ("ORDERS", "{:,.0f}", "Orders"),
+    "Units": ("UNITS", "{:,.0f}", "Units"),
+}
+metric_col, metric_fmt, metric_label = METRIC_MAP[metric_toggle]
+
 # --- Date logic ---
 today = date.today()
 if period == "TODAY":
@@ -79,16 +88,19 @@ statuses = tuple(order_status) if order_status else ("complete",)
 df_target = load_sales(target_date, statuses)
 df_compare = load_sales(compare_date, statuses)
 
-# --- Storefront filter (only show when 2+ storefronts exist) ---
-if not df_target.empty:
-    available_storefronts = sorted(df_target["STOREFRONT"].unique().tolist())
-    if len(available_storefronts) > 1:
-        selected_storefronts = st.multiselect(
-            "Storefront", available_storefronts, default=available_storefronts, key="ty_storefront"
-        )
-        if selected_storefronts:
-            df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
-            df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
+# --- Storefront filter (always show Website + GunBroker) ---
+STOREFRONTS = ["Website", "GunBroker"]
+sf_cols = st.columns(len(STOREFRONTS) + 1)
+with sf_cols[0]:
+    st.caption("STOREFRONT")
+selected_storefronts = []
+for i, sf in enumerate(STOREFRONTS):
+    with sf_cols[i + 1]:
+        if st.checkbox(sf, value=True, key=f"ty_sf_{sf}"):
+            selected_storefronts.append(sf)
+if selected_storefronts and not df_target.empty:
+    df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
+    df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
 
 # --- Store filter (customer-facing stores only, matching Power BI 5-store bar) ---
 # Exclude Admin (store_id 0) and internal store views
@@ -167,18 +179,35 @@ st.divider()
 # --- Charts row ---
 chart_cols = st.columns([3, 3, 3, 3])
 
-# Hourly sales chart (today vs compare)
+# Hourly chart (today vs compare) — metric-aware
 with chart_cols[0]:
-    st.subheader("Sales ($) / Hourly")
+    st.subheader(f"{metric_label} / Hourly")
     if not df_target.empty:
-        hourly_target = df_target.groupby(df_target["HOUR_BUCKET"].dt.hour)["NET_SALES"].sum().reset_index()
-        hourly_target.columns = ["HOUR", "NET_SALES"]
+        # Compute GP per row for groupby
+        df_target["GP"] = df_target["NET_SALES"] - df_target["COST"]
+        df_compare["GP"] = df_compare["NET_SALES"] - df_compare["COST"] if not df_compare.empty else 0
+        if metric_toggle == "Orders":
+            hourly_target = df_target.groupby(df_target["HOUR_BUCKET"].dt.hour)["ORDER_ID"].nunique().reset_index()
+            hourly_target.columns = ["HOUR", "VALUE"]
+        elif metric_toggle == "Units":
+            hourly_target = df_target.groupby(df_target["HOUR_BUCKET"].dt.hour)["UNITS"].sum().reset_index()
+            hourly_target.columns = ["HOUR", "VALUE"]
+        else:
+            col = "GP" if metric_toggle == "GP ($)" else "NET_SALES"
+            hourly_target = df_target.groupby(df_target["HOUR_BUCKET"].dt.hour)[col].sum().reset_index()
+            hourly_target.columns = ["HOUR", "VALUE"]
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=hourly_target["HOUR"], y=hourly_target["NET_SALES"], name=period, marker_color="#00d4aa"))
+        fig.add_trace(go.Bar(x=hourly_target["HOUR"], y=hourly_target["VALUE"], name=period, marker_color="#00d4aa"))
         if not df_compare.empty:
-            hourly_compare = df_compare.groupby(df_compare["HOUR_BUCKET"].dt.hour)["NET_SALES"].sum().reset_index()
-            hourly_compare.columns = ["HOUR", "NET_SALES"]
-            fig.add_trace(go.Scatter(x=hourly_compare["HOUR"], y=hourly_compare["NET_SALES"], name="Previous", line=dict(color="gray", dash="dash")))
+            if metric_toggle == "Orders":
+                hourly_compare = df_compare.groupby(df_compare["HOUR_BUCKET"].dt.hour)["ORDER_ID"].nunique().reset_index()
+            elif metric_toggle == "Units":
+                hourly_compare = df_compare.groupby(df_compare["HOUR_BUCKET"].dt.hour)["UNITS"].sum().reset_index()
+            else:
+                col = "GP" if metric_toggle == "GP ($)" else "NET_SALES"
+                hourly_compare = df_compare.groupby(df_compare["HOUR_BUCKET"].dt.hour)[col].sum().reset_index()
+            hourly_compare.columns = ["HOUR", "VALUE"]
+            fig.add_trace(go.Scatter(x=hourly_compare["HOUR"], y=hourly_compare["VALUE"], name="Previous", line=dict(color="gray", dash="dash")))
         fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
         fig.update_xaxes(title="Hour", dtick=2)
         fig.update_yaxes(title="")
@@ -186,12 +215,34 @@ with chart_cols[0]:
     else:
         st.info("No data for this period.")
 
-# Sales by Category
+# Helper: aggregate by dimension using selected metric
+def agg_by_metric(df, group_col, metric):
+    if df.empty:
+        return pd.DataFrame()
+    df = df.copy()
+    df["GP"] = df["NET_SALES"] - df["COST"]
+    if metric == "Orders":
+        result = df.groupby(group_col)["ORDER_ID"].nunique().reset_index()
+        result.columns = [group_col, "VALUE"]
+    elif metric == "Units":
+        result = df.groupby(group_col)["UNITS"].sum().reset_index()
+        result.columns = [group_col, "VALUE"]
+    else:
+        col = "GP" if metric == "GP ($)" else "NET_SALES"
+        result = df.groupby(group_col)[col].sum().reset_index()
+        result.columns = [group_col, "VALUE"]
+    return result.sort_values("VALUE", ascending=False).head(8)
+
+# Category chart
 with chart_cols[1]:
-    st.subheader("Sales ($) / Category")
+    st.subheader(f"{metric_label} / Category")
     if not df_target.empty:
         cat_sql = f"""
-            select p."Attribute Set" as CATEGORY, sum(f.ROW_TOTAL) as NET_SALES
+            select p."Attribute Set" as CATEGORY,
+                   sum(f.ROW_TOTAL) as NET_SALES,
+                   sum(f.COST) as COST,
+                   count(distinct f.INCREMENT_ID) as ORDERS,
+                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED)) as UNITS
             from F_SALES f
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
             where f.CREATED_AT::date = '{target_date}'
@@ -203,7 +254,10 @@ with chart_cols[1]:
         """
         cat_df = run_query(cat_sql)
         if not cat_df.empty:
-            fig = px.bar(cat_df, x="NET_SALES", y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
+            cat_df["GP"] = cat_df["NET_SALES"] - cat_df["COST"]
+            val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
+            cat_df = cat_df.sort_values(val_col, ascending=False)
+            fig = px.bar(cat_df, x=val_col, y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
@@ -211,13 +265,13 @@ with chart_cols[1]:
     else:
         st.info("No data.")
 
-# Sales by Fulfilled By (vendor)
+# Fulfilled By chart
 with chart_cols[2]:
-    st.subheader("Sales ($) / Fulfilled By")
+    st.subheader(f"{metric_label} / Fulfilled By")
     if not df_target.empty:
-        vendor_df = df_target.groupby("VENDOR")["NET_SALES"].sum().sort_values(ascending=False).head(6).reset_index()
-        if not vendor_df.empty:
-            fig = px.bar(vendor_df, x="NET_SALES", y="VENDOR", orientation="h", color_discrete_sequence=["#00d4aa"])
+        vendor_agg = agg_by_metric(df_target, "VENDOR", metric_toggle).head(6)
+        if not vendor_agg.empty:
+            fig = px.bar(vendor_agg, x="VALUE", y="VENDOR", orientation="h", color_discrete_sequence=["#00d4aa"])
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
@@ -225,12 +279,16 @@ with chart_cols[2]:
     else:
         st.info("No data.")
 
-# Sales by Manufacturer (SKU prefix)
+# Manufacturer chart
 with chart_cols[3]:
-    st.subheader("Sales ($) / Manufacturer")
+    st.subheader(f"{metric_label} / Manufacturer")
     if not df_target.empty:
         mfr_sql = f"""
-            select p."Manufacturer" as MANUFACTURER, sum(f.ROW_TOTAL) as NET_SALES
+            select p."Manufacturer" as MANUFACTURER,
+                   sum(f.ROW_TOTAL) as NET_SALES,
+                   sum(f.COST) as COST,
+                   count(distinct f.INCREMENT_ID) as ORDERS,
+                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED)) as UNITS
             from F_SALES f
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
             where f.CREATED_AT::date = '{target_date}'
@@ -242,7 +300,10 @@ with chart_cols[3]:
         """
         mfr_df = run_query(mfr_sql)
         if not mfr_df.empty:
-            fig = px.bar(mfr_df, x="NET_SALES", y="MANUFACTURER", orientation="h", color_discrete_sequence=["#00d4aa"])
+            mfr_df["GP"] = mfr_df["NET_SALES"] - mfr_df["COST"]
+            val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
+            mfr_df = mfr_df.sort_values(val_col, ascending=False)
+            fig = px.bar(mfr_df, x=val_col, y="MANUFACTURER", orientation="h", color_discrete_sequence=["#00d4aa"])
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")

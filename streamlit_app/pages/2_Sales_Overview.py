@@ -90,6 +90,15 @@ with filter_cols[2]:
 with filter_cols[3]:
     metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
 
+# Metric mapping
+METRIC_MAP = {
+    "$": ("NET_SALES", "${:,.0f}", "Sales ($)"),
+    "GP ($)": ("GP", "${:,.0f}", "Gross Profit ($)"),
+    "Orders": ("ORDERS", "{:,.0f}", "Orders"),
+    "Units": ("UNITS", "{:,.0f}", "Units"),
+}
+metric_col, metric_fmt, metric_label = METRIC_MAP[metric_toggle]
+
 # --- Date logic ---
 today = date.today()
 if period == "TODAY":
@@ -122,16 +131,19 @@ store_df = load_store_names()
 df_target = load_sales_data(start_date, end_date, statuses)
 df_compare = load_sales_data(compare_start, compare_end, statuses)
 
-# --- Storefront filter (only show when 2+ storefronts exist) ---
-if not df_target.empty:
-    available_storefronts = sorted(df_target["STOREFRONT"].unique().tolist())
-    if len(available_storefronts) > 1:
-        selected_storefronts = st.multiselect(
-            "Storefront", available_storefronts, default=available_storefronts, key="so_storefront"
-        )
-        if selected_storefronts:
-            df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
-            df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
+# --- Storefront filter (always show Website + GunBroker) ---
+STOREFRONTS = ["Website", "GunBroker"]
+sf_cols = st.columns(len(STOREFRONTS) + 1)
+with sf_cols[0]:
+    st.caption("STOREFRONT")
+selected_storefronts = []
+for i, sf in enumerate(STOREFRONTS):
+    with sf_cols[i + 1]:
+        if st.checkbox(sf, value=True, key=f"so_sf_{sf}"):
+            selected_storefronts.append(sf)
+if selected_storefronts and not df_target.empty:
+    df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
+    df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
 
 # --- Store filter (customer-facing stores only, matching Power BI 5-store bar) ---
 EXCLUDED_STORES = {"Admin", "Marketing Promotions Store View"}
@@ -241,19 +253,39 @@ st.divider()
 # --- Charts row ---
 chart_cols = st.columns([3, 3, 3, 3])
 
-# Hourly sales chart (today vs compare) — only for TODAY period
+# Helper: compute GP column and aggregate by metric
+def _add_gp(df):
+    df = df.copy()
+    df["GP"] = df["NET_SALES"] - df["COST"]
+    return df
+
+def _agg_metric(df, group_col, metric):
+    if df.empty:
+        return pd.DataFrame()
+    df = _add_gp(df)
+    if metric == "Orders":
+        r = df.groupby(group_col)["ORDER_ID"].nunique().reset_index()
+    elif metric == "Units":
+        r = df.groupby(group_col)["UNITS"].sum().reset_index()
+    else:
+        col = "GP" if metric == "GP ($)" else "NET_SALES"
+        r = df.groupby(group_col)[col].sum().reset_index()
+    r.columns = [group_col, "VALUE"]
+    return r.sort_values("VALUE", ascending=False)
+
+# Hourly/Daily chart — metric-aware
 with chart_cols[0]:
     if period == "TODAY":
-        st.subheader("Sales ($) / Hourly")
+        st.subheader(f"{metric_label} / Hourly")
         if not df_target.empty:
-            hourly_target = df_target.groupby(df_target["HOUR_BUCKET"].dt.hour)["NET_SALES"].sum().reset_index()
-            hourly_target.columns = ["HOUR", "NET_SALES"]
+            hourly_target = _agg_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
+            hourly_target.columns = ["HOUR", "VALUE"]
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=hourly_target["HOUR"], y=hourly_target["NET_SALES"], name="Today", marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(x=hourly_target["HOUR"], y=hourly_target["VALUE"], name="Today", marker_color="#00d4aa"))
             if not df_compare.empty:
-                hourly_compare = df_compare.groupby(df_compare["HOUR_BUCKET"].dt.hour)["NET_SALES"].sum().reset_index()
-                hourly_compare.columns = ["HOUR", "NET_SALES"]
-                fig.add_trace(go.Scatter(x=hourly_compare["HOUR"], y=hourly_compare["NET_SALES"], name="Yesterday", line=dict(color="gray", dash="dash")))
+                hourly_compare = _agg_metric(df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle)
+                hourly_compare.columns = ["HOUR", "VALUE"]
+                fig.add_trace(go.Scatter(x=hourly_compare["HOUR"], y=hourly_compare["VALUE"], name="Yesterday", line=dict(color="gray", dash="dash")))
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
             fig.update_xaxes(title="Hour", dtick=2)
             fig.update_yaxes(title="")
@@ -261,27 +293,26 @@ with chart_cols[0]:
         else:
             st.info("No data for this period.")
     else:
-        # For MTD/YTD — daily sales trend
-        st.subheader("Sales ($) / Daily")
+        st.subheader(f"{metric_label} / Daily")
         if not df_target.empty:
-            daily_target = df_target.groupby(df_target["CREATED_AT"].dt.date)["NET_SALES"].sum().reset_index()
-            daily_target.columns = ["DATE", "NET_SALES"]
+            daily_target = _agg_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
+            daily_target.columns = ["DATE", "VALUE"]
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=daily_target["DATE"], y=daily_target["NET_SALES"], name=period_label, marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(x=daily_target["DATE"], y=daily_target["VALUE"], name=period_label, marker_color="#00d4aa"))
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No data for this period.")
 
-# Sales by Category (or General Purpose if on a category page)
+# Category / General Purpose chart — metric-aware
 with chart_cols[1]:
     if category == "General":
-        st.subheader("Sales ($) / Category")
+        st.subheader(f"{metric_label} / Category")
         if not df_target.empty:
-            cat_df = df_target.groupby("CATEGORY")["NET_SALES"].sum().sort_values(ascending=False).head(8).reset_index()
-            if not cat_df.empty:
-                fig = px.bar(cat_df, x="NET_SALES", y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
+            cat_agg = _agg_metric(df_target, "CATEGORY", metric_toggle).head(8)
+            if not cat_agg.empty:
+                fig = px.bar(cat_agg, x="VALUE", y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -289,11 +320,11 @@ with chart_cols[1]:
         else:
             st.info("No data.")
     else:
-        st.subheader("Sales ($) / General Purpose")
+        st.subheader(f"{metric_label} / General Purpose")
         if not df_target.empty:
-            gp_df = df_target.groupby("GENERAL_PURPOSE")["NET_SALES"].sum().sort_values(ascending=False).head(8).reset_index()
-            if not gp_df.empty:
-                fig = px.bar(gp_df, x="NET_SALES", y="GENERAL_PURPOSE", orientation="h", color_discrete_sequence=["#00d4aa"])
+            gp_agg = _agg_metric(df_target, "GENERAL_PURPOSE", metric_toggle).head(8)
+            if not gp_agg.empty:
+                fig = px.bar(gp_agg, x="VALUE", y="GENERAL_PURPOSE", orientation="h", color_discrete_sequence=["#00d4aa"])
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -301,13 +332,13 @@ with chart_cols[1]:
         else:
             st.info("No data.")
 
-# Sales by Manufacturer
+# Manufacturer chart — metric-aware
 with chart_cols[2]:
-    st.subheader("Sales ($) / Manufacturer")
+    st.subheader(f"{metric_label} / Manufacturer")
     if not df_target.empty:
-        mfr_df = df_target.groupby("MANUFACTURER")["NET_SALES"].sum().sort_values(ascending=False).head(8).reset_index()
-        if not mfr_df.empty:
-            fig = px.bar(mfr_df, x="NET_SALES", y="MANUFACTURER", orientation="h", color_discrete_sequence=["#00d4aa"])
+        mfr_agg = _agg_metric(df_target, "MANUFACTURER", metric_toggle).head(8)
+        if not mfr_agg.empty:
+            fig = px.bar(mfr_agg, x="VALUE", y="MANUFACTURER", orientation="h", color_discrete_sequence=["#00d4aa"])
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
@@ -315,14 +346,14 @@ with chart_cols[2]:
     else:
         st.info("No data.")
 
-# Sales by Caliber (for ammunition-related categories) or Fulfilled By
+# Caliber / Fulfilled By chart — metric-aware
 with chart_cols[3]:
     if category in ("Ammunition", "Guns", "General"):
-        st.subheader("Sales ($) / Caliber")
+        st.subheader(f"{metric_label} / Caliber")
         if not df_target.empty:
-            cal_df = df_target.groupby("CALIBER")["NET_SALES"].sum().sort_values(ascending=False).head(8).reset_index()
-            if not cal_df.empty:
-                fig = px.bar(cal_df, x="NET_SALES", y="CALIBER", orientation="h", color_discrete_sequence=["#00d4aa"])
+            cal_agg = _agg_metric(df_target, "CALIBER", metric_toggle).head(8)
+            if not cal_agg.empty:
+                fig = px.bar(cal_agg, x="VALUE", y="CALIBER", orientation="h", color_discrete_sequence=["#00d4aa"])
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -330,11 +361,11 @@ with chart_cols[3]:
         else:
             st.info("No data.")
     else:
-        st.subheader("Sales ($) / Fulfilled By")
+        st.subheader(f"{metric_label} / Fulfilled By")
         if not df_target.empty:
-            vendor_df = df_target.groupby("VENDOR")["NET_SALES"].sum().sort_values(ascending=False).head(6).reset_index()
-            if not vendor_df.empty:
-                fig = px.bar(vendor_df, x="NET_SALES", y="VENDOR", orientation="h", color_discrete_sequence=["#00d4aa"])
+            vendor_agg = _agg_metric(df_target, "VENDOR", metric_toggle).head(6)
+            if not vendor_agg.empty:
+                fig = px.bar(vendor_agg, x="VALUE", y="VENDOR", orientation="h", color_discrete_sequence=["#00d4aa"])
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
