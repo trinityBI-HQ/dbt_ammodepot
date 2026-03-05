@@ -419,6 +419,7 @@ dependencies = [
     { name = "dbt-redshift" },
     { name = "dbt-snowflake" },
     { name = "openpyxl" },
+    { name = "pgeocode" },
     { name = "plotly" },
     { name = "python-dotenv" },
     { name = "snowflake-connector-python" },
@@ -432,6 +433,7 @@ requires-dist = [
     { name = "dbt-redshift", specifier = ">=1.10.1" },
     { name = "dbt-snowflake", specifier = ">=1.11.2" },
     { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "pgeocode", specifier = ">=0.5.0" },
     { name = "plotly", specifier = ">=6.6.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "snowflake-connector-python", specifier = ">=4.3.0" },
@@ -1253,6 +1255,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ca/bc/f35b8446f4531a7cb215605d100cd88b7ac6f44ab3fc94870c120ab3adbf/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712", size = 51043 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08", size = 31191 },
+]
+
+[[package]]
+name = "pgeocode"
+version = "0.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/91/27/0de1f3890a4b8c1a7ca0bd913251c1f414bf49d8d5d85482a8b95ba6c738/pgeocode-0.5.0.tar.gz", hash = "sha256:37d6caf74e9f2b1e69762811953df5b43fe7f1806833c83bf85a60dd784dff9e", size = 10473 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/62/ff5ac22710794b01a6021fb681189f43e8bff224e100cb590ced4c545f7b/pgeocode-0.5.0-py3-none-any.whl", hash = "sha256:de24a5997524ef557a29a1b22443cc1bf5d02c098e0c7a8dd9ea9caf01a6a72a", size = 9772 },
 ]
 
 [[package]]

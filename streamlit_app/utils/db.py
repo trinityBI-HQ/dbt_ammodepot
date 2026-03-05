@@ -94,6 +94,7 @@ def run_query(sql: str, params: dict | None = None) -> pd.DataFrame:
         else:
             cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description]
-        return pd.DataFrame(cursor.fetchall(), columns=columns)
+        df = pd.DataFrame(cursor.fetchall(), columns=columns)
+        return _convert_timestamp_columns(df)
     finally:
         cursor.close()
