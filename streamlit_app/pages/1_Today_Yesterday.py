@@ -734,11 +734,18 @@ with geo_right:
         )
         map_df = map_df.dropna(subset=["LAT", "LON"])
         # Jitter postcodes sharing ZIP3 so dots spread out
-        import numpy as np
-        rng = np.random.RandomState(42)
+        import random
+        random.seed(42)
         map_df = map_df.copy()
-        map_df["LAT"] = map_df["LAT"] + rng.uniform(-0.3, 0.3, len(map_df))
-        map_df["LON"] = map_df["LON"] + rng.uniform(-0.3, 0.3, len(map_df))
+        n = len(map_df)
+        map_df["LAT"] = [
+            float(lat) + random.uniform(-0.3, 0.3)
+            for lat in map_df["LAT"]
+        ]
+        map_df["LON"] = [
+            float(lon) + random.uniform(-0.3, 0.3)
+            for lon in map_df["LON"]
+        ]
         if not map_df.empty:
             # Normalize bubble size (min 3, max 30)
             max_sales = float(map_df["NET_SALES"].max())
@@ -750,19 +757,22 @@ with geo_right:
                 )
             else:
                 map_df["SIZE"] = min_sz
+            lat_list = [float(x) for x in map_df["LAT"]]
+            lon_list = [float(x) for x in map_df["LON"]]
+            size_list = [float(x) for x in map_df["SIZE"]]
             hover_texts = [
                 f"{r['CITY']}, {r['REGION']}<br>"
-                f"${r['NET_SALES']:,.0f} | {r['ORDERS']} orders"
+                f"${float(r['NET_SALES']):,.0f} | {int(r['ORDERS'])} orders"
                 for _, r in map_df.iterrows()
             ]
             from utils.db import _is_sis
             if _is_sis:
                 # SiS: Scattergeo (no external tile requests)
                 fig = go.Figure(go.Scattergeo(
-                    lat=map_df["LAT"].tolist(),
-                    lon=map_df["LON"].tolist(),
+                    lat=lat_list,
+                    lon=lon_list,
                     marker=dict(
-                        size=map_df["SIZE"].tolist(),
+                        size=size_list,
                         color="#00d4aa",
                         opacity=0.6,
                         line=dict(width=0.3, color="#008866"),
@@ -795,10 +805,10 @@ with geo_right:
             else:
                 # Local: Scattermapbox with CARTO dark tiles
                 fig = go.Figure(go.Scattermapbox(
-                    lat=map_df["LAT"].tolist(),
-                    lon=map_df["LON"].tolist(),
+                    lat=lat_list,
+                    lon=lon_list,
                     marker=dict(
-                        size=map_df["SIZE"].tolist(),
+                        size=size_list,
                         color="#00d4aa",
                         opacity=0.6,
                     ),
