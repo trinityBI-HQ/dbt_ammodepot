@@ -399,7 +399,10 @@ with chart_cols[0]:
             daily["MARGIN"] = (daily["GP"] / daily["NET_SALES"] * 100).fillna(0)
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=daily["DAY"].tolist(), y=daily[val_col].tolist(), name=metric_label, marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(
+                x=daily["DAY"].tolist(), y=daily[val_col].tolist(),
+                name=metric_label, marker_color="#00d4aa",
+            ))
             fig.add_trace(go.Scatter(
                 x=daily["DAY"].tolist(), y=daily["MARGIN"].tolist(), name="Margin %", yaxis="y2",
                 mode="lines+markers+text",
@@ -714,62 +717,65 @@ with geo_left:
 with geo_right:
     st.caption("Map")
     if not df_target.empty and not geo_df.empty:
-        # US state name → (lat, lon) centroids for map placement
-        US_STATE_COORDS = {
-            "Alabama": (32.8, -86.8), "Alaska": (64.2, -152.5),
-            "Arizona": (34.0, -111.1), "Arkansas": (35.2, -91.8),
-            "California": (36.8, -119.4), "Colorado": (39.1, -105.4),
-            "Connecticut": (41.6, -72.7), "Delaware": (39.0, -75.5),
-            "Florida": (27.8, -81.8), "Georgia": (33.0, -83.5),
-            "Hawaii": (19.9, -155.6), "Idaho": (44.2, -114.4),
-            "Illinois": (40.3, -89.0), "Indiana": (40.3, -86.1),
-            "Iowa": (42.0, -93.2), "Kansas": (38.5, -98.8),
-            "Kentucky": (37.8, -84.3), "Louisiana": (30.5, -91.2),
-            "Maine": (45.3, -69.4), "Maryland": (39.0, -76.6),
-            "Massachusetts": (42.4, -71.4), "Michigan": (44.3, -84.5),
-            "Minnesota": (46.4, -94.6), "Mississippi": (32.7, -89.7),
-            "Missouri": (37.9, -91.8), "Montana": (46.8, -110.4),
-            "Nebraska": (41.5, -99.9), "Nevada": (38.8, -116.4),
-            "New Hampshire": (43.2, -71.6), "New Jersey": (40.1, -74.5),
-            "New Mexico": (34.5, -106.0), "New York": (43.0, -75.5),
-            "North Carolina": (35.6, -79.0), "North Dakota": (47.5, -100.5),
-            "Ohio": (40.4, -82.9), "Oklahoma": (35.0, -97.1),
-            "Oregon": (43.8, -120.6), "Pennsylvania": (41.2, -77.2),
-            "Rhode Island": (41.6, -71.5), "South Carolina": (34.0, -81.2),
-            "South Dakota": (43.9, -99.9), "Tennessee": (35.5, -86.6),
-            "Texas": (31.1, -97.6), "Utah": (39.3, -111.1),
-            "Vermont": (44.6, -72.6), "Virginia": (37.4, -78.7),
-            "Washington": (47.4, -120.7), "West Virginia": (38.6, -80.6),
-            "Wisconsin": (43.8, -88.8), "Wyoming": (43.1, -107.6),
-            "District of Columbia": (38.9, -77.0),
-        }
-        # Aggregate by state for map display
-        map_df = geo_df.groupby("REGION").agg(
+        from utils.zip3_coords import ZIP3_COORDS
+
+        # Aggregate by postcode for city-level map granularity
+        geo_map = geo_df.copy()
+        geo_map["ZIP3"] = geo_map["POSTCODE"].astype(str).str[:3]
+        map_df = geo_map.groupby(["POSTCODE", "ZIP3", "CITY", "REGION"]).agg(
             NET_SALES=("NET_SALES", "sum"),
             ORDERS=("ORDER_ID", "nunique"),
         ).reset_index()
-        map_df["LAT"] = map_df["REGION"].map(
-            lambda s: US_STATE_COORDS.get(s, (None, None))[0]
+        map_df["LAT"] = map_df["ZIP3"].map(
+            lambda z: ZIP3_COORDS.get(z, (None, None))[0]
         )
-        map_df["LON"] = map_df["REGION"].map(
-            lambda s: US_STATE_COORDS.get(s, (None, None))[1]
+        map_df["LON"] = map_df["ZIP3"].map(
+            lambda z: ZIP3_COORDS.get(z, (None, None))[1]
         )
         map_df = map_df.dropna(subset=["LAT", "LON"])
+        # Jitter postcodes sharing ZIP3 so dots spread out
+        import numpy as np
+        rng = np.random.RandomState(42)
+        map_df = map_df.copy()
+        map_df["LAT"] = map_df["LAT"] + rng.uniform(-0.3, 0.3, len(map_df))
+        map_df["LON"] = map_df["LON"] + rng.uniform(-0.3, 0.3, len(map_df))
         if not map_df.empty:
-            # Normalize size for st.map (min 10, max 80)
-            max_sales = map_df["NET_SALES"].max()
-            min_size, max_size = 10, 80
+            # Normalize bubble size (min 3, max 30)
+            max_sales = float(map_df["NET_SALES"].max())
+            min_sz, max_sz = 3, 30
             if max_sales > 0:
-                map_df["size"] = (
-                    min_size + (map_df["NET_SALES"] / max_sales)
-                    * (max_size - min_size)
+                map_df["SIZE"] = (
+                    min_sz + (map_df["NET_SALES"] / max_sales)
+                    * (max_sz - min_sz)
                 )
             else:
-                map_df["size"] = min_size
-            map_df = map_df.rename(columns={
-                "LAT": "latitude", "LON": "longitude",
-            })
-            st.map(map_df[["latitude", "longitude"]])
+                map_df["SIZE"] = min_sz
+            fig = go.Figure(go.Scattermapbox(
+                lat=map_df["LAT"].tolist(),
+                lon=map_df["LON"].tolist(),
+                marker=dict(
+                    size=map_df["SIZE"].tolist(),
+                    color="#00d4aa",
+                    opacity=0.6,
+                ),
+                text=[
+                    f"{r['CITY']}, {r['REGION']}<br>"
+                    f"${r['NET_SALES']:,.0f} | {r['ORDERS']} orders"
+                    for _, r in map_df.iterrows()
+                ],
+                hoverinfo="text",
+            ))
+            fig.update_layout(
+                mapbox=dict(
+                    style="carto-darkmatter",
+                    center=dict(lat=38, lon=-97),
+                    zoom=3,
+                ),
+                height=350,
+                margin=dict(l=0, r=0, t=0, b=0),
+                showlegend=False,
+            )
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No geographic data to map.")
     else:
