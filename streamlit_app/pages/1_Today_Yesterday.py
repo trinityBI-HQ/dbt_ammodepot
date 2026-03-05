@@ -192,13 +192,13 @@ with chart_cols[1]:
     st.subheader("Sales ($) / Category")
     if not df_target.empty:
         cat_sql = f"""
-            select p.CATEGORY, sum(f.ROW_TOTAL) as NET_SALES
+            select p."Attribute Set" as CATEGORY, sum(f.ROW_TOTAL) as NET_SALES
             from F_SALES f
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
             where f.CREATED_AT::date = '{target_date}'
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
               and f.STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
-            group by p.CATEGORY
+            group by p."Attribute Set"
             order by NET_SALES desc
             limit 8
         """
@@ -231,13 +231,13 @@ with chart_cols[3]:
     st.subheader("Sales ($) / Manufacturer")
     if not df_target.empty:
         mfr_sql = f"""
-            select p.MANUFACTURER, sum(f.ROW_TOTAL) as NET_SALES
+            select p."Manufacturer" as MANUFACTURER, sum(f.ROW_TOTAL) as NET_SALES
             from F_SALES f
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
             where f.CREATED_AT::date = '{target_date}'
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
               and f.STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
-            group by p.MANUFACTURER
+            group by p."Manufacturer"
             order by NET_SALES desc
             limit 8
         """
