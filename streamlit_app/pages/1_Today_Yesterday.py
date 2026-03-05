@@ -22,8 +22,8 @@ with filter_cols[0]:
 with filter_cols[1]:
     order_status = st.multiselect(
         "Order Status",
-        ["complete", "processing"],
-        default=["complete", "processing"],
+        ["COMPLETE", "PROCESSING"],
+        default=["COMPLETE", "PROCESSING"],
     )
 with filter_cols[2]:
     metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
@@ -64,7 +64,7 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
         from F_SALES
         where CREATED_AT::date = '{dt}'
           and STATUS in ({status_list})
-          and STATUS not in ('closed', 'canceled', 'holded', 'fraud')
+          and STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
     """
     return run_query(sql)
 
@@ -197,7 +197,7 @@ with chart_cols[1]:
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
             where f.CREATED_AT::date = '{target_date}'
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
-              and f.STATUS not in ('closed', 'canceled', 'holded', 'fraud')
+              and f.STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
             group by p.CATEGORY
             order by NET_SALES desc
             limit 8
@@ -236,7 +236,7 @@ with chart_cols[3]:
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
             where f.CREATED_AT::date = '{target_date}'
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
-              and f.STATUS not in ('closed', 'canceled', 'holded', 'fraud')
+              and f.STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
             group by p.MANUFACTURER
             order by NET_SALES desc
             limit 8

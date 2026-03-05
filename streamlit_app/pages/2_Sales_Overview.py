@@ -70,7 +70,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
           and f.STATUS in ({status_list})
-          and f.STATUS not in ('closed', 'canceled', 'holded', 'fraud')
+          and f.STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
     """
     return run_query(sql)
 
@@ -84,8 +84,8 @@ with filter_cols[1]:
 with filter_cols[2]:
     order_status = st.multiselect(
         "Order Status",
-        ["complete", "processing"],
-        default=["complete", "processing"],
+        ["COMPLETE", "PROCESSING"],
+        default=["COMPLETE", "PROCESSING"],
     )
 with filter_cols[3]:
     metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
