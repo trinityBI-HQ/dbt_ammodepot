@@ -380,7 +380,7 @@ ALTER USER <SVC_AIRBYTE or SVC_DBT> UNSET RSA_PUBLIC_KEY_2;
 | Component | Value |
 |---|---|
 | App owner role | `STREAMLIT_ROLE` |
-| Viewer role | `DASHBOARD_VIEWER` |
+| Viewer role | `DASHBOARD_VIEWER_ROLE` |
 | Auth (viewers) | SSO via SAML 2.0 (company email) |
 | Auth (owner) | Owner's rights model — app queries run as `STREAMLIT_ROLE` |
 | Warehouse | `ETL_WH` (shared, XSMALL, auto-suspend 120s) |
@@ -413,7 +413,7 @@ ACCOUNTADMIN
     │   └── SVC_POWERBI   → Power BI dataflows (password auth)
     ├── STREAMLIT_ROLE    → Owns Streamlit apps, SELECT on AD_ANALYTICS.GOLD
     │   └── (app runs with this role's privileges — owner's rights)
-    └── DASHBOARD_VIEWER  → USAGE on Streamlit apps (viewer access)
+    └── DASHBOARD_VIEWER_ROLE  → USAGE on Streamlit apps (viewer access)
         └── SSO users     → Company email login via SAML 2.0
 ```
 
@@ -428,7 +428,7 @@ ACCOUNTADMIN
 | `TRANSFORMER_ROLE` | dbt transformation, owns `AD_ANALYTICS` SILVER/GOLD schemas |
 | `POWERBI_ROLE` | Power BI read-only access, SELECT on `AD_ANALYTICS.GOLD` |
 | `STREAMLIT_ROLE` | Owns Streamlit apps, SELECT on `AD_ANALYTICS.GOLD`, CREATE STREAMLIT |
-| `DASHBOARD_VIEWER` | Views Streamlit apps via SSO, USAGE on Streamlit objects only |
+| `DASHBOARD_VIEWER_ROLE` | Views Streamlit apps via SSO, USAGE on Streamlit objects only |
 
 ### Future considerations
 
@@ -563,12 +563,12 @@ CREATE ROLE IF NOT EXISTS STREAMLIT_ROLE
     COMMENT = 'Owns Streamlit apps - SELECT on AD_ANALYTICS.GOLD + CREATE STREAMLIT';
 
 -- Viewer role (end users who view dashboards via SSO)
-CREATE ROLE IF NOT EXISTS DASHBOARD_VIEWER
+CREATE ROLE IF NOT EXISTS DASHBOARD_VIEWER_ROLE
     COMMENT = 'Views Streamlit dashboards - USAGE on Streamlit objects only';
 
 -- Maintain role hierarchy
 GRANT ROLE STREAMLIT_ROLE TO ROLE SYSADMIN;
-GRANT ROLE DASHBOARD_VIEWER TO ROLE SYSADMIN;
+GRANT ROLE DASHBOARD_VIEWER_ROLE TO ROLE SYSADMIN;
 ```
 
 ### 12.2 Grant warehouse access
@@ -579,7 +579,7 @@ Both roles share `ETL_WH`. Streamlit warehouse runtime spins up per-viewer insta
 USE ROLE SYSADMIN;
 
 GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE STREAMLIT_ROLE;
-GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE DASHBOARD_VIEWER;
+GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE DASHBOARD_VIEWER_ROLE;
 ```
 
 ### 12.3 Grant STREAMLIT_ROLE data access + app creation
@@ -602,7 +602,7 @@ GRANT CREATE STREAMLIT ON SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
 GRANT CREATE STAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE STREAMLIT_ROLE;
 ```
 
-### 12.4 Grant DASHBOARD_VIEWER access to Streamlit apps
+### 12.4 Grant DASHBOARD_VIEWER_ROLE access to Streamlit apps
 
 Viewers need USAGE on the database, schema, and Streamlit object — but NOT on the underlying tables.
 
@@ -610,12 +610,12 @@ Viewers need USAGE on the database, schema, and Streamlit object — but NOT on 
 USE ROLE SYSADMIN;
 
 -- Database and schema navigation (required to reach the Streamlit object)
-GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE DASHBOARD_VIEWER;
-GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER;
+GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE DASHBOARD_VIEWER_ROLE;
+GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
 
 -- Access to all current and future Streamlit apps
-GRANT USAGE ON ALL STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER;
-GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER;
+GRANT USAGE ON ALL STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
+GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
 ```
 
 ### 12.5 Enable viewer identity (READ SESSION)
@@ -680,13 +680,13 @@ ALTER STREAMLIT AD_ANALYTICS.GOLD.AMMODEPOT_DASHBOARD ADD LIVE VERSION FROM LAST
 USE ROLE STREAMLIT_ROLE;
 SHOW STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD;
 
--- As DASHBOARD_VIEWER: verify access
-USE ROLE DASHBOARD_VIEWER;
+-- As DASHBOARD_VIEWER_ROLE: verify access
+USE ROLE DASHBOARD_VIEWER_ROLE;
 SHOW STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD;
 -- Should see AMMODEPOT_DASHBOARD
 
 -- Verify viewers cannot access tables directly
-USE ROLE DASHBOARD_VIEWER;
+USE ROLE DASHBOARD_VIEWER_ROLE;
 SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
 -- Expected: error (no SELECT privilege — data is only accessible through the app)
 ```
@@ -738,18 +738,19 @@ Replace the placeholder values with your IdP's actual SAML metadata.
 ```sql
 USE ROLE ACCOUNTADMIN;
 
-CREATE SECURITY INTEGRATION IF NOT EXISTS AMMODEPOT_SSO
+CREATE SECURITY INTEGRATION IF NOT EXISTS AMMODEPOT_AWS_SSO
     TYPE = SAML2
     ENABLED = TRUE
     SAML2_ISSUER = '<your-idp-issuer-url>'
     SAML2_SSO_URL = '<your-idp-sso-url>'
     SAML2_PROVIDER = 'CUSTOM'
     SAML2_X509_CERT = '<base64-encoded-idp-certificate>'
+    SAML2_SP_INITIATED_LOGIN_PAGE_LABEL = 'AmmoDepot - AWS SSO'
+    SAML2_ENABLE_SP_INITIATED = TRUE
     SAML2_SNOWFLAKE_ISSUER_URL = 'https://iwb48385.us-east-1.snowflakecomputing.com'
     SAML2_SNOWFLAKE_ACS_URL = 'https://iwb48385.us-east-1.snowflakecomputing.com/fed/login'
-    SAML2_ENABLE_SP_INITIATED = TRUE
-    SAML2_SP_INITIATED_LOGIN_PAGE_LABEL = 'AmmoDepot SSO'
-    ALLOWED_USER_DOMAINS = ('ammodepot.com');
+    SAML2_REQUESTED_NAMEID_FORMAT = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
+    ALLOWED_USER_DOMAINS = ('ammunitiondepot.com');
 ```
 
 **IdP-specific guides:**
@@ -769,12 +770,12 @@ CREATE USER IF NOT EXISTS john_doe
     LOGIN_NAME = 'john.doe@ammodepot.com'
     DISPLAY_NAME = 'John Doe'
     EMAIL = 'john.doe@ammodepot.com'
-    DEFAULT_ROLE = DASHBOARD_VIEWER
+    DEFAULT_ROLE = DASHBOARD_VIEWER_ROLE
     DEFAULT_WAREHOUSE = ETL_WH
     MUST_CHANGE_PASSWORD = FALSE
     COMMENT = 'Dashboard viewer - SSO via company email';
 
-GRANT ROLE DASHBOARD_VIEWER TO USER john_doe;
+GRANT ROLE DASHBOARD_VIEWER_ROLE TO USER john_doe;
 ```
 
 **To add multiple users**, repeat the CREATE USER + GRANT ROLE pattern for each team member. Only the `LOGIN_NAME` and `EMAIL` need to match the IdP's SAML assertion.
@@ -808,7 +809,7 @@ Identity Provider (Google/Azure AD/Okta)
 Snowflake Login (AMMODEPOT_SSO integration)
   │ Authenticated as john.doe@ammodepot.com
   ▼
-DASHBOARD_VIEWER role (default)
+DASHBOARD_VIEWER_ROLE role (default)
   │ USAGE on AMMODEPOT_DASHBOARD
   ▼
 Streamlit App (runs as STREAMLIT_ROLE — owner's rights)
