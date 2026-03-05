@@ -338,8 +338,8 @@ with chart_cols[0]:
                 st.dataframe(hourly_target)
             fig = go.Figure()
             fig.add_trace(go.Scatter(
-                x=hourly_target["HOUR_LABEL"],
-                y=hourly_target["VALUE"],
+                x=hourly_target["HOUR_LABEL"].tolist(),
+                y=hourly_target["VALUE"].tolist(),
                 name=period, marker_color="#00d4aa",
                 mode="lines+markers",
                 marker=dict(size=6),
@@ -347,8 +347,8 @@ with chart_cols[0]:
             if not df_compare.empty:
                 hourly_compare = _hourly_agg(df_compare, metric_toggle)
                 fig.add_trace(go.Scatter(
-                    x=hourly_compare["HOUR_LABEL"],
-                    y=hourly_compare["VALUE"],
+                    x=hourly_compare["HOUR_LABEL"].tolist(),
+                    y=hourly_compare["VALUE"].tolist(),
                     name="YESTERDAY",
                     line=dict(color="gray", dash="dash"),
                 ))
@@ -357,16 +357,16 @@ with chart_cols[0]:
             if not df_last_month.empty:
                 hourly_lm = _hourly_avg(df_last_month, metric_toggle)
                 if not hourly_lm.empty:
-                    lm_avg = hourly_lm["VALUE"].mean()
+                    lm_avg = float(hourly_lm["VALUE"].mean())
                     fig.add_trace(go.Scatter(
-                        x=hourly_lm["HOUR_LABEL"],
-                        y=hourly_lm["VALUE"],
+                        x=hourly_lm["HOUR_LABEL"].tolist(),
+                        y=hourly_lm["VALUE"].tolist(),
                         name="Average LM",
                         line=dict(color="gray", dash="dot", width=1),
                         mode="lines",
                     ))
             # Average line for target day
-            target_avg = hourly_target["VALUE"].mean()
+            target_avg = float(hourly_target["VALUE"].mean())
             fig.add_hline(
                 y=target_avg, line_dash="dot", line_color="#00d4aa",
                 line_width=1,
@@ -419,11 +419,11 @@ with chart_cols[0]:
             daily["MARGIN"] = (daily["GP"] / daily["NET_SALES"] * 100).fillna(0)
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=daily["DAY"], y=daily[val_col], name=metric_label, marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(x=daily["DAY"].tolist(), y=daily[val_col].tolist(), name=metric_label, marker_color="#00d4aa"))
             fig.add_trace(go.Scatter(
-                x=daily["DAY"], y=daily["MARGIN"], name="Margin %", yaxis="y2",
+                x=daily["DAY"].tolist(), y=daily["MARGIN"].tolist(), name="Margin %", yaxis="y2",
                 mode="lines+markers+text",
-                text=[f"{m:.0f}%" for m in daily["MARGIN"]],
+                text=[f"{m:.0f}%" for m in daily["MARGIN"].tolist()],
                 textposition="top center", line=dict(color="#4CAF50"),
             ))
             fig.update_layout(
@@ -461,7 +461,7 @@ with chart_cols[0]:
             pivot = pivot.sort_index(level=0)
             dow_labels = [row[1] for row in pivot.index]
             fig = go.Figure(data=go.Heatmap(
-                z=pivot.values,
+                z=pivot.values.tolist(),
                 x=[_hour_label(h) for h in pivot.columns],
                 y=dow_labels,
                 colorscale="Greens",
