@@ -62,13 +62,21 @@ def get_connection():
     return _get_local_connection()
 
 
+_TS_HINTS = {"DATE", "TIME", "CREATED", "UPDATED", "BUCKET", "EXTRACTED", "_AT"}
+
+
 def _convert_timestamp_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Convert string timestamp columns to datetime.
 
     Snowpark session.sql().to_pandas() can return TIMESTAMP columns as strings
     instead of datetime64. This breaks .dt accessor usage downstream.
+    Only converts columns whose name contains a timestamp-related keyword
+    to avoid misinterpreting postcodes/IDs as dates.
     """
     for col in df.columns:
+        col_upper = col.upper()
+        if not any(hint in col_upper for hint in _TS_HINTS):
+            continue
         if df[col].dtype == "object" and len(df) > 0:
             sample = df[col].dropna().head(5)
             if len(sample) > 0:
