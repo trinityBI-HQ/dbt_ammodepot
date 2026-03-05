@@ -324,16 +324,18 @@ with chart_cols[0]:
                 y=hourly_target["VALUE"],
                 name=period, marker_color="#00d4aa",
                 mode="lines+markers",
+                marker=dict(size=6),
             ))
             if not df_compare.empty:
                 hourly_compare = _hourly_agg(df_compare, metric_toggle)
                 fig.add_trace(go.Scatter(
                     x=hourly_compare["HOUR_LABEL"],
                     y=hourly_compare["VALUE"],
-                    name="Previous",
+                    name="YESTERDAY",
                     line=dict(color="gray", dash="dash"),
                 ))
             # Average LM (last 30 days average)
+            lm_avg = None
             if not df_last_month.empty:
                 hourly_lm = _hourly_avg(df_last_month, metric_toggle)
                 if not hourly_lm.empty:
@@ -341,20 +343,29 @@ with chart_cols[0]:
                     fig.add_trace(go.Scatter(
                         x=hourly_lm["HOUR_LABEL"],
                         y=hourly_lm["VALUE"],
-                        name=f"Average LM  {lm_avg:,.2f}",
-                        line=dict(color="gray", dash="dot"),
+                        name="Average LM",
+                        line=dict(color="gray", dash="dot", width=1),
                         mode="lines",
                     ))
             # Average line for target day
             target_avg = hourly_target["VALUE"].mean()
             fig.add_hline(
                 y=target_avg, line_dash="dot", line_color="#00d4aa",
-                annotation_text=f"Average  {target_avg:,.0f}",
-                annotation_position="top left",
+                line_width=1,
             )
+            # Summary below chart header
+            avg_text = f"Average  **{target_avg:,.0f}**"
+            if lm_avg is not None:
+                avg_text += f"  &nbsp;·&nbsp;  Average LM  **{lm_avg:,.2f}**"
             fig.update_layout(
-                height=300, margin=dict(l=0, r=0, t=10, b=0),
-                showlegend=True, legend=dict(orientation="h"),
+                height=300, margin=dict(l=0, r=0, t=30, b=0),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom", y=1.02,
+                    xanchor="left", x=0,
+                    font=dict(size=11),
+                ),
                 xaxis=dict(
                     categoryorder="array",
                     categoryarray=[_hour_label(h) for h in range(24)],
@@ -362,6 +373,7 @@ with chart_cols[0]:
             )
             fig.update_xaxes(title="Hour")
             fig.update_yaxes(title="")
+            st.caption(avg_text)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No data for this period.")
