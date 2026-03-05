@@ -122,27 +122,24 @@ store_df = load_store_names()
 df_target = load_sales_data(start_date, end_date, statuses)
 df_compare = load_sales_data(compare_start, compare_end, statuses)
 
-# --- Storefront filter (Website / GunBroker) ---
-storefronts = ["Website", "GunBroker"]
+# --- Storefront filter (only show when 2+ storefronts exist) ---
 if not df_target.empty:
-    available_storefronts = df_target["STOREFRONT"].unique().tolist()
-    storefronts = [s for s in storefronts if s in available_storefronts]
+    available_storefronts = sorted(df_target["STOREFRONT"].unique().tolist())
+    if len(available_storefronts) > 1:
+        selected_storefronts = st.multiselect(
+            "Storefront", available_storefronts, default=available_storefronts, key="so_storefront"
+        )
+        if selected_storefronts:
+            df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
+            df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
 
-storefront_cols = st.columns(len(storefronts) + 1)
-with storefront_cols[0]:
-    st.caption("STOREFRONT")
-selected_storefronts = []
-for i, sf in enumerate(storefronts):
-    with storefront_cols[i + 1]:
-        if st.checkbox(sf, value=True, key=f"so_sf_{sf}"):
-            selected_storefronts.append(sf)
-
-if selected_storefronts and not df_target.empty:
-    df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
-    df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
-
-# --- Store filter ---
-store_names = store_df["NAME"].tolist() if not store_df.empty else []
+# --- Store filter (customer-facing stores only, matching Power BI 5-store bar) ---
+EXCLUDED_STORES = {"Admin", "Marketing Promotions Store View"}
+if not store_df.empty:
+    customer_stores = store_df[~store_df["NAME"].isin(EXCLUDED_STORES)].copy()
+else:
+    customer_stores = store_df
+store_names = customer_stores["NAME"].tolist() if not customer_stores.empty else []
 if store_names:
     store_cols = st.columns(len(store_names) + 1)
     with store_cols[0]:
@@ -151,7 +148,7 @@ if store_names:
     for i, name in enumerate(store_names):
         with store_cols[i + 1]:
             if st.checkbox(name, value=True, key=f"so_store_{name}"):
-                sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
+                sid = customer_stores[customer_stores["NAME"] == name]["STORE_ID"].values[0]
                 selected_store_ids.append(sid)
 
     if selected_store_ids and not df_target.empty:
