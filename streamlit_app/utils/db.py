@@ -89,19 +89,18 @@ def _convert_timestamp_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert Decimal/object numeric columns to native float/int.
+    """Convert object columns with numeric values to native float.
 
-    Snowpark to_pandas() can return NUMBER columns as Python Decimal objects
-    (object dtype). Plotly and groupby aggregations need native numeric types.
-    pd.to_numeric() cannot convert Decimal objects, so we detect them by type.
+    Snowpark to_pandas() can return NUMBER columns as non-native types
+    (Decimal, etc.) stored as object dtype. Try astype(float) on every
+    object column — non-numeric columns (strings) will raise and be skipped.
     """
-    from decimal import Decimal
-
     for col in df.columns:
         if df[col].dtype == "object" and len(df) > 0:
-            first = df[col].dropna().iloc[0] if df[col].notna().any() else None
-            if isinstance(first, Decimal):
+            try:
                 df[col] = df[col].astype(float)
+            except (ValueError, TypeError):
+                pass
     return df
 
 
