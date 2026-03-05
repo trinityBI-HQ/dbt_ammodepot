@@ -2,34 +2,27 @@
 
 Run: streamlit run app.py (from streamlit_app/ directory)
 SiS entrypoint is streamlit_app.py (Snowflake convention).
+Both use legacy pages/ directory pattern for sidebar navigation.
 """
 
 import streamlit as st
 
-try:
-    st.set_page_config(
-        page_title="Ammunition Depot",
-        page_icon=":material/analytics:",
-        layout="wide",
-    )
-except Exception:
-    pass
+st.set_page_config(
+    page_title="Ammunition Depot",
+    page_icon=":material/analytics:",
+    layout="wide",
+)
 
-pages = {
-    "Sales": [
-        st.Page("pages/today_yesterday.py", title="Today / Yesterday", icon=":material/today:", default=True),
-        st.Page("pages/sales_overview.py", title="Sales Overview", icon=":material/bar_chart:"),
-    ],
-    "Operations": [
-        st.Page("pages/inventory.py", title="Inventory", icon=":material/inventory_2:"),
-    ],
-}
+st.title("Ammunition Depot Analytics")
+st.markdown("Use the sidebar to navigate between dashboards.")
 
-pg = st.navigation(pages)
+st.markdown("""
+### Dashboards
+
+- **Today / Yesterday** — Real-time daily KPIs, hourly sales, product performance
+- **Sales Overview** — Historical sales by category (TODAY / MTD / YTD)
+- **Inventory** — Stock levels, vendor analysis, open purchase orders
+""")
 
 with st.sidebar:
-    st.title("Ammunition Depot")
-    st.divider()
     st.caption("Analytics Dashboard v0.1")
-
-pg.run()

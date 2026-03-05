@@ -46,8 +46,8 @@ def load_units_sold_30d() -> pd.DataFrame:
             sum(ROW_TOTAL) as NET_SALES
         from F_SALES
         where CREATED_AT::date >= dateadd(day, -30, current_date())
-          and STATUS in ('complete', 'processing')
-          and STATUS not in ('closed', 'canceled', 'holded', 'fraud')
+          and STATUS in ('COMPLETE', 'PROCESSING')
+          and STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
         group by TESTSKU
     """
     return run_query(sql)
@@ -76,7 +76,7 @@ def load_pos_data() -> pd.DataFrame:
             p."Attribute Set" as CATEGORY
         from F_POS f
         left join D_VENDOR v on f.VENDOR_ID = v.VENDOR_ID
-        left join D_PRODUCT p on f.SKU = p.SKU
+        left join D_PRODUCT p on f.PART_NUMBER = p.SKU
     """
     return run_query(sql)
 
