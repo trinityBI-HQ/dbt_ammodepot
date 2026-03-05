@@ -331,6 +331,11 @@ with chart_cols[0]:
         st.subheader(f"{metric_label} / Hourly")
         if not df_target.empty:
             hourly_target = _hourly_agg(df_target, metric_toggle)
+            # DEBUG: show chart data
+            with st.expander("DEBUG: hourly_target chart data", expanded=False):
+                st.write(f"rows: {len(hourly_target)}, VALUE dtype: {hourly_target['VALUE'].dtype}")
+                st.write(f"VALUE sum: {hourly_target['VALUE'].sum()}")
+                st.dataframe(hourly_target)
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=hourly_target["HOUR_LABEL"],
@@ -496,13 +501,13 @@ with chart_cols[1]:
     if not df_target.empty:
         cat_sql = f"""
             select p."Attribute Set" as CATEGORY,
-                   sum(f.ROW_TOTAL) as NET_SALES,
-                   sum(f.COST) as COST,
+                   sum(f.ROW_TOTAL)::float as NET_SALES,
+                   sum(f.COST)::float as COST,
                    count(distinct f.INCREMENT_ID) as ORDERS,
-                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED)) as UNITS
+                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED))::float as UNITS
             from F_SALES f
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
-            where f.CREATED_AT::date = '{target_date}'
+            where f.CREATED_AT = '{target_date}'
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
             group by p."Attribute Set"
             order by NET_SALES desc
@@ -513,6 +518,10 @@ with chart_cols[1]:
             cat_df["GP"] = cat_df["NET_SALES"] - cat_df["COST"]
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             cat_df = cat_df.sort_values(val_col, ascending=False)
+            # DEBUG
+            with st.expander("DEBUG: cat_df", expanded=False):
+                st.write(f"NET_SALES dtype: {cat_df['NET_SALES'].dtype}")
+                st.dataframe(cat_df)
             fig = px.bar(cat_df, x=val_col, y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
@@ -541,13 +550,13 @@ with chart_cols[3]:
     if not df_target.empty:
         mfr_sql = f"""
             select p."Manufacturer" as MANUFACTURER,
-                   sum(f.ROW_TOTAL) as NET_SALES,
-                   sum(f.COST) as COST,
+                   sum(f.ROW_TOTAL)::float as NET_SALES,
+                   sum(f.COST)::float as COST,
                    count(distinct f.INCREMENT_ID) as ORDERS,
-                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED)) as UNITS
+                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED))::float as UNITS
             from F_SALES f
             join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
-            where f.CREATED_AT::date = '{target_date}'
+            where f.CREATED_AT = '{target_date}'
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
             group by p."Manufacturer"
             order by NET_SALES desc
