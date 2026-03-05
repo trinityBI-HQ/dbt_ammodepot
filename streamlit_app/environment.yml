@@ -1,3 +1,6 @@
+# SiS warehouse runtime bundles Streamlit 1.26.0 (cannot be overridden).
+# This file only controls additional pip/conda packages.
+# Features added after 1.26 (e.g. hide_index, st.scatter_chart) are unavailable.
 name: sf_env
 channels:
   - snowflake

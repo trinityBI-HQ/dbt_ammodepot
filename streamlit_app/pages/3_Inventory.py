@@ -203,8 +203,7 @@ with tab_inv:
                 "Daily Avg": "{:,.1f}",
                 "Cost on Hand": "${:,.2f}",
                 "Net Sales (30d)": "${:,.2f}",
-            }),
-            hide_index=True,
+            }).hide(axis="index"),
             use_container_width=True,
         )
     else:
@@ -270,8 +269,7 @@ with tab_vendor:
                     "QTY": "{:,.0f}",
                     "TOTAL_COST": "${:,.2f}",
                     "AVG_COST": "${:,.2f}",
-                }),
-                hide_index=True,
+                }).hide(axis="index"),
                 use_container_width=True,
             )
 
@@ -285,8 +283,7 @@ with tab_vendor:
                 cal_agg.style.format({
                     "QTY": "{:,.0f}",
                     "TOTAL_COST": "${:,.2f}",
-                }),
-                hide_index=True,
+                }).hide(axis="index"),
                 use_container_width=True,
             )
 
@@ -302,8 +299,7 @@ with tab_vendor:
                     "QTY": "{:,.0f}",
                     "TOTAL_COST": "${:,.2f}",
                     "UNIT_COST": "${:,.4f}",
-                }),
-                hide_index=True,
+                }).hide(axis="index"),
                 use_container_width=True,
             )
     else:
@@ -365,8 +361,7 @@ with tab_open_po:
                     "QTY_REMAINING": "{:,.0f}",
                     "TOTAL_COST": "${:,.2f}",
                     "LEAD_TIME": "{:,.0f}",
-                }),
-                hide_index=True,
+                }).hide(axis="index"),
                 use_container_width=True,
             )
 
@@ -385,8 +380,7 @@ with tab_open_po:
                     v_agg.style.format({
                         "QTY_REMAINING": "{:,.0f}",
                         "LEAD_TIME": "{:,.0f}",
-                    }),
-                    hide_index=True,
+                    }).hide(axis="index"),
                     use_container_width=True,
                 )
 
@@ -400,8 +394,7 @@ with tab_open_po:
                     s_agg.style.format({
                         "QTY_REMAINING": "{:,.0f}",
                         "LEAD_TIME": "{:,.0f}",
-                    }),
-                    hide_index=True,
+                    }).hide(axis="index"),
                     use_container_width=True,
                 )
         else:

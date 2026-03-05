@@ -62,10 +62,29 @@ def get_connection():
     return _get_local_connection()
 
 
+def _convert_timestamp_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert string timestamp columns to datetime.
+
+    Snowpark session.sql().to_pandas() can return TIMESTAMP columns as strings
+    instead of datetime64. This breaks .dt accessor usage downstream.
+    """
+    for col in df.columns:
+        if df[col].dtype == "object" and len(df) > 0:
+            sample = df[col].dropna().head(5)
+            if len(sample) > 0:
+                try:
+                    pd.to_datetime(sample)
+                    df[col] = pd.to_datetime(df[col], errors="coerce")
+                except (ValueError, TypeError):
+                    pass
+    return df
+
+
 def run_query(sql: str, params: dict | None = None) -> pd.DataFrame:
     """Execute a query and return a pandas DataFrame."""
     if _is_sis:
-        return _session.sql(sql).to_pandas()
+        df = _session.sql(sql).to_pandas()
+        return _convert_timestamp_columns(df)
 
     conn = get_connection()
     cursor = conn.cursor()
