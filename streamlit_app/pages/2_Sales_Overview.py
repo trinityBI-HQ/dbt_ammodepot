@@ -374,8 +374,7 @@ with table_cols[0]:
                 "GP": "${:,.2f}",
                 "MARGIN": "{:.2f}%",
                 "PRICE/UNIT": "${:,.2f}",
-            }),
-            hide_index=True,
+            }).hide(axis="index"),
             use_container_width=True,
         )
     else:
@@ -401,8 +400,7 @@ with table_cols[1]:
             customer_perf[display_cols].style.format({
                 "NET_SALES": "${:,.2f}",
                 "GP": "${:,.2f}",
-            }),
-            hide_index=True,
+            }).hide(axis="index"),
             use_container_width=True,
         )
     else:
