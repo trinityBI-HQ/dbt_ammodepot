@@ -70,7 +70,7 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
         select
             CREATED_AT,
             TIMEDATE,
-            date_trunc('HOUR', TIMEDATE) as HOUR_BUCKET,
+            extract(HOUR from TIMEDATE) as HOUR_NUM,
             INCREMENT_ID as ORDER_ID,
             CUSTOMER_EMAIL,
             CUSTOMER_NAME,
@@ -102,8 +102,7 @@ def load_sales_range(start_dt: date, end_dt: date, statuses: tuple) -> pd.DataFr
     sql = f"""
         select
             CREATED_AT,
-            TIMEDATE,
-            date_trunc('HOUR', TIMEDATE) as HOUR_BUCKET,
+            extract(HOUR from TIMEDATE) as HOUR_NUM,
             INCREMENT_ID as ORDER_ID,
             STORE_ID,
             STOREFRONT,
@@ -125,7 +124,7 @@ def load_last_month_sales(statuses: tuple) -> pd.DataFrame:
     sql = f"""
         select
             CREATED_AT,
-            date_trunc('HOUR', TIMEDATE) as HOUR_BUCKET,
+            extract(HOUR from TIMEDATE) as HOUR_NUM,
             INCREMENT_ID as ORDER_ID,
             ROW_TOTAL as NET_SALES,
             COST,
@@ -270,14 +269,13 @@ def _hourly_agg(df, metric):
         return pd.DataFrame(columns=["HOUR", "HOUR_LABEL", "VALUE"])
     df = df.copy()
     df["GP"] = df["NET_SALES"] - df["COST"]
-    hour_series = pd.to_datetime(df["HOUR_BUCKET"]).dt.hour
     if metric == "Orders":
-        r = df.groupby(hour_series)["ORDER_ID"].nunique()
+        r = df.groupby("HOUR_NUM")["ORDER_ID"].nunique()
     elif metric == "Units":
-        r = df.groupby(hour_series)["UNITS"].sum()
+        r = df.groupby("HOUR_NUM")["UNITS"].sum()
     else:
         col = "GP" if metric == "GP ($)" else "NET_SALES"
-        r = df.groupby(hour_series)[col].sum()
+        r = df.groupby("HOUR_NUM")[col].sum()
     result = r.reset_index().set_axis(["HOUR", "VALUE"], axis=1)
     result["HOUR_LABEL"] = result["HOUR"].apply(_hour_label)
     return result
@@ -289,7 +287,7 @@ def _hourly_avg(df, metric):
         return pd.DataFrame(columns=["HOUR", "HOUR_LABEL", "VALUE"])
     df = df.copy()
     df["GP"] = df["NET_SALES"] - df["COST"]
-    df["HOUR"] = pd.to_datetime(df["HOUR_BUCKET"]).dt.hour
+    df["HOUR"] = df["HOUR_NUM"]
     df["DAY"] = df["CREATED_AT"]
     n_days = df["DAY"].nunique()
     if n_days == 0:
@@ -429,7 +427,7 @@ with chart_cols[0]:
         if not df_heat.empty:
             df_heat = df_heat.copy()
             df_heat["GP"] = df_heat["NET_SALES"] - df_heat["COST"]
-            df_heat["HOUR"] = pd.to_datetime(df_heat["HOUR_BUCKET"]).dt.hour
+            df_heat["HOUR"] = df_heat["HOUR_NUM"]
             df_heat["DOW_NUM"] = pd.to_datetime(df_heat["CREATED_AT"]).dt.dayofweek
             df_heat["DOW"] = pd.to_datetime(df_heat["CREATED_AT"]).dt.day_name()
             if metric_toggle == "Orders":
