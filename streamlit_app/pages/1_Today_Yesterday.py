@@ -10,10 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
-from utils.db import run_query, debug_dataframe
-
-# --- Clear stale cache (TEMPORARY — remove after debugging) ---
-st.cache_data.clear()
+from utils.db import run_query
 
 # --- Page config ---
 st.title("SALES OVERVIEW: TODAY / YESTERDAY")
@@ -153,17 +150,6 @@ df_target = load_sales(target_date, statuses)
 df_compare = load_sales(compare_date, statuses)
 df_last_month = load_last_month_sales(statuses)
 
-# --- DEBUG: Remove after verifying SiS dtype fix ---
-debug_dataframe(df_target, f"df_target ({target_date})")
-if not df_target.empty:
-    with st.expander("DEBUG: groupby test", expanded=False):
-        hourly_sum = df_target.groupby("HOUR_NUM")["NET_SALES"].sum()
-        st.write(f"KPI total: {df_target['NET_SALES'].sum()}")
-        st.write(f"Groupby hourly total: {hourly_sum.sum()}")
-        st.write(f"HOUR_NUM dtype: {df_target['HOUR_NUM'].dtype}")
-        st.write(f"NET_SALES dtype: {df_target['NET_SALES'].dtype}")
-        st.dataframe(hourly_sum.reset_index())
-# --- END DEBUG ---
 
 # --- Storefront filter (always show Website + GunBroker) ---
 STOREFRONTS = ["Website", "GunBroker"]
@@ -323,7 +309,7 @@ def _hourly_avg(df, metric):
 
 
 # --- Charts row ---
-chart_cols = st.columns([4, 3, 3, 3])
+chart_cols = st.columns([40, 20, 20, 20])
 
 # Analytical View chart (first column — switches between Hourly / Bar Chart / Heat Map)
 with chart_cols[0]:
@@ -331,11 +317,6 @@ with chart_cols[0]:
         st.subheader(f"{metric_label} / Hourly")
         if not df_target.empty:
             hourly_target = _hourly_agg(df_target, metric_toggle)
-            # DEBUG: show chart data
-            with st.expander("DEBUG: hourly_target chart data", expanded=False):
-                st.write(f"rows: {len(hourly_target)}, VALUE dtype: {hourly_target['VALUE'].dtype}")
-                st.write(f"VALUE sum: {hourly_target['VALUE'].sum()}")
-                st.dataframe(hourly_target)
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=hourly_target["HOUR_LABEL"].tolist(),
@@ -518,10 +499,6 @@ with chart_cols[1]:
             cat_df["GP"] = cat_df["NET_SALES"] - cat_df["COST"]
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             cat_df = cat_df.sort_values(val_col, ascending=False)
-            # DEBUG
-            with st.expander("DEBUG: cat_df", expanded=False):
-                st.write(f"NET_SALES dtype: {cat_df['NET_SALES'].dtype}")
-                st.dataframe(cat_df)
             fig = px.bar(cat_df, x=val_col, y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
