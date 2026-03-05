@@ -759,10 +759,7 @@ with geo_right:
             map_df = map_df.rename(columns={
                 "LAT": "latitude", "LON": "longitude",
             })
-            st.map(
-                map_df, latitude="latitude", longitude="longitude",
-                size="size", color="#00d4aa",
-            )
+            st.map(map_df[["latitude", "longitude"]])
         else:
             st.info("No geographic data to map.")
     else:
