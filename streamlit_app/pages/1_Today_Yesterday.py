@@ -767,41 +767,17 @@ with geo_right:
             ]
             from utils.db import _is_sis
             if _is_sis:
-                # SiS: Scattergeo (no external tile requests)
-                fig = go.Figure(go.Scattergeo(
-                    lat=lat_list,
-                    lon=lon_list,
-                    marker=dict(
-                        size=size_list,
-                        color="#00d4aa",
-                        opacity=0.6,
-                        line=dict(width=0.3, color="#008866"),
-                    ),
-                    text=hover_texts,
-                    hoverinfo="text",
-                ))
-                fig.update_geos(
-                    resolution=50,
-                    bgcolor="rgba(0,0,0,0)",
-                    landcolor="#1a1a2e",
-                    lakecolor="#0d0d1a",
-                    oceancolor="#0d0d1a",
-                    showocean=True, showlakes=True,
-                    coastlinecolor="#555", coastlinewidth=0.5,
-                    countrycolor="#555", countrywidth=0.5,
-                    subunitcolor="#555", subunitwidth=0.8,
-                    showsubunits=True, showcoastlines=True,
-                    showcountries=True,
-                    center=dict(lat=38, lon=-97),
-                    projection_scale=3.5,
-                )
-                fig.update_layout(
-                    height=350,
-                    margin=dict(l=0, r=0, t=0, b=0),
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    geo=dict(bgcolor="rgba(0,0,0,0)"),
-                    showlegend=False,
-                )
+                # SiS: st.map (built-in, no external deps)
+                sis_map = pd.DataFrame({
+                    "latitude": lat_list,
+                    "longitude": lon_list,
+                    "size": size_list,
+                })
+                try:
+                    st.map(sis_map, size="size")
+                except TypeError:
+                    # Older Streamlit without size param
+                    st.map(sis_map[["latitude", "longitude"]])
             else:
                 # Local: Scattermapbox with CARTO dark tiles
                 fig = go.Figure(go.Scattermapbox(
@@ -825,7 +801,7 @@ with geo_right:
                     margin=dict(l=0, r=0, t=0, b=0),
                     showlegend=False,
                 )
-            st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No geographic data to map.")
     else:
