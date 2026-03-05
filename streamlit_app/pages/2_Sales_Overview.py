@@ -6,7 +6,6 @@ Source: AD_ANALYTICS.GOLD.F_SALES, D_PRODUCT, D_CUSTOMER, D_STORE
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
@@ -15,8 +14,8 @@ from utils.db import run_query
 # --- Page config ---
 st.title("SALES OVERVIEW")
 
-# Statuses to exclude by default (matches Power BI default filter)
-EXCLUDED_STATUSES = {"CLOSED", "HOLDED", "CANCELED", "FRAUD"}
+# Statuses preselected by default (matches Power BI default filter)
+DEFAULT_STATUSES = {"COMPLETE", "PROCESSING", "UNVERIFIED"}
 
 
 @st.cache_data(ttl=3600)
@@ -26,7 +25,7 @@ def load_order_statuses() -> list:
 
 
 all_statuses = load_order_statuses()
-default_statuses = [s for s in all_statuses if s not in EXCLUDED_STATUSES]
+default_statuses = [s for s in all_statuses if s in DEFAULT_STATUSES]
 
 # --- Category pages (mirrors Power BI 9-page structure) ---
 CATEGORIES = [
@@ -355,7 +354,7 @@ with chart_cols[1]:
         if not df_target.empty:
             cat_agg = _agg_metric(df_target, "CATEGORY", metric_toggle).head(8)
             if not cat_agg.empty:
-                fig = px.bar(cat_agg, x="VALUE", y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
+                fig = go.Figure(go.Bar(x=cat_agg["VALUE"].tolist(), y=cat_agg["CATEGORY"].tolist(), orientation="h", marker_color="#00d4aa"))
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -367,10 +366,7 @@ with chart_cols[1]:
         if not df_target.empty:
             gp_agg = _agg_metric(df_target, "GENERAL_PURPOSE", metric_toggle).head(8)
             if not gp_agg.empty:
-                fig = px.bar(
-                    gp_agg, x="VALUE", y="GENERAL_PURPOSE",
-                    orientation="h", color_discrete_sequence=["#00d4aa"],
-                )
+                fig = go.Figure(go.Bar(x=gp_agg["VALUE"].tolist(), y=gp_agg["GENERAL_PURPOSE"].tolist(), orientation="h", marker_color="#00d4aa"))
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -384,7 +380,7 @@ with chart_cols[2]:
     if not df_target.empty:
         mfr_agg = _agg_metric(df_target, "MANUFACTURER", metric_toggle).head(8)
         if not mfr_agg.empty:
-            fig = px.bar(mfr_agg, x="VALUE", y="MANUFACTURER", orientation="h", color_discrete_sequence=["#00d4aa"])
+            fig = go.Figure(go.Bar(x=mfr_agg["VALUE"].tolist(), y=mfr_agg["MANUFACTURER"].tolist(), orientation="h", marker_color="#00d4aa"))
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
             fig.update_xaxes(title="")
             fig.update_yaxes(title="")
@@ -399,7 +395,7 @@ with chart_cols[3]:
         if not df_target.empty:
             cal_agg = _agg_metric(df_target, "CALIBER", metric_toggle).head(8)
             if not cal_agg.empty:
-                fig = px.bar(cal_agg, x="VALUE", y="CALIBER", orientation="h", color_discrete_sequence=["#00d4aa"])
+                fig = go.Figure(go.Bar(x=cal_agg["VALUE"].tolist(), y=cal_agg["CALIBER"].tolist(), orientation="h", marker_color="#00d4aa"))
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -411,7 +407,7 @@ with chart_cols[3]:
         if not df_target.empty:
             vendor_agg = _agg_metric(df_target, "VENDOR", metric_toggle).head(6)
             if not vendor_agg.empty:
-                fig = px.bar(vendor_agg, x="VALUE", y="VENDOR", orientation="h", color_discrete_sequence=["#00d4aa"])
+                fig = go.Figure(go.Bar(x=vendor_agg["VALUE"].tolist(), y=vendor_agg["VENDOR"].tolist(), orientation="h", marker_color="#00d4aa"))
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
