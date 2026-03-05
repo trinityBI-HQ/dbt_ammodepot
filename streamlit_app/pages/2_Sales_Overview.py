@@ -273,19 +273,31 @@ def _agg_metric(df, group_col, metric):
     r.columns = [group_col, "VALUE"]
     return r.sort_values("VALUE", ascending=False)
 
+# Helper: aggregate by time bucket (Series-based groupby)
+def _agg_time_metric(df, time_series, metric):
+    if df.empty:
+        return pd.DataFrame(columns=["BUCKET", "VALUE"])
+    df = _add_gp(df)
+    if metric == "Orders":
+        r = df.groupby(time_series)["ORDER_ID"].nunique()
+    elif metric == "Units":
+        r = df.groupby(time_series)["UNITS"].sum()
+    else:
+        col = "GP" if metric == "GP ($)" else "NET_SALES"
+        r = df.groupby(time_series)[col].sum()
+    return r.reset_index().set_axis(["BUCKET", "VALUE"], axis=1)
+
 # Hourly/Daily chart — metric-aware
 with chart_cols[0]:
     if period == "TODAY":
         st.subheader(f"{metric_label} / Hourly")
         if not df_target.empty:
-            hourly_target = _agg_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
-            hourly_target.columns = ["HOUR", "VALUE"]
+            hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=hourly_target["HOUR"], y=hourly_target["VALUE"], name="Today", marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(x=hourly_target["BUCKET"], y=hourly_target["VALUE"], name="Today", marker_color="#00d4aa"))
             if not df_compare.empty:
-                hourly_compare = _agg_metric(df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle)
-                hourly_compare.columns = ["HOUR", "VALUE"]
-                fig.add_trace(go.Scatter(x=hourly_compare["HOUR"], y=hourly_compare["VALUE"], name="Yesterday", line=dict(color="gray", dash="dash")))
+                hourly_compare = _agg_time_metric(df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle)
+                fig.add_trace(go.Scatter(x=hourly_compare["BUCKET"], y=hourly_compare["VALUE"], name="Yesterday", line=dict(color="gray", dash="dash")))
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
             fig.update_xaxes(title="Hour", dtick=2)
             fig.update_yaxes(title="")
@@ -295,10 +307,9 @@ with chart_cols[0]:
     else:
         st.subheader(f"{metric_label} / Daily")
         if not df_target.empty:
-            daily_target = _agg_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
-            daily_target.columns = ["DATE", "VALUE"]
+            daily_target = _agg_time_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
             fig = go.Figure()
-            fig.add_trace(go.Bar(x=daily_target["DATE"], y=daily_target["VALUE"], name=period_label, marker_color="#00d4aa"))
+            fig.add_trace(go.Bar(x=daily_target["BUCKET"], y=daily_target["VALUE"], name=period_label, marker_color="#00d4aa"))
             fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=True, legend=dict(orientation="h"))
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
