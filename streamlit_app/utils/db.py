@@ -89,18 +89,24 @@ def _convert_timestamp_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _coerce_numeric_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert object columns with numeric values to native float.
+    """Convert object columns containing Decimal values to native float64.
 
-    Snowpark to_pandas() can return NUMBER columns as non-native types
-    (Decimal, etc.) stored as object dtype. Try astype(float) on every
-    object column — non-numeric columns (strings) will raise and be skipped.
+    Older Snowpark versions return NUMBER(p,s) columns as Python Decimal
+    objects stored in object-dtype Series.  pandas groupby().sum() silently
+    drops or mis-aggregates object-dtype columns (they are treated as
+    non-numeric "nuisance" columns).
+
+    This function ONLY converts columns whose first non-null value is a
+    Decimal instance, preserving genuine string columns (POSTCODE, STATUS,
+    REGION, etc.) that happen to contain digit-only values.
     """
+    from decimal import Decimal as _Decimal
+
     for col in df.columns:
         if df[col].dtype == "object" and len(df) > 0:
-            try:
-                df[col] = df[col].astype(float)
-            except (ValueError, TypeError):
-                pass
+            sample = df[col].dropna().iloc[0] if len(df[col].dropna()) > 0 else None
+            if isinstance(sample, _Decimal):
+                df[col] = pd.to_numeric(df[col], errors="coerce")
     return df
 
 
@@ -120,6 +126,30 @@ def run_query(sql: str, params: dict | None = None) -> pd.DataFrame:
             cursor.execute(sql)
         columns = [desc[0] for desc in cursor.description]
         df = pd.DataFrame(cursor.fetchall(), columns=columns)
+        df = _coerce_numeric_columns(df)
         return _convert_timestamp_columns(df)
     finally:
         cursor.close()
+
+
+def debug_dataframe(df: pd.DataFrame, label: str = "DataFrame") -> None:
+    """Show dtype and sample info in an expander. Remove after debugging."""
+    import io
+
+    with st.expander(f"DEBUG: {label} ({len(df)} rows)", expanded=False):
+        buf = io.StringIO()
+        df.info(buf=buf)
+        st.text(buf.getvalue())
+        if not df.empty:
+            st.write("First row raw values + types:")
+            row = df.iloc[0]
+            debug_rows = []
+            for col_name in df.columns:
+                val = row[col_name]
+                debug_rows.append({
+                    "column": col_name,
+                    "dtype": str(df[col_name].dtype),
+                    "value": repr(val),
+                    "type(value)": type(val).__name__,
+                })
+            st.dataframe(pd.DataFrame(debug_rows))
