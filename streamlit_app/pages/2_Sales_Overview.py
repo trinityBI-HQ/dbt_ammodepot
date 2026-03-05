@@ -236,26 +236,136 @@ def pct_delta(current, previous):
 
 # --- KPI Row ---
 st.divider()
+
+shipping_ns_pct = (kpi["freight_rev"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
+contrib_margin = (kpi["gp_after_var"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
+
+kpi_cards = [
+    {
+        "icon": "&#x1F4B2;",
+        "color": "#00B4D8",
+        "title": "Net Sales",
+        "value": f"${kpi['net_sales']:,.0f}",
+        "delta": pct_delta(kpi["net_sales"], kpi_prev["net_sales"]),
+        "sub_label": "Avg Ticket",
+        "sub_value": f"${avg_ticket:,.2f}",
+    },
+    {
+        "icon": "&#x1F4C8;",
+        "color": "#2DC653",
+        "title": "Gross Profit",
+        "value": f"${kpi['gross_profit']:,.0f}",
+        "delta": pct_delta(kpi["gross_profit"], kpi_prev["gross_profit"]),
+        "sub_label": "Margin",
+        "sub_value": f"{margin:.1f}%",
+    },
+    {
+        "icon": "&#x1F6D2;",
+        "color": "#00B4D8",
+        "title": "Orders",
+        "value": f"{kpi['orders']:,}",
+        "delta": pct_delta(kpi["orders"], kpi_prev["orders"]),
+        "sub_label": "Orders/Day",
+        "sub_value": f"{kpi['orders']}",
+    },
+    {
+        "icon": "&#x1F69A;",
+        "color": "#2DC653",
+        "title": "Shipping Revenue",
+        "value": f"${kpi['freight_rev']:,.0f}",
+        "delta": pct_delta(kpi["freight_rev"], kpi_prev["freight_rev"]),
+        "sub_label": "Shipping/NS",
+        "sub_value": f"{shipping_ns_pct:.1f}%",
+    },
+    {
+        "icon": "&#x1F6E1;",
+        "color": "#00B4D8",
+        "title": "GP After Var Cost",
+        "value": f"${kpi['gp_after_var']:,.0f}",
+        "delta": pct_delta(kpi["gp_after_var"], kpi_prev["gp_after_var"]),
+        "sub_label": "Contribution Margin",
+        "sub_value": f"{contrib_margin:.1f}%",
+    },
+]
+
+st.markdown(
+    """
+    <style>
+    .kpi-card {
+        background: #1E1E1E;
+        border-radius: 8px;
+        padding: 12px 16px;
+        border-left: 4px solid;
+        height: 100%;
+    }
+    .kpi-header {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+    .kpi-icon { font-size: 18px; }
+    .kpi-title {
+        font-size: 12px;
+        color: #AAAAAA;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: #FFFFFF;
+        margin: 2px 0;
+    }
+    .kpi-delta {
+        font-size: 12px;
+        margin-bottom: 6px;
+    }
+    .kpi-delta-pos { color: #2DC653; }
+    .kpi-delta-neg { color: #FF4B4B; }
+    .kpi-delta-zero { color: #AAAAAA; }
+    .kpi-sub {
+        font-size: 11px;
+        color: #888888;
+        border-top: 1px solid #333;
+        padding-top: 6px;
+        margin-top: 4px;
+    }
+    .kpi-sub-val {
+        color: #CCCCCC;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 kpi_cols = st.columns(5)
-with kpi_cols[0]:
-    st.metric("Net Sales ($)", f"${kpi['net_sales']:,.0f}", pct_delta(kpi["net_sales"], kpi_prev["net_sales"]))
-    st.caption(f"Avg Ticket: ${avg_ticket:,.2f}")
-with kpi_cols[1]:
-    gp_delta = pct_delta(kpi["gross_profit"], kpi_prev["gross_profit"])
-    st.metric("Gross Profit ($)", f"${kpi['gross_profit']:,.0f}", gp_delta)
-    st.caption(f"Margin: {margin:.1f}%")
-with kpi_cols[2]:
-    st.metric("Orders", f"{kpi['orders']:,}", pct_delta(kpi["orders"], kpi_prev["orders"]))
-with kpi_cols[3]:
-    fr_delta = pct_delta(kpi["freight_rev"], kpi_prev["freight_rev"])
-    st.metric("Shipping Revenue ($)", f"${kpi['freight_rev']:,.0f}", fr_delta)
-    shipping_ns_pct = (kpi["freight_rev"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
-    st.caption(f"Shipping/NS: {shipping_ns_pct:.1f}%")
-with kpi_cols[4]:
-    gpa_delta = pct_delta(kpi["gp_after_var"], kpi_prev["gp_after_var"])
-    st.metric("GP After Variable Cost", f"${kpi['gp_after_var']:,.0f}", gpa_delta)
-    contrib_margin = (kpi["gp_after_var"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
-    st.caption(f"Contribution Margin: {contrib_margin:.1f}%")
+for i, card in enumerate(kpi_cards):
+    delta = card["delta"]
+    if delta and delta.startswith("+"):
+        delta_class = "kpi-delta-pos"
+    elif delta and delta.startswith("-"):
+        delta_class = "kpi-delta-neg"
+    else:
+        delta_class = "kpi-delta-zero"
+    delta_text = f"vs {compare_label}: {delta}" if delta else f"vs {compare_label}: --"
+
+    html = f"""
+    <div class="kpi-card" style="border-left-color: {card['color']};">
+        <div class="kpi-header">
+            <span class="kpi-icon">{card['icon']}</span>
+            <span class="kpi-title">{card['title']}</span>
+        </div>
+        <div class="kpi-value">{card['value']}</div>
+        <div class="kpi-delta {delta_class}">{delta_text}</div>
+        <div class="kpi-sub">
+            {card['sub_label']}: <span class="kpi-sub-val">{card['sub_value']}</span>
+        </div>
+    </div>
+    """
+    with kpi_cols[i]:
+        st.markdown(html, unsafe_allow_html=True)
 
 st.divider()
 
