@@ -746,24 +746,23 @@ with geo_right:
         )
         map_df = map_df.dropna(subset=["LAT", "LON"])
         if not map_df.empty:
-            fig = px.scatter_geo(
-                map_df, lat="LAT", lon="LON", scope="usa",
-                size="NET_SALES", text="REGION",
-                hover_data={
-                    "REGION": True, "NET_SALES": ":$,.0f",
-                    "ORDERS": True, "LAT": False, "LON": False,
-                },
-                color_discrete_sequence=["#00d4aa"],
+            # Normalize size for st.map (min 10, max 80)
+            max_sales = map_df["NET_SALES"].max()
+            min_size, max_size = 10, 80
+            if max_sales > 0:
+                map_df["size"] = (
+                    min_size + (map_df["NET_SALES"] / max_sales)
+                    * (max_size - min_size)
+                )
+            else:
+                map_df["size"] = min_size
+            map_df = map_df.rename(columns={
+                "LAT": "latitude", "LON": "longitude",
+            })
+            st.map(
+                map_df, latitude="latitude", longitude="longitude",
+                size="size", color="#00d4aa",
             )
-            fig.update_layout(
-                height=350, margin=dict(l=0, r=0, t=0, b=0),
-                geo=dict(
-                    bgcolor="rgba(0,0,0,0)",
-                    lakecolor="rgba(0,0,0,0.1)",
-                ),
-            )
-            fig.update_traces(marker=dict(line=dict(width=0)))
-            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No geographic data to map.")
     else:
