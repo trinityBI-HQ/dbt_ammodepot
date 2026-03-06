@@ -663,7 +663,7 @@ with tab_vendor:
                 monthly = received_df.groupby("MONTH").agg(
                     QTY=("QTY", "sum"),
                     AVG_COST=("UNIT_COST", "mean"),
-                ).reset_index().tail(12)
+                ).reset_index().sort_values("MONTH").tail(12)
 
                 months = monthly["MONTH"].tolist()
                 qty_vals = monthly["QTY"].tolist()
@@ -701,7 +701,10 @@ with tab_vendor:
                         title="", side="right",
                         overlaying="y", showgrid=False,
                     ),
-                    xaxis=dict(type="category"),
+                    xaxis=dict(
+                        type="category",
+                        rangeslider=dict(visible=True, thickness=0.05),
+                    ),
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
