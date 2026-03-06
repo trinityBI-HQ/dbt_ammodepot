@@ -157,16 +157,19 @@ df_compare = load_sales(compare_date, statuses)
 df_last_month = load_last_month_sales(statuses)
 
 
-# --- Storefront filter (always show Website + GunBroker) ---
+# --- Storefront + Store filters (UI rendered at bottom, filtering here) ---
 STOREFRONTS = ["Website", "GunBroker"]
-sf_cols = st.columns(len(STOREFRONTS) + 1)
-with sf_cols[0]:
-    st.caption("STOREFRONT")
-selected_storefronts = []
-for i, sf in enumerate(STOREFRONTS):
-    with sf_cols[i + 1]:
-        if st.checkbox(sf, value=True, key=f"ty_sf_{sf}"):
-            selected_storefronts.append(sf)
+for sf in STOREFRONTS:
+    if f"ty_sf_{sf}" not in st.session_state:
+        st.session_state[f"ty_sf_{sf}"] = True
+
+store_names = store_df["NAME"].tolist() if not store_df.empty else []
+for name in store_names:
+    if f"ty_store_{name}" not in st.session_state:
+        st.session_state[f"ty_store_{name}"] = True
+
+# Apply storefront filter from session state
+selected_storefronts = [sf for sf in STOREFRONTS if st.session_state.get(f"ty_sf_{sf}", True)]
 if selected_storefronts and not df_target.empty:
     df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
     df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
@@ -175,26 +178,19 @@ if selected_storefronts and not df_target.empty:
             df_last_month["STOREFRONT"].isin(selected_storefronts)
         ]
 
-# --- Store filter (all stores, matching Power BI) ---
-store_names = store_df["NAME"].tolist() if not store_df.empty else []
+# Apply store filter from session state
 selected_store_ids = []
-if store_names:
-    store_cols = st.columns(len(store_names) + 1)
-    with store_cols[0]:
-        st.caption("STORE")
-    for i, name in enumerate(store_names):
-        with store_cols[i + 1]:
-            if st.checkbox(name, value=True, key=f"store_{name}"):
-                sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
-                selected_store_ids.append(sid)
-
-    if selected_store_ids and not df_target.empty:
-        df_target = df_target[df_target["STORE_ID"].isin(selected_store_ids)]
-        df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids)]
-        if not df_last_month.empty:
-            df_last_month = df_last_month[
-                df_last_month["STORE_ID"].isin(selected_store_ids)
-            ]
+for name in store_names:
+    if st.session_state.get(f"ty_store_{name}", True):
+        sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
+        selected_store_ids.append(sid)
+if selected_store_ids and not df_target.empty:
+    df_target = df_target[df_target["STORE_ID"].isin(selected_store_ids)]
+    df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids)]
+    if not df_last_month.empty:
+        df_last_month = df_last_month[
+            df_last_month["STORE_ID"].isin(selected_store_ids)
+        ]
 
 # --- Compute GP for downstream use ---
 if not df_target.empty:
@@ -926,6 +922,21 @@ with geo_right:
             st.info("No geographic data to map.")
     else:
         st.info("No geographic data.")
+
+# --- Store filter UI (rendered at bottom, matches PBI layout) ---
+st.divider()
+st.markdown("**STOREFRONT**")
+sf_ui_cols = st.columns(len(STOREFRONTS))
+for i, sf in enumerate(STOREFRONTS):
+    with sf_ui_cols[i]:
+        st.checkbox(sf, key=f"ty_sf_{sf}")
+
+if store_names:
+    st.markdown("**STORE**")
+    store_ui_cols = st.columns(len(store_names))
+    for i, name in enumerate(store_names):
+        with store_ui_cols[i]:
+            st.checkbox(name, key=f"ty_store_{name}")
 
 # --- Footer ---
 st.divider()
