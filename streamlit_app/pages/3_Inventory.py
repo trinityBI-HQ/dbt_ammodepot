@@ -137,6 +137,7 @@ def load_pos_data() -> pd.DataFrame:
             f.DATERECEIVED,
             f.PO_CREATED_AT,
             f.PO_ISSUED_AT,
+            f.PO_FIRST_SHIPMENT_DATE,
             f.SCHEDULED_FULFILLMENT_DATE,
             f.QUANTITY_FULFILLED,
             f.QUANTITY_TO_FULFILL,
@@ -566,101 +567,298 @@ with tab_inv:
 # =============================================================================
 with tab_vendor:
     if not pos_df.empty:
-        # Filter to received items only
+        # --- Receipt Filters ---
+        st.markdown("**RECEIPT FILTERS**")
+        rcpt_periods = ["L. 30 Days", "L. 90 Days", "L. 180 Days", "L. 365 Days"]
+        rf_row = st.columns([2, 2, 2, 2, 3])
+        with rf_row[0]:
+            rcpt_period = st.radio(
+                "Receipt Period", rcpt_periods,
+                index=2, horizontal=True,
+                label_visibility="collapsed",
+                key="va_rcpt_period",
+            )
+        with rf_row[4]:
+            va_show_custom = st.checkbox(
+                "Custom Filters", value=False, key="va_custom_toggle",
+            )
+
+        # Compute receipt date range
+        rcpt_days_map = {
+            "L. 30 Days": 30, "L. 90 Days": 90,
+            "L. 180 Days": 180, "L. 365 Days": 365,
+        }
+        rcpt_lookback = rcpt_days_map[rcpt_period]
+        rcpt_start = today - timedelta(days=rcpt_lookback)
+        rcpt_end = today
+
+        if va_show_custom:
+            va_custom_cols = st.columns([2, 2, 2, 2])
+            years = list(range(today.year, 2018, -1))
+            months_list = [
+                "All", "January", "February", "March", "April", "May",
+                "June", "July", "August", "September", "October",
+                "November", "December",
+            ]
+            with va_custom_cols[0]:
+                va_year = st.selectbox("Year", years, index=0, key="va_year")
+            with va_custom_cols[1]:
+                va_month = st.selectbox(
+                    "Month", months_list, index=0, key="va_month",
+                )
+            with va_custom_cols[2]:
+                va_week = st.selectbox(
+                    "Week", ["All", "W1", "W2", "W3", "W4"],
+                    index=0, key="va_week",
+                )
+            day_options = [
+                "All", "Monday", "Tuesday", "Wednesday",
+                "Thursday", "Friday", "Saturday", "Sunday",
+            ]
+            with va_custom_cols[3]:
+                va_day = st.selectbox(
+                    "Day of Week", day_options, index=0, key="va_day",
+                )
+            # Override receipt period from custom filters
+            if va_month != "All":
+                month_num = months_list.index(va_month)
+                rcpt_start = date(va_year, month_num, 1)
+                if month_num == 12:
+                    rcpt_end = date(va_year, 12, 31)
+                else:
+                    rcpt_end = date(va_year, month_num + 1, 1) - timedelta(days=1)
+            else:
+                rcpt_start = date(va_year, 1, 1)
+                rcpt_end = date(va_year, 12, 31)
+            if rcpt_end > today:
+                rcpt_end = today
+
+        # Filter to received items within receipt period
         received_df = pos_df[pos_df["DATERECEIVED"].notna()].copy()
+        received_df["RCPT_DATE"] = pd.to_datetime(received_df["DATERECEIVED"]).dt.date
+        received_df = received_df[
+            (received_df["RCPT_DATE"] >= rcpt_start)
+            & (received_df["RCPT_DATE"] <= rcpt_end)
+        ]
 
         # Vendor filter
         vendors = sorted(received_df["VENDOR_NAME"].dropna().unique().tolist())
         sel_vendor = st.multiselect("Vendor", vendors, key="va_vendor")
         if sel_vendor:
-            received_df = received_df[received_df["VENDOR_NAME"].isin(sel_vendor)]
+            received_df = received_df[
+                received_df["VENDOR_NAME"].isin(sel_vendor)
+            ]
 
         st.divider()
 
-        # Charts row
-        chart_cols = st.columns(2)
-
-        with chart_cols[0]:
-            st.subheader("Qty Received / Month")
+        # --- QTY AND COST PER RECEIPTS (dual-axis chart) ---
+        chart_row = st.columns([3, 2])
+        with chart_row[0]:
+            st.subheader("QTY AND COST PER RECEIPTS")
             if not received_df.empty:
-                received_df["MONTH"] = pd.to_datetime(received_df["DATERECEIVED"]).dt.to_period("M").astype(str)
-                monthly_qty = received_df.groupby("MONTH")["QTY"].sum().reset_index().tail(12)
-                fig = go.Figure(go.Bar(
-                    x=monthly_qty["MONTH"].tolist(),
-                    y=monthly_qty["QTY"].tolist(),
-                    marker_color="#00d4aa",
-                ))
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
+                received_df["MONTH"] = (
+                    pd.to_datetime(received_df["DATERECEIVED"])
+                    .dt.to_period("M").astype(str)
+                )
+                monthly = received_df.groupby("MONTH").agg(
+                    QTY=("QTY", "sum"),
+                    AVG_COST=("UNIT_COST", "mean"),
+                ).reset_index().tail(12)
 
-        with chart_cols[1]:
-            st.subheader("Avg Unit Cost / Month")
-            if not received_df.empty:
-                monthly_cost = received_df.groupby("MONTH")["UNIT_COST"].mean().reset_index().tail(12)
-                fig = go.Figure(go.Scatter(
-                    x=monthly_cost["MONTH"].tolist(),
-                    y=monthly_cost["UNIT_COST"].tolist(),
-                    mode="lines+markers",
-                    line=dict(color="#00d4aa"),
+                months = monthly["MONTH"].tolist()
+                qty_vals = monthly["QTY"].tolist()
+                cost_vals = monthly["AVG_COST"].tolist()
+
+                fig = go.Figure()
+                fig.add_trace(go.Bar(
+                    x=months, y=qty_vals,
+                    name="QTY",
+                    marker_color="#5B9BD5",
+                    text=[f"{v:,.0f}" for v in qty_vals],
+                    textposition="outside",
+                    yaxis="y",
                 ))
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
-                fig.update_yaxes(title="")
+                fig.add_trace(go.Scatter(
+                    x=months, y=cost_vals,
+                    name="Avg. Cost",
+                    mode="lines+markers+text",
+                    line=dict(color="#E8B84B", dash="dot", width=2),
+                    marker=dict(color="#E8B84B", size=6),
+                    text=[f"${v:,.2f}" for v in cost_vals],
+                    textposition="top center",
+                    textfont=dict(size=10),
+                    yaxis="y2",
+                ))
+                fig.update_layout(
+                    height=400,
+                    margin=dict(l=50, r=50, t=10, b=40),
+                    legend=dict(
+                        orientation="h", yanchor="bottom",
+                        y=1.02, xanchor="left", x=0,
+                    ),
+                    yaxis=dict(title="", side="left"),
+                    yaxis2=dict(
+                        title="", side="right",
+                        overlaying="y", showgrid=False,
+                    ),
+                    xaxis=dict(type="category"),
+                )
                 st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No receipt data for the selected period.")
+
+        # --- INDIVIDUAL POS table ---
+        with chart_row[1]:
+            st.subheader("INDIVIDUAL POS")
+            if not received_df.empty:
+                po_detail = received_df.groupby("PURCHASE_ORDER_ID").agg(
+                    CREATED=("PO_CREATED_AT", "min"),
+                    F_DELIVER=("RCPT_DATE", "min"),
+                    L_DELIVER=("RCPT_DATE", "max"),
+                    FILLED=("QTY", "sum"),
+                    TOTAL=("QUANTITY_TO_FULFILL", "max"),
+                    LT=("PRECISE_LEADTIME", "mean"),
+                    EXPECTED=("DATE_EXPECTED", "max"),
+                    DELIVERS=("RCPT_DATE", "nunique"),
+                ).reset_index().sort_values(
+                    "PURCHASE_ORDER_ID", ascending=False,
+                ).head(30)
+
+                po_detail["CREATED"] = pd.to_datetime(
+                    po_detail["CREATED"]
+                ).dt.strftime("%m/%d/%Y")
+                po_detail["F_DELIVER"] = pd.to_datetime(
+                    po_detail["F_DELIVER"].astype(str)
+                ).dt.strftime("%m/%d/%Y")
+                po_detail["L_DELIVER"] = pd.to_datetime(
+                    po_detail["L_DELIVER"].astype(str)
+                ).dt.strftime("%m/%d/%Y")
+                po_detail["EXPECTED"] = pd.to_datetime(
+                    po_detail["EXPECTED"]
+                ).dt.strftime("%m/%d/%Y")
+                po_detail["PCT"] = po_detail.apply(
+                    lambda r: (r["FILLED"] / r["TOTAL"] * 100)
+                    if r["TOTAL"] and r["TOTAL"] > 0 else 0,
+                    axis=1,
+                )
+                po_detail["LT_EXPECTED"] = po_detail["LT"]
+
+                display_po = po_detail[[
+                    "PURCHASE_ORDER_ID", "CREATED", "F_DELIVER",
+                    "L_DELIVER", "FILLED", "TOTAL", "PCT",
+                    "LT", "LT_EXPECTED", "EXPECTED", "DELIVERS",
+                ]].copy()
+                display_po.columns = [
+                    "POID", "Created", "F. Deliver", "L. Deliver",
+                    "FILLED", "TOTAL", "%",
+                    "LT", "LT Expected", "Expected", "Delivers",
+                ]
+                st.dataframe(
+                    display_po.style.format({
+                        "FILLED": "{:,.0f}",
+                        "TOTAL": "{:,.0f}",
+                        "%": "{:.2f}%",
+                        "LT": "{:,.0f}",
+                        "LT Expected": "{:,.0f}",
+                        "Delivers": "{:,.0f}",
+                    }).hide(axis="index"),
+                    use_container_width=True,
+                    height=400,
+                )
+            else:
+                st.info("No PO data for the selected period.")
 
         st.divider()
 
-        # Breakdown tables
+        # --- Breakdown tables (VENDOR, CALIBER, PART SKU) ---
+        def _build_breakdown(grp_df, group_col, group_label):
+            """Build PBI-matching breakdown with totals row."""
+            agg = grp_df.groupby(group_col).agg(
+                QTY=("QTY", "sum"),
+                TOTAL_COST=("TOTAL_COST", "sum"),
+                DELIVERS=("PURCHASE_ORDER_ID", "nunique"),
+                LT=("PRECISE_LEADTIME", "mean"),
+            ).reset_index().sort_values("QTY", ascending=False)
+
+            agg["AVG_COST"] = (agg["TOTAL_COST"] / agg["QTY"]).round(2)
+            agg["W_AVG_COST"] = (agg["TOTAL_COST"] / agg["QTY"]).round(2)
+
+            # Totals row
+            totals = pd.DataFrame([{
+                group_col: "Total",
+                "QTY": agg["QTY"].sum(),
+                "AVG_COST": (
+                    agg["TOTAL_COST"].sum() / agg["QTY"].sum()
+                    if agg["QTY"].sum() > 0 else 0
+                ),
+                "DELIVERS": agg["DELIVERS"].sum(),
+                "LT": agg["LT"].mean(),
+                "W_AVG_COST": (
+                    agg["TOTAL_COST"].sum() / agg["QTY"].sum()
+                    if agg["QTY"].sum() > 0 else 0
+                ),
+                "TOTAL_COST": agg["TOTAL_COST"].sum(),
+            }])
+            agg = pd.concat([agg.head(15), totals], ignore_index=True)
+
+            table = agg[[
+                group_col, "QTY", "AVG_COST", "DELIVERS",
+                "LT", "W_AVG_COST", "TOTAL_COST",
+            ]].copy()
+            table.columns = [
+                group_label, "QTY", "Avg. Cost", "Delivers",
+                "LT", "W. Avg. Cost", "Total Cost",
+            ]
+            return table
+
         table_cols = st.columns(3)
+        if not received_df.empty:
+            with table_cols[0]:
+                st.subheader("VENDOR")
+                vt = _build_breakdown(received_df, "VENDOR_NAME", "VENDOR")
+                st.dataframe(
+                    vt.style.format({
+                        "QTY": "{:,.0f}",
+                        "Avg. Cost": "${:,.2f}",
+                        "Delivers": "{:,.0f}",
+                        "LT": "{:,.0f}",
+                        "W. Avg. Cost": "${:,.2f}",
+                        "Total Cost": "${:,.0f}",
+                    }).hide(axis="index"),
+                    use_container_width=True,
+                )
 
-        with table_cols[0]:
-            st.subheader("By Vendor")
-            vendor_agg = received_df.groupby("VENDOR_NAME").agg(
-                QTY=("QTY", "sum"),
-                TOTAL_COST=("TOTAL_COST", "sum"),
-                POS=("PURCHASE_ORDER_ID", "nunique"),
-            ).reset_index().sort_values("QTY", ascending=False).head(15)
-            vendor_agg["AVG_COST"] = (vendor_agg["TOTAL_COST"] / vendor_agg["QTY"]).round(2)
-            st.dataframe(
-                vendor_agg.style.format({
-                    "QTY": "{:,.0f}",
-                    "TOTAL_COST": "${:,.2f}",
-                    "AVG_COST": "${:,.2f}",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
+            with table_cols[1]:
+                st.subheader("CALIBER")
+                ct = _build_breakdown(received_df, "CALIBER", "CALIBER")
+                st.dataframe(
+                    ct.style.format({
+                        "QTY": "{:,.0f}",
+                        "Avg. Cost": "${:,.2f}",
+                        "Delivers": "{:,.0f}",
+                        "LT": "{:,.0f}",
+                        "W. Avg. Cost": "${:,.2f}",
+                        "Total Cost": "${:,.0f}",
+                    }).hide(axis="index"),
+                    use_container_width=True,
+                )
 
-        with table_cols[1]:
-            st.subheader("By Caliber")
-            cal_agg = received_df.groupby("CALIBER").agg(
-                QTY=("QTY", "sum"),
-                TOTAL_COST=("TOTAL_COST", "sum"),
-            ).reset_index().sort_values("QTY", ascending=False).head(15)
-            st.dataframe(
-                cal_agg.style.format({
-                    "QTY": "{:,.0f}",
-                    "TOTAL_COST": "${:,.2f}",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
-
-        with table_cols[2]:
-            st.subheader("By Part SKU")
-            sku_agg = received_df.groupby("SKU").agg(
-                QTY=("QTY", "sum"),
-                TOTAL_COST=("TOTAL_COST", "sum"),
-                UNIT_COST=("UNIT_COST", "mean"),
-            ).reset_index().sort_values("QTY", ascending=False).head(15)
-            st.dataframe(
-                sku_agg.style.format({
-                    "QTY": "{:,.0f}",
-                    "TOTAL_COST": "${:,.2f}",
-                    "UNIT_COST": "${:,.4f}",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
+            with table_cols[2]:
+                st.subheader("PART SKU")
+                pt = _build_breakdown(received_df, "SKU", "PART SKU")
+                st.dataframe(
+                    pt.style.format({
+                        "QTY": "{:,.0f}",
+                        "Avg. Cost": "${:,.2f}",
+                        "Delivers": "{:,.0f}",
+                        "LT": "{:,.0f}",
+                        "W. Avg. Cost": "${:,.2f}",
+                        "Total Cost": "${:,.0f}",
+                    }).hide(axis="index"),
+                    use_container_width=True,
+                )
+        else:
+            st.info("No receipt data for the selected period.")
     else:
         st.info("No purchase order data available.")
 
