@@ -655,17 +655,21 @@ with tab_vendor:
         chart_row = st.columns([3, 2])
         with chart_row[0]:
             st.subheader("QTY AND COST PER RECEIPTS")
-            if not received_df.empty:
-                received_df["MONTH_KEY"] = (
-                    pd.to_datetime(received_df["DATERECEIVED"])
+            # Chart uses ALL received data (back to 2019), not filtered
+            all_received = pos_df[pos_df["DATERECEIVED"].notna()].copy()
+            if not all_received.empty:
+                all_received["MONTH_KEY"] = (
+                    pd.to_datetime(all_received["DATERECEIVED"])
                     .dt.to_period("M").astype(str)
                 )
-                monthly = received_df.groupby("MONTH_KEY").agg(
+                monthly = all_received.groupby("MONTH_KEY").agg(
                     QTY=("QTY", "sum"),
                     AVG_COST=("UNIT_COST", "mean"),
-                ).reset_index().sort_values("MONTH_KEY")
+                ).reset_index().sort_values(
+                    "MONTH_KEY", ascending=False,
+                )
 
-                # Format labels: "Nov", "Dec", then "Jan\n2026"
+                # Format labels: newest first, year shown on change
                 labels = []
                 prev_year = None
                 for mk in monthly["MONTH_KEY"]:
@@ -702,6 +706,9 @@ with tab_vendor:
                     textfont=dict(size=10),
                     yaxis="y2",
                 ))
+                # Show ~10 most recent months initially, scroll for rest
+                n_months = len(months)
+                visible_end = min(10, n_months) - 1
                 fig.update_layout(
                     height=400,
                     margin=dict(l=50, r=50, t=10, b=40),
@@ -716,12 +723,13 @@ with tab_vendor:
                     ),
                     xaxis=dict(
                         type="category",
+                        range=[-0.5, visible_end + 0.5],
                         rangeslider=dict(visible=True, thickness=0.05),
                     ),
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("No receipt data for the selected period.")
+                st.info("No receipt data available.")
 
         # --- INDIVIDUAL POS table ---
         with chart_row[1]:
