@@ -149,6 +149,7 @@ def load_pos_data() -> pd.DataFrame:
         from F_POS f
         left join D_VENDOR v on f.VENDOR_ID = v.VENDOR_ID
         left join D_PRODUCT p on f.PART_NUMBER = p.SKU
+        where f.LOCATION_GROUP_ID = 8
     """
     return run_query(sql)
 
