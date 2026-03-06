@@ -669,26 +669,27 @@ with tab_vendor:
                     "MONTH_KEY", ascending=False,
                 )
 
-                # Format labels: newest first, year shown on change
-                labels = []
+                # Use numeric positions for x to avoid duplicate labels
+                x_pos = list(range(len(monthly)))
+                qty_vals = monthly["QTY"].tolist()
+                cost_vals = monthly["AVG_COST"].tolist()
+
+                # Tick labels: "Nov", "Dec", "Jan<br>2026"
+                tick_labels = []
                 prev_year = None
                 for mk in monthly["MONTH_KEY"]:
                     dt = pd.Timestamp(mk)
                     mon = dt.strftime("%b")
                     yr = dt.year
                     if prev_year is not None and yr != prev_year:
-                        labels.append(f"{mon}<br>{yr}")
+                        tick_labels.append(f"{mon}<br>{yr}")
                     else:
-                        labels.append(mon)
+                        tick_labels.append(mon)
                     prev_year = yr
-
-                months = labels
-                qty_vals = monthly["QTY"].tolist()
-                cost_vals = monthly["AVG_COST"].tolist()
 
                 fig = go.Figure()
                 fig.add_trace(go.Bar(
-                    x=months, y=qty_vals,
+                    x=x_pos, y=qty_vals,
                     name="QTY",
                     marker_color="#5B9BD5",
                     text=[f"{v:,.0f}" for v in qty_vals],
@@ -696,7 +697,7 @@ with tab_vendor:
                     yaxis="y",
                 ))
                 fig.add_trace(go.Scatter(
-                    x=months, y=cost_vals,
+                    x=x_pos, y=cost_vals,
                     name="Avg. Cost",
                     mode="lines+markers+text",
                     line=dict(color="#E8B84B", dash="dot", width=2),
@@ -707,7 +708,7 @@ with tab_vendor:
                     yaxis="y2",
                 ))
                 # Show ~10 most recent months initially, scroll for rest
-                n_months = len(months)
+                n_months = len(x_pos)
                 visible_end = min(10, n_months) - 1
                 fig.update_layout(
                     height=400,
@@ -722,7 +723,9 @@ with tab_vendor:
                         overlaying="y", showgrid=False,
                     ),
                     xaxis=dict(
-                        type="category",
+                        tickmode="array",
+                        tickvals=x_pos,
+                        ticktext=tick_labels,
                         range=[-0.5, visible_end + 0.5],
                         rangeslider=dict(visible=True, thickness=0.05),
                     ),
