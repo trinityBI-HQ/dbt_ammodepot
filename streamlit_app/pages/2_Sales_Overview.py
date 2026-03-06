@@ -19,10 +19,13 @@ st.markdown(
     "</style>",
     unsafe_allow_html=True,
 )
-st.title("SALES OVERVIEW")
+
+# Title placeholder — updated after category selection
+_title_placeholder = st.empty()
 
 # Statuses preselected by default (matches Power BI default filter)
 DEFAULT_STATUSES = {"COMPLETE", "PROCESSING", "UNVERIFIED"}
+FREE_SHIPPING_THRESHOLD = 140  # matches dbt var ammodepot_free_shipping_threshold
 
 
 @st.cache_data(ttl=3600)
@@ -81,9 +84,13 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             p."Attribute Set" as CATEGORY,
             p."Manufacturer" as MANUFACTURER,
             p."Caliber" as CALIBER,
+            p."Projectile" as PROJECTILE,
             p."General Purpose" as GENERAL_PURPOSE,
             p."Manufacturer SKU" as MANUFACTURER_SKU,
-            p."Product Name" as PRODUCT_NAME
+            p."Product Name" as PRODUCT_NAME,
+            p."DD Gun Action" as GUN_ACTION,
+            p."Capacity" as CAPACITY,
+            p."Material" as MATERIAL
         from F_SALES f
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
@@ -92,8 +99,8 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
     return run_query(sql)
 
 
-# --- Filters row 1: Period + Category + Order Status ---
-filter_cols = st.columns([2, 3, 3, 4])
+# --- Filters row 1: Period + Category + Order Status + Analytical View + Custom Filters ---
+filter_cols = st.columns([2, 3, 3, 3, 3, 2])
 with filter_cols[0]:
     period = st.radio("Period", ["TODAY", "MTD", "YTD"], horizontal=True)
 with filter_cols[1]:
@@ -105,20 +112,78 @@ with filter_cols[2]:
         default=default_statuses,
     )
 with filter_cols[3]:
+    analytical_view = st.radio("Analytical View", ["Hourly", "Bar Chart", "Heat Map"], horizontal=True)
+with filter_cols[4]:
     metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
+with filter_cols[5]:
+    st.checkbox("Custom Filters", value=False, key="so_custom_toggle")
 
-# Metric mapping
+# --- Custom Filters row (Year / Month / Week / Day — matches PBI) ---
+today = date.today()
+custom_active = st.session_state.get("so_custom_toggle", False)
+
+if custom_active:
+    custom_cols = st.columns([2, 2, 2, 2])
+    years = list(range(today.year, 2018, -1))
+    months_list = [
+        "All", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
+    with custom_cols[0]:
+        st.selectbox("Year", years, index=0, key="so_custom_year")
+    with custom_cols[1]:
+        st.selectbox("Month", months_list, index=0, key="so_custom_month")
+    with custom_cols[2]:
+        st.selectbox(
+            "Week", ["All", "W1", "W2", "W3", "W4"],
+            index=0, key="so_custom_week",
+        )
+    day_options = [
+        "All", "Monday", "Tuesday", "Wednesday",
+        "Thursday", "Friday", "Saturday", "Sunday",
+    ]
+    with custom_cols[3]:
+        st.selectbox("Day of Week", day_options, index=0, key="so_custom_day")
+
+# --- Dynamic title (rendered at top via placeholder) ---
+_title_placeholder.title(f"SALES OVERVIEW: {category.upper()}")
+
+# Metric mapping: toggle value → (column, format, chart_label)
+# Chart labels match PBI: "$", "G.P. ($)", "Orders", "Units"
 METRIC_MAP = {
-    "$": ("NET_SALES", "${:,.0f}", "Sales ($)"),
-    "GP ($)": ("GP", "${:,.0f}", "Gross Profit ($)"),
+    "$": ("NET_SALES", "${:,.0f}", "Orders"),
+    "GP ($)": ("GP", "${:,.0f}", "G.P. ($)"),
     "Orders": ("ORDERS", "{:,.0f}", "Orders"),
     "Units": ("UNITS", "{:,.0f}", "Units"),
 }
 metric_col, metric_fmt, metric_label = METRIC_MAP[metric_toggle]
 
 # --- Date logic ---
-today = date.today()
-if period == "TODAY":
+if custom_active:
+    sel_year = st.session_state.get("so_custom_year", today.year)
+    sel_month_name = st.session_state.get("so_custom_month", "All")
+    months_list_idx = [
+        "All", "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    ]
+    if sel_month_name != "All":
+        month_num = months_list_idx.index(sel_month_name)
+        start_date = date(sel_year, month_num, 1)
+        if month_num == 12:
+            end_date = date(sel_year, 12, 31)
+        else:
+            end_date = date(sel_year, month_num + 1, 1) - timedelta(days=1)
+    else:
+        start_date = date(sel_year, 1, 1)
+        end_date = date(sel_year, 12, 31)
+    if end_date > today:
+        end_date = today
+    # Compare to same period previous year
+    compare_start = date(sel_year - 1, start_date.month, start_date.day)
+    compare_end = date(sel_year - 1, end_date.month, min(end_date.day, 28))
+    period_label = f"Custom ({start_date:%b %Y})" if sel_month_name != "All" else f"Custom ({sel_year})"
+    compare_label = f"Prev Year ({sel_year - 1})"
+elif period == "TODAY":
     start_date = today
     end_date = today
     compare_start = today - timedelta(days=1)
@@ -148,36 +213,47 @@ store_df = load_store_names()
 df_target = load_sales_data(start_date, end_date, statuses)
 df_compare = load_sales_data(compare_start, compare_end, statuses)
 
-# --- Storefront filter (always show Website + GunBroker) ---
+# --- Apply Custom Filters: Week / Day of Week ---
+if custom_active and not df_target.empty:
+    sel_week = st.session_state.get("so_custom_week", "All")
+    sel_day = st.session_state.get("so_custom_day", "All")
+    if sel_week != "All":
+        week_num = int(sel_week.replace("W", ""))
+        df_target = df_target.copy()
+        df_target["_WEEK"] = ((pd.to_datetime(df_target["CREATED_AT"]).dt.day - 1) // 7) + 1
+        df_target = df_target[df_target["_WEEK"] == week_num].drop(columns=["_WEEK"])
+    if sel_day != "All":
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        day_num = day_names.index(sel_day)
+        df_target = df_target[pd.to_datetime(df_target["CREATED_AT"]).dt.dayofweek == day_num]
+
+# --- Storefront + Store filters (UI rendered at bottom, filtering here) ---
 STOREFRONTS = ["Website", "GunBroker"]
-sf_cols = st.columns(len(STOREFRONTS) + 1)
-with sf_cols[0]:
-    st.caption("STOREFRONT")
-selected_storefronts = []
-for i, sf in enumerate(STOREFRONTS):
-    with sf_cols[i + 1]:
-        if st.checkbox(sf, value=True, key=f"so_sf_{sf}"):
-            selected_storefronts.append(sf)
+# Initialize session state defaults (checked=True) on first run
+for sf in STOREFRONTS:
+    if f"so_sf_{sf}" not in st.session_state:
+        st.session_state[f"so_sf_{sf}"] = True
+
+store_names = store_df["NAME"].tolist() if not store_df.empty else []
+for name in store_names:
+    if f"so_store_{name}" not in st.session_state:
+        st.session_state[f"so_store_{name}"] = True
+
+# Apply storefront filter from session state
+selected_storefronts = [sf for sf in STOREFRONTS if st.session_state.get(f"so_sf_{sf}", True)]
 if selected_storefronts and not df_target.empty:
     df_target = df_target[df_target["STOREFRONT"].isin(selected_storefronts)]
     df_compare = df_compare[df_compare["STOREFRONT"].isin(selected_storefronts)]
 
-# --- Store filter (all stores, matching Power BI) ---
-store_names = store_df["NAME"].tolist() if not store_df.empty else []
-if store_names:
-    store_cols = st.columns(len(store_names) + 1)
-    with store_cols[0]:
-        st.caption("STORE")
-    selected_store_ids = []
-    for i, name in enumerate(store_names):
-        with store_cols[i + 1]:
-            if st.checkbox(name, value=True, key=f"so_store_{name}"):
-                sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
-                selected_store_ids.append(sid)
-
-    if selected_store_ids and not df_target.empty:
-        df_target = df_target[df_target["STORE_ID"].isin(selected_store_ids)]
-        df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids)]
+# Apply store filter from session state
+selected_store_ids = []
+for name in store_names:
+    if st.session_state.get(f"so_store_{name}", True):
+        sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
+        selected_store_ids.append(sid)
+if selected_store_ids and not df_target.empty:
+    df_target = df_target[df_target["STORE_ID"].isin(selected_store_ids)]
+    df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids)]
 
 # --- Category filter ---
 if not df_target.empty:
@@ -208,13 +284,16 @@ def calc_kpis(df: pd.DataFrame) -> dict:
         return {
             "net_sales": 0, "cost": 0, "gross_profit": 0,
             "orders": 0, "units": 0, "freight_rev": 0,
-            "freight_cost": 0, "gp_after_var": 0,
+            "freight_cost": 0, "gp_after_var": 0, "free_ship_orders": 0,
         }
     net_sales = df["NET_SALES"].sum()
     cost = df["COST"].sum()
     gross_profit = net_sales - cost
     freight_rev = df["FREIGHT_REVENUE"].sum()
     freight_cost = df["FREIGHT_COST"].sum()
+    # Free shipping orders: orders where order subtotal >= threshold
+    order_totals = df.groupby("ORDER_ID")["NET_SALES"].sum()
+    free_ship_orders = int((order_totals >= FREE_SHIPPING_THRESHOLD).sum())
     return {
         "net_sales": net_sales,
         "cost": cost,
@@ -224,6 +303,7 @@ def calc_kpis(df: pd.DataFrame) -> dict:
         "freight_rev": freight_rev,
         "freight_cost": freight_cost,
         "gp_after_var": gross_profit - freight_cost,
+        "free_ship_orders": free_ship_orders,
     }
 
 
@@ -232,6 +312,14 @@ kpi_prev = calc_kpis(df_compare)
 
 margin = (kpi["gross_profit"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
 avg_ticket = (kpi["net_sales"] / kpi["orders"]) if kpi["orders"] else 0
+margin_prev = (kpi_prev["gross_profit"] / kpi_prev["net_sales"] * 100) if kpi_prev["net_sales"] else 0
+avg_ticket_prev = (kpi_prev["net_sales"] / kpi_prev["orders"]) if kpi_prev["orders"] else 0
+shipping_ns_pct = (kpi["freight_rev"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
+shipping_ns_pct_prev = (kpi_prev["freight_rev"] / kpi_prev["net_sales"] * 100) if kpi_prev["net_sales"] else 0
+contrib_margin = (kpi["gp_after_var"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
+contrib_margin_prev = (kpi_prev["gp_after_var"] / kpi_prev["net_sales"] * 100) if kpi_prev["net_sales"] else 0
+n_days = max((end_date - start_date).days + 1, 1)
+orders_per_day = kpi["orders"] / n_days
 
 
 def pct_delta(current, previous):
@@ -243,27 +331,34 @@ def pct_delta(current, previous):
 # --- KPI Row ---
 st.divider()
 
-shipping_ns_pct = (kpi["freight_rev"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
-contrib_margin = (kpi["gp_after_var"] / kpi["net_sales"] * 100) if kpi["net_sales"] else 0
-
 kpi_cards = [
     {
         "icon": "&#x1F4B2;",
         "color": "#00B4D8",
-        "title": "Net Sales",
+        "title": "Net Sales ($)",
         "value": f"${kpi['net_sales']:,.0f}",
         "delta": pct_delta(kpi["net_sales"], kpi_prev["net_sales"]),
         "sub_label": "Avg Ticket",
         "sub_value": f"${avg_ticket:,.2f}",
+        "prev_label": f"{compare_label}",
+        "prev_lines": [
+            f"Net Sales: <span class='kpi-sub-val'>${kpi_prev['net_sales']:,.0f}</span>",
+            f"Avg Ticket: <span class='kpi-sub-val'>${avg_ticket_prev:,.2f}</span>",
+        ],
     },
     {
         "icon": "&#x1F4C8;",
         "color": "#2DC653",
-        "title": "Gross Profit",
+        "title": "Gross Profit ($)",
         "value": f"${kpi['gross_profit']:,.0f}",
         "delta": pct_delta(kpi["gross_profit"], kpi_prev["gross_profit"]),
         "sub_label": "Margin",
         "sub_value": f"{margin:.1f}%",
+        "prev_label": f"{compare_label}",
+        "prev_lines": [
+            f"Gross Profit: <span class='kpi-sub-val'>${kpi_prev['gross_profit']:,.0f}</span>",
+            f"Margin: <span class='kpi-sub-val'>{margin_prev:.1f}%</span>",
+        ],
     },
     {
         "icon": "&#x1F6D2;",
@@ -271,26 +366,42 @@ kpi_cards = [
         "title": "Orders",
         "value": f"{kpi['orders']:,}",
         "delta": pct_delta(kpi["orders"], kpi_prev["orders"]),
+        "badge": f"Free S. Orders: {kpi['free_ship_orders']}",
         "sub_label": "Orders/Day",
-        "sub_value": f"{kpi['orders']}",
+        "sub_value": f"{orders_per_day:.1f}",
+        "prev_label": f"{compare_label}",
+        "prev_lines": [
+            f"Orders: <span class='kpi-sub-val'>{kpi_prev['orders']:,}</span>",
+            f"Orders/Day: <span class='kpi-sub-val'>{kpi_prev['orders']}</span>",
+        ],
     },
     {
         "icon": "&#x1F69A;",
         "color": "#2DC653",
-        "title": "Shipping Revenue",
+        "title": "Shipping Revenue ($)",
         "value": f"${kpi['freight_rev']:,.0f}",
         "delta": pct_delta(kpi["freight_rev"], kpi_prev["freight_rev"]),
-        "sub_label": "Shipping/NS",
+        "sub_label": "Shipping($) / NS($)",
         "sub_value": f"{shipping_ns_pct:.1f}%",
+        "prev_label": f"{compare_label}",
+        "prev_lines": [
+            f"Shipping Revenue: <span class='kpi-sub-val'>${kpi_prev['freight_rev']:,.0f}</span>",
+            f"Shipping/NS: <span class='kpi-sub-val'>{shipping_ns_pct_prev:.1f}%</span>",
+        ],
     },
     {
         "icon": "&#x1F6E1;",
         "color": "#00B4D8",
-        "title": "GP After Var Cost",
+        "title": "Gross Profit ($) After Variable Cost",
         "value": f"${kpi['gp_after_var']:,.0f}",
         "delta": pct_delta(kpi["gp_after_var"], kpi_prev["gp_after_var"]),
         "sub_label": "Contribution Margin",
         "sub_value": f"{contrib_margin:.1f}%",
+        "prev_label": f"{compare_label}",
+        "prev_lines": [
+            f"Profitability: <span class='kpi-sub-val'>${kpi_prev['gp_after_var']:,.0f}</span>",
+            f"Contribution Margin: <span class='kpi-sub-val'>{contrib_margin_prev:.1f}%</span>",
+        ],
     },
 ]
 
@@ -317,6 +428,14 @@ st.markdown(
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+    .kpi-badge {
+        font-size: 10px;
+        color: #00d4aa;
+        background: #1a3a2a;
+        padding: 1px 6px;
+        border-radius: 4px;
+        margin-left: auto;
+    }
     .kpi-value {
         font-size: 24px;
         font-weight: 700;
@@ -341,6 +460,12 @@ st.markdown(
         color: #CCCCCC;
         font-weight: 600;
     }
+    .kpi-prev {
+        font-size: 10px;
+        color: #666666;
+        margin-top: 4px;
+        line-height: 1.5;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -357,17 +482,30 @@ for i, card in enumerate(kpi_cards):
         delta_class = "kpi-delta-zero"
     delta_text = f"vs {compare_label}: {delta}" if delta else f"vs {compare_label}: --"
 
+    badge_html = ""
+    if card.get("badge"):
+        badge_html = f'<span class="kpi-badge">{card["badge"]}</span>'
+
+    prev_html = ""
+    if card.get("prev_lines"):
+        prev_html = (
+            f'<div class="kpi-prev"><b>{card["prev_label"]}</b><br>'
+            + "<br>".join(card["prev_lines"]) + "</div>"
+        )
+
     html = f"""
     <div class="kpi-card" style="border-left-color: {card['color']};">
         <div class="kpi-header">
             <span class="kpi-icon">{card['icon']}</span>
             <span class="kpi-title">{card['title']}</span>
+            {badge_html}
         </div>
         <div class="kpi-value">{card['value']}</div>
         <div class="kpi-delta {delta_class}">{delta_text}</div>
         <div class="kpi-sub">
             {card['sub_label']}: <span class="kpi-sub-val">{card['sub_value']}</span>
         </div>
+        {prev_html}
     </div>
     """
     with kpi_cols[i]:
@@ -375,8 +513,15 @@ for i, card in enumerate(kpi_cards):
 
 st.divider()
 
-# --- Charts row ---
-chart_cols = st.columns([3, 3, 3, 3])
+# --- Charts row (layout varies by category) ---
+# Ammunition: Hourly | Caliber | Manufacturer | Projectile
+# Guns: Hourly | Manufacturer | Caliber | Action | Capacity
+# Magazines: Hourly | Manufacturer | Caliber | Capacity | Material
+# Others: Hourly | General Purpose | Manufacturer | Fulfilled By
+if category in ("Guns", "Magazines"):
+    chart_cols = st.columns([30, 14, 14, 14, 14])
+else:
+    chart_cols = st.columns([40, 20, 20, 20])
 
 # Helper: compute GP column and aggregate by metric
 
@@ -402,6 +547,27 @@ def _agg_metric(df, group_col, metric):
     return r.sort_values("VALUE", ascending=False)
 
 
+def _render_hbar(df, group_col, metric, label, limit=8):
+    """Render a horizontal bar chart for a dimension."""
+    st.subheader(f"{metric_label} / {label}")
+    if not df.empty:
+        agg = _agg_metric(df, group_col, metric).head(limit)
+        if not agg.empty:
+            fig = go.Figure(go.Bar(
+                x=agg["VALUE"].tolist(), y=agg[group_col].tolist(),
+                orientation="h", marker_color="#00d4aa",
+            ))
+            fig.update_layout(
+                height=300, margin=dict(l=0, r=0, t=10, b=0),
+                showlegend=False,
+            )
+            fig.update_xaxes(title="")
+            fig.update_yaxes(title="")
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No data.")
+
+
 # Helper: aggregate by time bucket (Series-based groupby)
 def _agg_time_metric(df, time_series, metric):
     if df.empty:
@@ -417,106 +583,173 @@ def _agg_time_metric(df, time_series, metric):
     return r.reset_index().set_axis(["BUCKET", "VALUE"], axis=1)
 
 
-# Hourly/Daily chart — metric-aware
+def _hour_label(h):
+    """Format hour integer as '12:00 AM', '1:00 AM', etc."""
+    if h == 0:
+        return "12:00 AM"
+    elif h < 12:
+        return f"{h}:00 AM"
+    elif h == 12:
+        return "12:00 PM"
+    else:
+        return f"{h - 12}:00 PM"
+
+
+# Analytical View chart (first column — Hourly / Bar Chart / Heat Map)
 with chart_cols[0]:
-    if period == "TODAY":
-        st.subheader(f"{metric_label} / Hourly")
+    if analytical_view == "Hourly":
+        if period == "TODAY":
+            st.subheader(f"{metric_label} / Hourly")
+            if not df_target.empty:
+                hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=[_hour_label(int(h)) for h in hourly_target["BUCKET"].tolist()],
+                    y=hourly_target["VALUE"].tolist(),
+                    name="TODAY", marker_color="#00d4aa",
+                    mode="lines+markers", marker=dict(size=6),
+                ))
+                if not df_compare.empty:
+                    hourly_compare = _agg_time_metric(
+                        df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle,
+                    )
+                    fig.add_trace(go.Scatter(
+                        x=[_hour_label(int(h)) for h in hourly_compare["BUCKET"].tolist()],
+                        y=hourly_compare["VALUE"].tolist(),
+                        name="YESTERDAY", line=dict(color="gray", dash="dash"),
+                    ))
+                fig.update_layout(
+                    height=300, margin=dict(l=0, r=0, t=30, b=0),
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=11)),
+                    xaxis=dict(categoryorder="array", categoryarray=[_hour_label(h) for h in range(24)]),
+                )
+                fig.update_xaxes(title="Hour")
+                fig.update_yaxes(title="")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No data for this period.")
+        else:
+            st.subheader(f"{metric_label} / Daily")
+            if not df_target.empty:
+                daily_target = _agg_time_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
+                fig = go.Figure()
+                fig.add_trace(go.Bar(
+                    x=daily_target["BUCKET"], y=daily_target["VALUE"],
+                    name=period_label, marker_color="#00d4aa",
+                ))
+                fig.update_layout(
+                    height=300, margin=dict(l=0, r=0, t=10, b=0),
+                    showlegend=True, legend=dict(orientation="h"),
+                )
+                fig.update_yaxes(title="")
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No data for this period.")
+
+    elif analytical_view == "Bar Chart":
+        st.subheader(f"{metric_label} / Daily Trend")
         if not df_target.empty:
-            hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
+            df_bar = _add_gp(df_target)
+            daily = df_bar.groupby(df_bar["CREATED_AT"].dt.date).agg(
+                NET_SALES=("NET_SALES", "sum"),
+                COST=("COST", "sum"),
+                GP=("GP", "sum"),
+                ORDERS=("ORDER_ID", pd.Series.nunique),
+                UNITS=("UNITS", "sum"),
+            ).reset_index()
+            daily.columns = ["DAY", "NET_SALES", "COST", "GP", "ORDERS", "UNITS"]
+            daily["MARGIN"] = (daily["GP"] / daily["NET_SALES"] * 100).fillna(0)
+            val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             fig = go.Figure()
             fig.add_trace(go.Bar(
-                x=hourly_target["BUCKET"], y=hourly_target["VALUE"],
-                name="Today", marker_color="#00d4aa",
+                x=daily["DAY"].tolist(), y=daily[val_col].tolist(),
+                name=metric_label, marker_color="#00d4aa",
             ))
-            if not df_compare.empty:
-                hourly_compare = _agg_time_metric(
-                    df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle,
-                )
-                fig.add_trace(go.Scatter(
-                    x=hourly_compare["BUCKET"], y=hourly_compare["VALUE"],
-                    name="Yesterday", line=dict(color="gray", dash="dash"),
-                ))
+            fig.add_trace(go.Scatter(
+                x=daily["DAY"].tolist(), y=daily["MARGIN"].tolist(), name="Margin %", yaxis="y2",
+                mode="lines+markers+text",
+                text=[f"{m:.0f}%" for m in daily["MARGIN"].tolist()],
+                textposition="top center", line=dict(color="#4CAF50"),
+            ))
             fig.update_layout(
-                height=300, margin=dict(l=0, r=0, t=10, b=0),
+                height=300, margin=dict(l=0, r=40, t=10, b=0),
+                yaxis2=dict(title="Margin %", overlaying="y", side="right", range=[0, 100]),
                 showlegend=True, legend=dict(orientation="h"),
             )
+            fig.update_yaxes(title="")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No data.")
+
+    else:  # Heat Map
+        st.subheader(f"{metric_label} / Heat Map")
+        if not df_target.empty:
+            df_heat = _add_gp(df_target)
+            df_heat["HOUR"] = df_heat["HOUR_BUCKET"].dt.hour
+            df_heat["DOW_NUM"] = pd.to_datetime(df_heat["CREATED_AT"]).dt.dayofweek
+            df_heat["DOW"] = pd.to_datetime(df_heat["CREATED_AT"]).dt.day_name()
+            if metric_toggle == "Orders":
+                hm = df_heat.groupby(["DOW_NUM", "DOW", "HOUR"])["ORDER_ID"].nunique().reset_index(name="VALUE")
+            elif metric_toggle == "Units":
+                hm = df_heat.groupby(["DOW_NUM", "DOW", "HOUR"])["UNITS"].sum().reset_index(name="VALUE")
+            else:
+                col = "GP" if metric_toggle == "GP ($)" else "NET_SALES"
+                hm = df_heat.groupby(["DOW_NUM", "DOW", "HOUR"])[col].sum().reset_index(name="VALUE")
+            pivot = hm.pivot_table(index=["DOW_NUM", "DOW"], columns="HOUR", values="VALUE", fill_value=0)
+            pivot = pivot.sort_index(level=0)
+            dow_labels = [row[1] for row in pivot.index]
+            fig = go.Figure(data=go.Heatmap(
+                z=pivot.values.tolist(),
+                x=[_hour_label(h) for h in pivot.columns],
+                y=dow_labels,
+                colorscale="Greens",
+                hoverongaps=False,
+            ))
+            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0))
             fig.update_xaxes(title="Hour", dtick=2)
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("No data for this period.")
-    else:
-        st.subheader(f"{metric_label} / Daily")
-        if not df_target.empty:
-            daily_target = _agg_time_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=daily_target["BUCKET"], y=daily_target["VALUE"],
-                name=period_label, marker_color="#00d4aa",
-            ))
-            fig.update_layout(
-                height=300, margin=dict(l=0, r=0, t=10, b=0),
-                showlegend=True, legend=dict(orientation="h"),
-            )
-            fig.update_yaxes(title="")
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No data for this period.")
-
-# General Purpose chart — metric-aware
-with chart_cols[1]:
-    st.subheader(f"{metric_label} / General Purpose")
-    if not df_target.empty:
-        gp_agg = _agg_metric(df_target, "GENERAL_PURPOSE", metric_toggle).head(8)
-        if not gp_agg.empty:
-            fig = go.Figure(go.Bar(x=gp_agg["VALUE"].tolist(), y=gp_agg["GENERAL_PURPOSE"].tolist(), orientation="h", marker_color="#00d4aa"))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-            fig.update_xaxes(title="")
-            fig.update_yaxes(title="")
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No data.")
-
-# Manufacturer chart — metric-aware
-with chart_cols[2]:
-    st.subheader(f"{metric_label} / Manufacturer")
-    if not df_target.empty:
-        mfr_agg = _agg_metric(df_target, "MANUFACTURER", metric_toggle).head(8)
-        if not mfr_agg.empty:
-            fig = go.Figure(go.Bar(x=mfr_agg["VALUE"].tolist(), y=mfr_agg["MANUFACTURER"].tolist(), orientation="h", marker_color="#00d4aa"))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-            fig.update_xaxes(title="")
-            fig.update_yaxes(title="")
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No data.")
-
-# Caliber / Fulfilled By chart — metric-aware
-with chart_cols[3]:
-    if category in ("Ammunition", "Guns"):
-        st.subheader(f"{metric_label} / Caliber")
-        if not df_target.empty:
-            cal_agg = _agg_metric(df_target, "CALIBER", metric_toggle).head(8)
-            if not cal_agg.empty:
-                fig = go.Figure(go.Bar(x=cal_agg["VALUE"].tolist(), y=cal_agg["CALIBER"].tolist(), orientation="h", marker_color="#00d4aa"))
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
-        else:
             st.info("No data.")
-    else:
-        st.subheader(f"{metric_label} / Fulfilled By")
-        if not df_target.empty:
-            vendor_agg = _agg_metric(df_target, "VENDOR", metric_toggle).head(6)
-            if not vendor_agg.empty:
-                fig = go.Figure(go.Bar(x=vendor_agg["VALUE"].tolist(), y=vendor_agg["VENDOR"].tolist(), orientation="h", marker_color="#00d4aa"))
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No data.")
+
+# Category-specific charts (columns 1+ vary by category)
+if category == "Ammunition":
+    # Ammunition: Caliber | Manufacturer | Projectile
+    with chart_cols[1]:
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+    with chart_cols[2]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[3]:
+        _render_hbar(df_target, "PROJECTILE", metric_toggle, "Projectile")
+elif category == "Guns":
+    # Guns: Manufacturer | Caliber | Action | Capacity
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+    with chart_cols[3]:
+        _render_hbar(df_target, "GUN_ACTION", metric_toggle, "Action")
+    with chart_cols[4]:
+        _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity")
+elif category == "Magazines":
+    # Magazines: Manufacturer | Caliber | Capacity | Material
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+    with chart_cols[3]:
+        _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity")
+    with chart_cols[4]:
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+else:
+    # Other categories: General Purpose | Manufacturer | Fulfilled By
+    with chart_cols[1]:
+        _render_hbar(df_target, "GENERAL_PURPOSE", metric_toggle, "General Purpose")
+    with chart_cols[2]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[3]:
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
 
 st.divider()
 
@@ -540,7 +773,7 @@ with table_cols[0]:
         product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
         product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
         product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(25)
-        display_cols = ["MANUFACTURER_SKU", "SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT"]
+        display_cols = ["MANUFACTURER_SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT"]
         st.dataframe(
             product_perf[display_cols].style.format({
                 "NET_SALES": "${:,.2f}",
@@ -579,12 +812,202 @@ with table_cols[1]:
     else:
         st.info("No data.")
 
+# --- Geographic / Customer Overview ---
+st.divider()
+geo_left, geo_right = st.columns([3, 4])
+
+with geo_left:
+    geo_view = st.radio("", ["Geographic", "Customer"], horizontal=True, key="so_geo_view")
+
+    if not df_target.empty:
+        # State / City / Zip filters
+        filter_geo = st.columns(3)
+        states = sorted(df_target["REGION"].dropna().unique().tolist())
+        with filter_geo[0]:
+            sel_state = st.selectbox("STATE", ["All"] + states, key="so_geo_state")
+        geo_df = df_target if sel_state == "All" else df_target[df_target["REGION"] == sel_state]
+
+        cities = sorted(geo_df["CITY"].dropna().unique().tolist())
+        with filter_geo[1]:
+            sel_city = st.selectbox("CITY", ["All"] + cities, key="so_geo_city")
+        if sel_city != "All":
+            geo_df = geo_df[geo_df["CITY"] == sel_city]
+
+        zips = sorted(geo_df["POSTCODE"].dropna().unique().tolist())
+        with filter_geo[2]:
+            sel_zip = st.selectbox("ZIP CODE", ["All"] + zips, key="so_geo_zip")
+        if sel_zip != "All":
+            geo_df = geo_df[geo_df["POSTCODE"] == sel_zip]
+
+        if geo_view == "Geographic":
+            st.caption(f"Geographic Overview / {period_label}")
+            geo_agg = (
+                geo_df.groupby("CITY")
+                .agg(NET_SALES=("NET_SALES", "sum"), COST=("COST", "sum"),
+                     ORDERS=("ORDER_ID", "nunique"), UNITS=("UNITS", "sum"))
+                .reset_index()
+            )
+            geo_agg["GP"] = geo_agg["NET_SALES"] - geo_agg["COST"]
+            geo_agg["MARGIN"] = (geo_agg["GP"] / geo_agg["NET_SALES"] * 100).fillna(0).round(2)
+            geo_agg = geo_agg.sort_values("NET_SALES", ascending=False)
+
+            totals = pd.DataFrame([{
+                "CITY": "Total",
+                "NET_SALES": geo_agg["NET_SALES"].sum(),
+                "GP": geo_agg["GP"].sum(),
+                "ORDERS": geo_agg["ORDERS"].sum(),
+                "UNITS": geo_agg["UNITS"].sum(),
+                "MARGIN": (geo_agg["GP"].sum() / geo_agg["NET_SALES"].sum() * 100) if geo_agg["NET_SALES"].sum() else 0,
+            }])
+            geo_display = pd.concat([geo_agg, totals], ignore_index=True)
+            cols = ["CITY", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN"]
+            st.dataframe(
+                geo_display[cols].style.format({
+                    "NET_SALES": "${:,.0f}", "GP": "${:,.0f}", "MARGIN": "{:.2f}%",
+                }).hide(axis="index"),
+                use_container_width=True, height=250,
+            )
+        else:  # Customer
+            st.caption(f"Customer Overview / {period_label}")
+            cust_agg = (
+                geo_df.groupby(["CUSTOMER_EMAIL", "CUSTOMER_NAME"])
+                .agg(NET_SALES=("NET_SALES", "sum"), COST=("COST", "sum"),
+                     ORDERS=("ORDER_ID", "nunique"), UNITS=("UNITS", "sum"))
+                .reset_index()
+            )
+            cust_agg["GP"] = cust_agg["NET_SALES"] - cust_agg["COST"]
+            cust_agg = cust_agg.sort_values("NET_SALES", ascending=False)
+
+            totals = pd.DataFrame([{
+                "CUSTOMER_EMAIL": "Total", "CUSTOMER_NAME": "",
+                "NET_SALES": cust_agg["NET_SALES"].sum(),
+                "GP": cust_agg["GP"].sum(),
+                "ORDERS": cust_agg["ORDERS"].sum(),
+                "UNITS": cust_agg["UNITS"].sum(),
+            }])
+            cust_display = pd.concat([cust_agg, totals], ignore_index=True)
+            cols = ["CUSTOMER_EMAIL", "CUSTOMER_NAME", "NET_SALES", "GP", "ORDERS", "UNITS"]
+            st.dataframe(
+                cust_display[cols].style.format({
+                    "NET_SALES": "${:,.0f}", "GP": "${:,.0f}",
+                }).hide(axis="index"),
+                use_container_width=True, height=250,
+            )
+    else:
+        st.info("No data.")
+
+with geo_right:
+    st.caption("Map")
+    if not df_target.empty and not geo_df.empty:
+        from utils.zip3_coords import ZIP3_COORDS
+
+        geo_map = geo_df.copy()
+        geo_map["ZIP3"] = geo_map["POSTCODE"].astype(str).str[:3]
+        map_df = geo_map.groupby(["POSTCODE", "ZIP3", "CITY", "REGION"]).agg(
+            NET_SALES=("NET_SALES", "sum"),
+            ORDERS=("ORDER_ID", "nunique"),
+        ).reset_index()
+        map_df["LAT"] = map_df["ZIP3"].map(
+            lambda z: ZIP3_COORDS.get(z, (None, None))[0]
+        )
+        map_df["LON"] = map_df["ZIP3"].map(
+            lambda z: ZIP3_COORDS.get(z, (None, None))[1]
+        )
+        map_df = map_df.dropna(subset=["LAT", "LON"])
+        import random
+        random.seed(42)
+        map_df = map_df.copy()
+        map_df["LAT"] = [
+            float(lat) + random.uniform(-0.3, 0.3)
+            for lat in map_df["LAT"]
+        ]
+        map_df["LON"] = [
+            float(lon) + random.uniform(-0.3, 0.3)
+            for lon in map_df["LON"]
+        ]
+        if not map_df.empty:
+            max_sales = float(map_df["NET_SALES"].max())
+            min_sz, max_sz = 3, 30
+            if max_sales > 0:
+                map_df["SIZE"] = (
+                    min_sz + (map_df["NET_SALES"] / max_sales)
+                    * (max_sz - min_sz)
+                )
+            else:
+                map_df["SIZE"] = min_sz
+            lat_list = [float(x) for x in map_df["LAT"]]
+            lon_list = [float(x) for x in map_df["LON"]]
+            size_list = [float(x) for x in map_df["SIZE"]]
+            hover_texts = [
+                f"{r['CITY']}, {r['REGION']}<br>"
+                f"${float(r['NET_SALES']):,.0f} | {int(r['ORDERS'])} orders"
+                for _, r in map_df.iterrows()
+            ]
+            from utils.db import _is_sis
+            if _is_sis:
+                sis_map = pd.DataFrame({
+                    "latitude": lat_list,
+                    "longitude": lon_list,
+                    "size": size_list,
+                })
+                try:
+                    st.map(sis_map, size="size")
+                except TypeError:
+                    st.map(sis_map[["latitude", "longitude"]])
+            else:
+                fig = go.Figure(go.Scattermapbox(
+                    lat=lat_list,
+                    lon=lon_list,
+                    marker=dict(
+                        size=size_list,
+                        color="#00d4aa",
+                        opacity=0.6,
+                    ),
+                    text=hover_texts,
+                    hoverinfo="text",
+                ))
+                fig.update_layout(
+                    mapbox=dict(
+                        style="carto-darkmatter",
+                        center=dict(lat=38, lon=-97),
+                        zoom=3,
+                    ),
+                    height=350,
+                    margin=dict(l=0, r=0, t=0, b=0),
+                    showlegend=False,
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No geographic data to map.")
+    else:
+        st.info("No geographic data.")
+
+# --- Store filter UI (rendered at bottom, matches PBI layout) ---
+st.divider()
+st.markdown("**STOREFRONT**")
+sf_ui_cols = st.columns(len(STOREFRONTS))
+for i, sf in enumerate(STOREFRONTS):
+    with sf_ui_cols[i]:
+        st.checkbox(sf, key=f"so_sf_{sf}")
+
+if store_names:
+    st.markdown("**STORE**")
+    store_ui_cols = st.columns(len(store_names))
+    for i, name in enumerate(store_names):
+        with store_ui_cols[i]:
+            st.checkbox(name, key=f"so_store_{name}")
+
 # --- Footer ---
 st.divider()
+from datetime import datetime
+now = datetime.now()
 if not df_target.empty:
     last_order_time = df_target["CREATED_AT"].max()
     row_count = len(df_target)
     st.caption(
+        f"Last Update: {now:%m/%d/%y %H:%M:%S} | "
         f"Last Order: {last_order_time} | {row_count:,} line items"
         f" | {period_label} vs {compare_label} | Data cached 5 min"
     )
+else:
+    st.caption(f"Last Update: {now:%m/%d/%y %H:%M:%S} | No data for selected filters")
