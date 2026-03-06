@@ -372,7 +372,7 @@ with tab_inv:
             key="inv_period",
         )
     with sf_row[4]:
-        st.toggle("Custom Filters", value=False, key="inv_custom_toggle")
+        st.checkbox("Custom Filters", value=False, key="inv_custom_toggle")
 
     if st.session_state.get("inv_custom_toggle", False):
         custom_cols = st.columns([2, 2, 2, 2])
