@@ -642,7 +642,12 @@ with tab_vendor:
                 rcpt_end = today
 
         # Filter to received items within receipt period
-        received_df = pos_df[pos_df["DATERECEIVED"].notna()].copy()
+        # PBI filters: Attribute Set = Ammunition, QTY != 0
+        received_df = pos_df[
+            pos_df["DATERECEIVED"].notna()
+            & (pos_df["CATEGORY"] == "Ammunition")
+            & (pos_df["QTY"] != 0)
+        ].copy()
         received_df["RCPT_DATE"] = pd.to_datetime(received_df["DATERECEIVED"]).dt.date
         received_df = received_df[
             (received_df["RCPT_DATE"] >= rcpt_start)
@@ -663,8 +668,12 @@ with tab_vendor:
         chart_row = st.columns([3, 2])
         with chart_row[0]:
             st.subheader("QTY AND COST PER RECEIPTS")
-            # Chart uses ALL received data (back to 2019), not filtered
-            all_received = pos_df[pos_df["DATERECEIVED"].notna()].copy()
+            # Chart uses ALL received data (back to 2019), filtered to Ammunition only
+            all_received = pos_df[
+                pos_df["DATERECEIVED"].notna()
+                & (pos_df["CATEGORY"] == "Ammunition")
+                & (pos_df["QTY"] != 0)
+            ].copy()
             if not all_received.empty:
                 all_received["MONTH_KEY"] = (
                     pd.to_datetime(all_received["DATERECEIVED"])
