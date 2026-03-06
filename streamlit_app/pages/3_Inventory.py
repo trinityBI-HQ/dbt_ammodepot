@@ -656,16 +656,29 @@ with tab_vendor:
         with chart_row[0]:
             st.subheader("QTY AND COST PER RECEIPTS")
             if not received_df.empty:
-                received_df["MONTH"] = (
+                received_df["MONTH_KEY"] = (
                     pd.to_datetime(received_df["DATERECEIVED"])
                     .dt.to_period("M").astype(str)
                 )
-                monthly = received_df.groupby("MONTH").agg(
+                monthly = received_df.groupby("MONTH_KEY").agg(
                     QTY=("QTY", "sum"),
                     AVG_COST=("UNIT_COST", "mean"),
-                ).reset_index().sort_values("MONTH").tail(12)
+                ).reset_index().sort_values("MONTH_KEY")
 
-                months = monthly["MONTH"].tolist()
+                # Format labels: "Nov", "Dec", then "Jan\n2026"
+                labels = []
+                prev_year = None
+                for mk in monthly["MONTH_KEY"]:
+                    dt = pd.Timestamp(mk)
+                    mon = dt.strftime("%b")
+                    yr = dt.year
+                    if prev_year is not None and yr != prev_year:
+                        labels.append(f"{mon}<br>{yr}")
+                    else:
+                        labels.append(mon)
+                    prev_year = yr
+
+                months = labels
                 qty_vals = monthly["QTY"].tolist()
                 cost_vals = monthly["AVG_COST"].tolist()
 
