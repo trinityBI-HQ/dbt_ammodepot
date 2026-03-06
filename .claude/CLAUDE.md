@@ -61,6 +61,37 @@ Airbyte CDC (Fishbowl, Magento)
 | Packages | dbt_utils, dbt_expectations (metaplane fork) |
 | Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
 | Python | uv (package manager) |
+| BI Dashboard | Streamlit (local + Streamlit in Snowflake) |
+
+---
+
+## Streamlit Dashboard App
+
+Replacement for Power BI dashboards, running locally and targeting Streamlit in Snowflake (SiS).
+
+```
+streamlit_app/
+├── app.py                         # Entry point (local)
+├── streamlit_app.py               # Entry point (SiS)
+├── pages/
+│   ├── 1_Today_Yesterday.py       # Real-time sales (replaces PBI SALES OVERVIEW FASTER)
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages (replaces PBI SALES OVERVIEW)
+│   └── 3_Inventory.py             # Inventory dashboard
+└── utils/
+    ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion
+    └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps
+```
+
+**Total:** ~2,450 lines across 8 Python files
+
+### SiS Compatibility Notes
+
+- **Plotly**: Use `go.Bar`/`go.Figure` with `.tolist()` — `px.bar` fails serialization in SiS
+- **Maps**: Scattermapbox (local only, CARTO tiles blocked in SiS), `st.map()` fallback for SiS
+- **Data types**: All plotly data must be plain Python types (`float()`, `.tolist()`), not numpy/pandas
+- **Dual-mode**: `_is_sis` flag in `utils/db.py` controls local vs SiS rendering paths
+- **KPI cards**: Custom HTML/CSS with `st.markdown(unsafe_allow_html=True)` — PBI-style icons, colored borders
+- **Default filters**: Order Status preselected to COMPLETE, PROCESSING, UNVERIFIED (matches PBI)
 
 ---
 
@@ -131,6 +162,12 @@ ammodepot/
 ```
 
 **Snowflake Counts:** 98 models (34 FB + 23 MG + 21 Inv + 13 Gold + 7 Int), 65 source tables, 16 generic tests, 2 macros
+
+### Streamlit App (BI Dashboard)
+
+```
+streamlit_app/                          # See "Streamlit Dashboard App" section above
+```
 
 ### Shared Documentation
 
@@ -275,7 +312,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ## Agent Usage Guidelines
 
-43 specialized agents organized by category in `.claude/agents/`:
+44 specialized agents organized by category in `.claude/agents/`:
 
 | Category | Agents | Use When |
 |---|---|---|
@@ -287,6 +324,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 | **Code Quality** | code-reviewer, code-cleaner, code-documenter, dual-reviewer, python-developer, test-generator | Reviews, refactoring, testing, documentation |
 | **Communication** | the-planner, adaptive-explainer, meeting-analyst | Planning, stakeholder explanations, meeting notes |
 | **DevOps** | ci-cd-specialist | Azure DevOps, Terraform, CI/CD pipelines |
+| **Automation** | streamlit-expert | Streamlit apps, SiS deployment, dashboard optimization |
 | **Exploration** | codebase-explorer, kb-architect | Codebase analysis, knowledge base management |
 | **Workflow** | build-agent, define-agent, design-agent, iterate-agent, ship-agent, brainstorm-agent | SDD pipeline stages |
 | **Dev** | prompt-crafter, dev-loop-executor | PROMPT.md creation, Dev Loop execution |
@@ -295,22 +333,23 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 - **dbt-expert** -- dbt model development, testing, and debugging
 - **snowflake-expert** -- Snowflake queries, architecture (for migration evaluation)
+- **streamlit-expert** -- Streamlit dashboard development, SiS compatibility
 - **medallion-architect** -- Bronze/Silver/Gold layer design
 - **code-reviewer** -- Post-change code quality review
 - **the-planner** -- Multi-step implementation planning
 
 ---
 
-## Knowledge Base (46 registered + 9 placeholder in 6 categories)
+## Knowledge Base (537 files in 6 categories)
 
-| Category | Full | Placeholder | Key Technologies |
-|---|---|---|---|
-| data-engineering | 16 | 3 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, Onehouse |
-| cloud | 11 | 1 | S3, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, S3 Tables, GCP, EMR, Fargate |
-| devops-sre | 9 | 4 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, railway, github |
-| ai-ml | 6 | 0 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
-| automation | 3 | 1 | mermaid, n8n, Streamlit |
-| document-processing | 1 | 0 | docling |
+| Category | Files | Key Technologies |
+|---|---|---|
+| data-engineering | 190 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, elementary |
+| cloud | 117 | S3, IAM, Glue, Athena, CloudWatch, KMS, GCP, EMR, Fargate |
+| devops-sre | 110 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github |
+| ai-ml | 74 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
+| automation | 33 | mermaid, n8n, Streamlit |
+| document-processing | 13 | docling |
 
 Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.
 
