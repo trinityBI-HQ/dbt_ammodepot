@@ -144,11 +144,17 @@ def load_pos_data() -> pd.DataFrame:
             f.QUANTITY_TO_FULFILL,
             f.PRECISE_LEADTIME,
             f.DATE_EXPECTED,
-            p."Caliber" as CALIBER,
-            p."Attribute Set" as CATEGORY
+            p.CALIBER,
+            p.CATEGORY
         from F_POS f
         left join D_VENDOR v on f.VENDOR_ID = v.VENDOR_ID
-        left join D_PRODUCT p on f.PART_NUMBER = p.SKU
+        left join (
+            select SKU,
+                   "Caliber" as CALIBER,
+                   "Attribute Set" as CATEGORY,
+                   row_number() over (partition by SKU order by SKU) as rn
+            from D_PRODUCT
+        ) p on f.PART_NUMBER = p.SKU and p.rn = 1
         where f.LOCATION_GROUP_ID = 8
     """
     return run_query(sql)
@@ -158,12 +164,8 @@ def load_pos_data() -> pd.DataFrame:
 inv_df = load_inventory()
 sold_df = load_units_sold(sales_start, sales_end)
 daily_sold_df = load_daily_units_sold(sales_start, sales_end)
-pos_df_raw = load_pos_data()
+pos_df = load_pos_data()
 store_df = load_store_names()
-
-# Deduplicate: D_PRODUCT join can create multiple rows per receipt item
-# Use pos_df (deduped) for aggregations, pos_df_raw only when CALIBER/CATEGORY needed
-pos_df = pos_df_raw.drop_duplicates(subset=["RECEIPT_ITEM_ID"], keep="first")
 
 # --- Store filter (rendered later, logic here for data filtering) ---
 store_names = store_df["NAME"].tolist() if not store_df.empty else []
