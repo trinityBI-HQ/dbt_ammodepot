@@ -6,13 +6,60 @@ Source: AD_ANALYTICS.GOLD.F_INVENTORYVIEW, F_POS, D_PRODUCT, D_VENDOR
 
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
 
 st.title("INVENTORY")
+
+today = date.today()
+
+
+# --- Sales period computation (UI rendered inside Inventory tab) ---
+def _compute_sales_period():
+    """Compute sales_start/sales_end/n_days from session state values."""
+    period = st.session_state.get("inv_period", "YTD")
+    custom = st.session_state.get("inv_custom_toggle", False)
+
+    if custom:
+        sel_year = st.session_state.get("inv_custom_year", today.year)
+        sel_month_name = st.session_state.get("inv_custom_month", "All")
+        months_list = [
+            "All", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+        if sel_month_name != "All":
+            month_num = months_list.index(sel_month_name)
+            start = date(sel_year, month_num, 1)
+            if month_num == 12:
+                end = date(sel_year, 12, 31)
+            else:
+                end = date(sel_year, month_num + 1, 1) - timedelta(days=1)
+        else:
+            start = date(sel_year, 1, 1)
+            end = date(sel_year, 12, 31)
+        if end > today:
+            end = today
+    elif period == "YESTERDAY":
+        start = today - timedelta(days=1)
+        end = today - timedelta(days=1)
+    elif period == "7 DAYS":
+        start = today - timedelta(days=7)
+        end = today
+    elif period == "MTD":
+        start = today.replace(day=1)
+        end = today
+    else:  # YTD
+        start = today.replace(month=1, day=1)
+        end = today
+
+    days = max((end - start).days, 1)
+    return start, end, days
+
+
+sales_start, sales_end, n_days = _compute_sales_period()
+
 
 # --- Data loading ---
 @st.cache_data(ttl=600)
@@ -37,20 +84,43 @@ def load_inventory() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=600)
-def load_units_sold_30d() -> pd.DataFrame:
-    """Units sold per SKU over last 30 days for Days of Supply calc."""
+def load_units_sold(start_date: date, end_date: date) -> pd.DataFrame:
+    """Units sold and cost per SKU for the selected period."""
     sql = f"""
         select
             TESTSKU as SKU,
+            STORE_ID,
             sum(coalesce(PART_QTY_SOLD, QTY_ORDERED)) as UNITS_SOLD,
-            sum(ROW_TOTAL) as NET_SALES
+            sum(ROW_TOTAL) as NET_SALES,
+            sum(COST) as COST_OF_GOODS
         from F_SALES
-        where CREATED_AT::date >= dateadd(day, -30, current_date())
+        where CREATED_AT::date between '{start_date}' and '{end_date}'
           and STATUS in ('COMPLETE', 'PROCESSING')
-          and STATUS not in ('CLOSED', 'CANCELED', 'HOLDED', 'FRAUD')
-        group by TESTSKU
+        group by TESTSKU, STORE_ID
     """
     return run_query(sql)
+
+
+@st.cache_data(ttl=600)
+def load_daily_units_sold(start_date: date, end_date: date) -> pd.DataFrame:
+    """Daily total units sold for Units Sold/Period chart."""
+    sql = f"""
+        select
+            CREATED_AT::date as SALE_DATE,
+            STORE_ID,
+            sum(coalesce(PART_QTY_SOLD, QTY_ORDERED)) as UNITS_SOLD
+        from F_SALES
+        where CREATED_AT::date between '{start_date}' and '{end_date}'
+          and STATUS in ('COMPLETE', 'PROCESSING')
+        group by CREATED_AT::date, STORE_ID
+        order by SALE_DATE
+    """
+    return run_query(sql)
+
+
+@st.cache_data(ttl=3600)
+def load_store_names() -> pd.DataFrame:
+    return run_query("select STORE_ID, NAME from D_STORE where IS_ACTIVE = true")
 
 
 @st.cache_data(ttl=600)
@@ -81,15 +151,48 @@ def load_pos_data() -> pd.DataFrame:
     return run_query(sql)
 
 
-@st.cache_data(ttl=3600)
-def load_store_names() -> pd.DataFrame:
-    return run_query("select STORE_ID, NAME from D_STORE where IS_ACTIVE = true")
-
-
 # --- Load all data ---
 inv_df = load_inventory()
-sold_df = load_units_sold_30d()
+sold_df = load_units_sold(sales_start, sales_end)
+daily_sold_df = load_daily_units_sold(sales_start, sales_end)
 pos_df = load_pos_data()
+store_df = load_store_names()
+
+# --- Store filter (rendered later, logic here for data filtering) ---
+store_names = store_df["NAME"].tolist() if not store_df.empty else []
+# Store selection uses session state so UI can render after charts
+for name in store_names:
+    key = f"inv_store_{name}"
+    if key not in st.session_state:
+        st.session_state[key] = True
+
+selected_store_ids = []
+for name in store_names:
+    if st.session_state.get(f"inv_store_{name}", True):
+        sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
+        selected_store_ids.append(sid)
+
+if selected_store_ids and not sold_df.empty:
+    sold_df = sold_df[sold_df["STORE_ID"].isin(selected_store_ids)]
+if selected_store_ids and not daily_sold_df.empty:
+    daily_sold_df = daily_sold_df[
+        daily_sold_df["STORE_ID"].isin(selected_store_ids)
+    ]
+
+# Aggregate sold_df by SKU (after store filtering)
+sold_agg = sold_df.groupby("SKU").agg(
+    UNITS_SOLD=("UNITS_SOLD", "sum"),
+    NET_SALES=("NET_SALES", "sum"),
+    COST_OF_GOODS=("COST_OF_GOODS", "sum"),
+).reset_index() if not sold_df.empty else pd.DataFrame(
+    columns=["SKU", "UNITS_SOLD", "NET_SALES", "COST_OF_GOODS"]
+)
+
+# Aggregate daily sold by date (after store filtering)
+if not daily_sold_df.empty:
+    daily_agg = daily_sold_df.groupby("SALE_DATE")["UNITS_SOLD"].sum().reset_index()
+else:
+    daily_agg = pd.DataFrame(columns=["SALE_DATE", "UNITS_SOLD"])
 
 # --- Sub-pages via tabs ---
 tab_inv, tab_vendor, tab_open_po = st.tabs(["Inventory", "Vendor Analysis", "Open POs"])
@@ -119,20 +222,32 @@ with tab_inv:
         df = df[df["PROJECTILE"].isin(sel_projectiles)]
 
     # Merge units sold for DoS calculation
-    df = df.merge(sold_df, on="SKU", how="left")
+    df = df.merge(sold_agg, on="SKU", how="left")
     df["UNITS_SOLD"] = df["UNITS_SOLD"].fillna(0)
     df["NET_SALES"] = df["NET_SALES"].fillna(0)
-    df["DAILY_AVG"] = df["UNITS_SOLD"] / 30
+    df["COST_OF_GOODS"] = df["COST_OF_GOODS"].fillna(0)
+    df["DAILY_AVG"] = df["UNITS_SOLD"] / n_days
     df["DAYS_OF_SUPPLY"] = df.apply(
         lambda r: r["QTY_AVAILABLE"] / r["DAILY_AVG"] if r["DAILY_AVG"] > 0 else None, axis=1
     )
+
+    # Derived columns for PBI match
+    df["PCT_MARGIN"] = df.apply(
+        lambda r: ((r["NET_SALES"] - r["COST_OF_GOODS"]) / r["NET_SALES"] * 100)
+        if r["NET_SALES"] > 0 else 0, axis=1,
+    )
+    df["DOS_PLUS_ON_ORDER"] = df.apply(
+        lambda r: (r["QTY_AVAILABLE"] + r["QTY_ON_ORDER"]) / r["DAILY_AVG"]
+        if r["DAILY_AVG"] > 0 else None, axis=1,
+    )
+    df["COST_ON_ORDER"] = df["QTY_ON_ORDER"] * df["PART_COST"]
 
     # KPIs
     total_qty = df["QTY_AVAILABLE"].sum() if not df.empty else 0
     total_cost = df["EXTENDED_COST"].sum() if not df.empty else 0
     total_on_order = df["QTY_ON_ORDER"].sum() if not df.empty else 0
     total_units_sold = df["UNITS_SOLD"].sum() if not df.empty else 0
-    avg_dos = (total_qty / (total_units_sold / 30)) if total_units_sold > 0 else 0
+    avg_dos = (total_qty / (total_units_sold / n_days)) if total_units_sold > 0 else 0
 
     st.divider()
     kpi_cols = st.columns(5)
@@ -141,7 +256,7 @@ with tab_inv:
     with kpi_cols[1]:
         st.metric("Cost on Hand", f"${total_cost:,.0f}")
     with kpi_cols[2]:
-        st.metric("Units Sold (30d)", f"{total_units_sold:,.0f}")
+        st.metric("Units Sold", f"{total_units_sold:,.0f}")
     with kpi_cols[3]:
         st.metric("Qty on Order", f"{total_on_order:,.0f}")
     with kpi_cols[4]:
@@ -149,65 +264,302 @@ with tab_inv:
 
     st.divider()
 
+    # Metric toggles for inventory bar charts (matches PBI left sidebar)
+    # Two dimensions: QUANTITY/COST + On Hand/On Order/Total
+    toggle_cols = st.columns([3, 5])
+    with toggle_cols[0]:
+        inv_unit = st.radio(
+            "Unit", ["QUANTITY", "COST"],
+            index=0, horizontal=True, key="inv_unit",
+        )
+    with toggle_cols[1]:
+        inv_stock = st.radio(
+            "Stock", ["On Hand", "On Order", "Total"],
+            index=0, horizontal=True, key="inv_stock",
+        )
+
+    # Derive column based on both toggles
+    if not df.empty:
+        df["QTY_TOTAL"] = df["QTY_AVAILABLE"] + df["QTY_ON_ORDER"]
+        df["COST_ON_ORDER"] = df["QTY_ON_ORDER"] * df["PART_COST"]
+        df["COST_TOTAL"] = df["EXTENDED_COST"] + df["COST_ON_ORDER"]
+
+    INV_COL_MAP = {
+        ("QUANTITY", "On Hand"): "QTY_AVAILABLE",
+        ("QUANTITY", "On Order"): "QTY_ON_ORDER",
+        ("QUANTITY", "Total"): "QTY_TOTAL",
+        ("COST", "On Hand"): "EXTENDED_COST",
+        ("COST", "On Order"): "COST_ON_ORDER",
+        ("COST", "Total"): "COST_TOTAL",
+    }
+    inv_col = INV_COL_MAP[(inv_unit, inv_stock)]
+    is_cost = inv_unit == "COST"
+
     # Charts
     chart_cols = st.columns(3)
     with chart_cols[0]:
-        st.subheader("Qty on Hand / Category")
+        st.subheader("Inventory Per Category")
         if not df.empty:
-            cat_df = df.groupby("CATEGORY")["QTY_AVAILABLE"].sum().sort_values(ascending=False).head(8).reset_index()
+            cat_df = df.groupby("CATEGORY")[inv_col].sum().sort_values(ascending=True).tail(8).reset_index()
             if not cat_df.empty:
-                fig = px.bar(cat_df, x="QTY_AVAILABLE", y="CATEGORY", orientation="h", color_discrete_sequence=["#00d4aa"])
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
+                # Add value labels
+                text_vals = [f"${v:,.2f}" if is_cost else f"{v:,.0f}" for v in cat_df[inv_col]]
+                fig = go.Figure(go.Bar(
+                    x=cat_df[inv_col].tolist(),
+                    y=cat_df["CATEGORY"].tolist(),
+                    orientation="h",
+                    marker_color="#5B9BD5",
+                    text=text_vals,
+                    textposition="outside",
+                ))
+                fig.update_layout(height=300, margin=dict(l=0, r=100, t=10, b=0), showlegend=False)
+                fig.update_xaxes(title="", visible=False)
                 fig.update_yaxes(title="")
                 st.plotly_chart(fig, use_container_width=True)
 
     with chart_cols[1]:
-        st.subheader("Qty on Hand / Caliber")
+        st.subheader("Inventory Per Caliber")
         if not df.empty:
-            cal_df = df.groupby("CALIBER")["QTY_AVAILABLE"].sum().sort_values(ascending=False).head(8).reset_index()
+            cal_df = df.groupby("CALIBER")[inv_col].sum().sort_values(ascending=True).tail(8).reset_index()
             if not cal_df.empty:
-                fig = px.bar(cal_df, x="QTY_AVAILABLE", y="CALIBER", orientation="h", color_discrete_sequence=["#00d4aa"])
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
+                text_vals = [f"${v:,.2f}" if is_cost else f"{v:,.0f}" for v in cal_df[inv_col]]
+                fig = go.Figure(go.Bar(
+                    x=cal_df[inv_col].tolist(),
+                    y=cal_df["CALIBER"].tolist(),
+                    orientation="h",
+                    marker_color="#5B9BD5",
+                    text=text_vals,
+                    textposition="outside",
+                ))
+                fig.update_layout(height=300, margin=dict(l=0, r=100, t=10, b=0), showlegend=False)
+                fig.update_xaxes(title="", visible=False)
                 fig.update_yaxes(title="")
                 st.plotly_chart(fig, use_container_width=True)
 
     with chart_cols[2]:
-        st.subheader("Qty on Hand / Projectile")
+        st.subheader("Inventory Per Projectile")
         if not df.empty:
-            proj_df = df.groupby("PROJECTILE")["QTY_AVAILABLE"].sum().sort_values(ascending=False).head(8).reset_index()
+            proj_df = df.groupby("PROJECTILE")[inv_col].sum().sort_values(ascending=True).tail(8).reset_index()
             if not proj_df.empty:
-                fig = px.bar(proj_df, x="QTY_AVAILABLE", y="PROJECTILE", orientation="h", color_discrete_sequence=["#00d4aa"])
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
+                text_vals = [f"${v:,.2f}" if is_cost else f"{v:,.0f}" for v in proj_df[inv_col]]
+                fig = go.Figure(go.Bar(
+                    x=proj_df[inv_col].tolist(),
+                    y=proj_df["PROJECTILE"].tolist(),
+                    orientation="h",
+                    marker_color="#5B9BD5",
+                    text=text_vals,
+                    textposition="outside",
+                ))
+                fig.update_layout(height=300, margin=dict(l=0, r=100, t=10, b=0), showlegend=False)
+                fig.update_xaxes(title="", visible=False)
                 fig.update_yaxes(title="")
                 st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
 
-    # Inventory overview table
-    st.subheader("Inventory Overview")
-    if not df.empty:
-        total_all_qty = df["QTY_AVAILABLE"].sum()
-        df["PCT_TOTAL"] = (df["QTY_AVAILABLE"] / total_all_qty * 100).round(2) if total_all_qty > 0 else 0
-        table_df = df[["SKU", "QTY_AVAILABLE", "PCT_TOTAL", "UNITS_SOLD", "DAYS_OF_SUPPLY", "DAILY_AVG", "EXTENDED_COST", "NET_SALES"]].copy()
-        table_df = table_df.sort_values("QTY_AVAILABLE", ascending=False).head(50)
-        table_df.columns = ["SKU", "Qty on Hand", "% Total", "Units Sold (30d)", "Days of Supply", "Daily Avg", "Cost on Hand", "Net Sales (30d)"]
-        st.dataframe(
-            table_df.style.format({
-                "Qty on Hand": "{:,.0f}",
-                "% Total": "{:.2f}%",
-                "Units Sold (30d)": "{:,.0f}",
-                "Days of Supply": "{:,.0f}",
-                "Daily Avg": "{:,.1f}",
-                "Cost on Hand": "${:,.2f}",
-                "Net Sales (30d)": "${:,.2f}",
-            }).hide(axis="index"),
-            use_container_width=True,
+    # --- Sales Filters (period for units sold / analytical view) ---
+    st.markdown("**Sales Filters**")
+    sf_row = st.columns([2, 2, 2, 2, 3])
+    with sf_row[0]:
+        st.radio(
+            "Period",
+            ["YESTERDAY", "7 DAYS", "MTD", "YTD"],
+            index=["YESTERDAY", "7 DAYS", "MTD", "YTD"].index(
+                st.session_state.get("inv_period", "YTD")
+            ),
+            horizontal=True,
+            label_visibility="collapsed",
+            key="inv_period",
         )
+    with sf_row[4]:
+        st.toggle("Custom Filters", value=False, key="inv_custom_toggle")
+
+    if st.session_state.get("inv_custom_toggle", False):
+        custom_cols = st.columns([2, 2, 2, 2])
+        years = list(range(today.year, 2018, -1))
+        months_list = [
+            "All", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December",
+        ]
+        with custom_cols[0]:
+            st.selectbox("Year", years, index=0, key="inv_custom_year")
+        with custom_cols[1]:
+            st.selectbox("Month", months_list, index=0, key="inv_custom_month")
+        with custom_cols[2]:
+            st.selectbox(
+                "Week", ["All", "W1", "W2", "W3", "W4"],
+                index=0, key="inv_custom_week",
+            )
+        day_options = [
+            "All", "Monday", "Tuesday", "Wednesday",
+            "Thursday", "Friday", "Saturday", "Sunday",
+        ]
+        with custom_cols[3]:
+            st.selectbox("Day of Week", day_options, index=0, key="inv_custom_day")
+
+    # Analytical View toggle (matches PBI right panel)
+    st.markdown("**Analytical View**")
+    anal_view = st.radio(
+        "View",
+        ["OVERVIEW", "LOW STOCK", "OVERSTOCK"],
+        index=0,
+        horizontal=True,
+        key="inv_analytical_view",
+        label_visibility="collapsed",
+    )
+
+    if not df.empty:
+        # Compute Total % on Hand
+        total_all_qty = df["QTY_AVAILABLE"].sum()
+        df["PCT_ON_HAND"] = (
+            (df["QTY_AVAILABLE"] / total_all_qty * 100)
+            if total_all_qty > 0 else 0
+        )
+
+        if anal_view == "OVERVIEW":
+            st.subheader("Overview Inventory")
+            table_df = df[[
+                "SKU", "QTY_AVAILABLE", "PCT_ON_HAND",
+                "UNITS_SOLD", "DAYS_OF_SUPPLY", "DAILY_AVG",
+                "EXTENDED_COST", "NET_SALES", "PCT_MARGIN",
+            ]].copy()
+            table_df = table_df.sort_values(
+                "DAILY_AVG", ascending=False,
+            ).head(50)
+            table_df.columns = [
+                "Manufacturer SKU", "Qty on Hand",
+                "Total % on Hand", "Units Sold in Period",
+                "DoS", "Daily Average Units Sold",
+                "Cost on Hand", "Net Sales ($)", "% Margin",
+            ]
+            st.dataframe(
+                table_df.style.format({
+                    "Qty on Hand": "{:,.0f}",
+                    "Total % on Hand": "{:.2f}%",
+                    "Units Sold in Period": "{:,.0f}",
+                    "DoS": "{:,.0f}",
+                    "Daily Average Units Sold": "{:,.0f}",
+                    "Cost on Hand": "${:,.0f}",
+                    "Net Sales ($)": "${:,.0f}",
+                    "% Margin": "{:.2f}%",
+                }).hide(axis="index"),
+                use_container_width=True,
+            )
+
+        elif anal_view == "LOW STOCK":
+            st.subheader("Lowstock")
+            # Low stock = items with low DoS relative to demand
+            low_df = df.copy()
+            low_df = low_df.sort_values(
+                "DAYS_OF_SUPPLY", ascending=True, na_position="first",
+            ).head(50)
+            table_df = low_df[[
+                "SKU", "QTY_AVAILABLE", "PCT_ON_HAND",
+                "UNITS_SOLD", "DAYS_OF_SUPPLY", "DAILY_AVG",
+                "NET_SALES",
+            ]].copy()
+            table_df.columns = [
+                "Manufacturer SKU", "Qty On Hand", "Total %",
+                "Units Sold", "Days of Stock",
+                "Daily Average Units Sold", "Net Sales ($)",
+            ]
+            st.dataframe(
+                table_df.style.format({
+                    "Qty On Hand": "{:,.0f}",
+                    "Total %": "{:.2f}%",
+                    "Units Sold": "{:,.0f}",
+                    "Days of Stock": "{:,.0f}",
+                    "Daily Average Units Sold": "{:,.0f}",
+                    "Net Sales ($)": "${:,.0f}",
+                }).hide(axis="index"),
+                use_container_width=True,
+            )
+
+        else:  # OVERSTOCK
+            st.subheader("Overstock")
+            # Overstock = items with high DoS (excess inventory)
+            over_df = df.copy()
+            over_df = over_df.sort_values(
+                "DAYS_OF_SUPPLY", ascending=False, na_position="last",
+            ).head(50)
+            table_df = over_df[[
+                "SKU", "QTY_AVAILABLE", "PCT_ON_HAND",
+                "UNITS_SOLD", "DAYS_OF_SUPPLY", "DAILY_AVG",
+                "NET_SALES", "DOS_PLUS_ON_ORDER",
+                "QTY_ON_ORDER", "EXTENDED_COST",
+            ]].copy()
+            table_df.columns = [
+                "Manufacturer SKU", "Qty On Hand", "Total%",
+                "Units Sold", "DoS", "Daily Average Units Sold",
+                "Net Sales ($)", "DOS + On Order",
+                "Qty On Order", "Cost on Hand",
+            ]
+            st.dataframe(
+                table_df.style.format({
+                    "Qty On Hand": "{:,.0f}",
+                    "Total%": "{:.2f}%",
+                    "Units Sold": "{:,.0f}",
+                    "DoS": "{:,.0f}",
+                    "Daily Average Units Sold": "{:,.0f}",
+                    "Net Sales ($)": "${:,.0f}",
+                    "DOS + On Order": "{:,.0f}",
+                    "Qty On Order": "{:,.0f}",
+                    "Cost on Hand": "${:,.0f}",
+                }).hide(axis="index"),
+                use_container_width=True,
+            )
     else:
         st.info("No inventory data.")
+
+    st.divider()
+
+    # Units Sold/Period chart (matches PBI bottom chart)
+    st.subheader("Units Sold/Period")
+    if not daily_agg.empty:
+        daily_agg_sorted = daily_agg.sort_values("SALE_DATE")
+        dates = [str(d) for d in daily_agg_sorted["SALE_DATE"].tolist()]
+        units = daily_agg_sorted["UNITS_SOLD"].tolist()
+        avg_val = sum(units) / len(units) if units else 0
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=dates,
+            y=units,
+            name="Units Sold",
+            marker_color="#5B9BD5",
+            text=[f"{v:,.0f}" for v in units],
+            textposition="outside",
+        ))
+        fig.add_trace(go.Scatter(
+            x=dates,
+            y=[avg_val] * len(dates),
+            name="Daily Average",
+            mode="lines",
+            line=dict(color="#00d4aa", dash="dot", width=2),
+        ))
+        fig.update_layout(
+            height=350,
+            margin=dict(l=40, r=20, t=10, b=40),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+            xaxis=dict(type="category"),
+        )
+        fig.update_xaxes(title="")
+        fig.update_yaxes(title="")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No sales data for the selected period.")
+
+    # --- Store filter UI (rendered at bottom, matches PBI) ---
+    st.divider()
+    if store_names:
+        st.markdown("**STORE**")
+        store_ui_cols = st.columns(len(store_names))
+        for i, name in enumerate(store_names):
+            with store_ui_cols[i]:
+                st.checkbox(
+                    name, value=True,
+                    key=f"inv_store_{name}",
+                )
 
 # =============================================================================
 # TAB 2: VENDOR ANALYSIS
@@ -232,9 +584,12 @@ with tab_vendor:
             st.subheader("Qty Received / Month")
             if not received_df.empty:
                 received_df["MONTH"] = pd.to_datetime(received_df["DATERECEIVED"]).dt.to_period("M").astype(str)
-                monthly_qty = received_df.groupby("MONTH")["QTY"].sum().reset_index()
-                monthly_qty = monthly_qty.tail(12)
-                fig = px.bar(monthly_qty, x="MONTH", y="QTY", color_discrete_sequence=["#00d4aa"])
+                monthly_qty = received_df.groupby("MONTH")["QTY"].sum().reset_index().tail(12)
+                fig = go.Figure(go.Bar(
+                    x=monthly_qty["MONTH"].tolist(),
+                    y=monthly_qty["QTY"].tolist(),
+                    marker_color="#00d4aa",
+                ))
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -243,9 +598,13 @@ with tab_vendor:
         with chart_cols[1]:
             st.subheader("Avg Unit Cost / Month")
             if not received_df.empty:
-                monthly_cost = received_df.groupby("MONTH")["UNIT_COST"].mean().reset_index()
-                monthly_cost = monthly_cost.tail(12)
-                fig = px.line(monthly_cost, x="MONTH", y="UNIT_COST", color_discrete_sequence=["#00d4aa"])
+                monthly_cost = received_df.groupby("MONTH")["UNIT_COST"].mean().reset_index().tail(12)
+                fig = go.Figure(go.Scatter(
+                    x=monthly_cost["MONTH"].tolist(),
+                    y=monthly_cost["UNIT_COST"].tolist(),
+                    mode="lines+markers",
+                    line=dict(color="#00d4aa"),
+                ))
                 fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
                 fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
@@ -319,7 +678,6 @@ with tab_open_po:
 
         if not open_df.empty:
             open_df["QTY_REMAINING"] = open_df["QUANTITY_TO_FULFILL"] - open_df["QUANTITY_FULFILLED"]
-            today = date.today()
             open_df["IS_OVERDUE"] = open_df["SCHEDULED_FULFILLMENT_DATE"].apply(
                 lambda x: pd.to_datetime(x).date() < today if pd.notna(x) else False
             )
@@ -355,7 +713,11 @@ with tab_open_po:
             ).reset_index().sort_values("SCHEDULED", ascending=True)
 
             po_table["STATUS"] = po_table["IS_OVERDUE"].apply(lambda x: "OVERDUE" if x else "On Track")
-            display_cols = ["PURCHASE_ORDER_ID", "VENDOR_NAME", "QTY_REMAINING", "TOTAL_COST", "SCHEDULED", "DATE_EXPECTED", "LEAD_TIME", "STATUS"]
+            display_cols = [
+                "PURCHASE_ORDER_ID", "VENDOR_NAME", "QTY_REMAINING",
+                "TOTAL_COST", "SCHEDULED", "DATE_EXPECTED",
+                "LEAD_TIME", "STATUS",
+            ]
             st.dataframe(
                 po_table[display_cols].style.format({
                     "QTY_REMAINING": "{:,.0f}",
