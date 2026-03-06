@@ -1097,16 +1097,152 @@ with tab_open_po:
 
             st.divider()
 
-            # --- Row 2: Inventory Projections + Breakdown tables ---
-            bottom_row = st.columns([1, 1])
+            # --- Row 2: Inventory Projections ---
+            st.subheader("INVENTORY PROJECTIONS")
 
-            with bottom_row[0]:
-                st.subheader("INVENTORY PROJECTIONS")
-                # Placeholder for inventory projections chart
-                st.info("Inventory projections chart — coming soon.")
+            # Build projection: current on-hand - daily sales + incoming POs
+            if not filtered_df.empty and not inv_df.empty:
+                # Current on-hand (Ammunition only)
+                inv_ammo = inv_df[inv_df["CATEGORY"] == "Ammunition"]
+                current_on_hand = inv_ammo["QTY_AVAILABLE"].sum()
 
-            with bottom_row[1]:
-                pass  # Space used by TOTAL POS above
+                # Daily sales rate from selected period
+                total_sold = sold_agg["UNITS_SOLD"].sum() if not sold_agg.empty else 0
+                daily_rate = total_sold / n_days if n_days > 0 else 0
+
+                # Incoming POs by expected date
+                incoming = filtered_df[
+                    filtered_df["DATE_EXPECTED_DT"].notna()
+                ].groupby(
+                    filtered_df["DATE_EXPECTED_DT"].dt.date
+                )["QTY"].sum().to_dict()
+
+                # Build daily projection from today to projection end
+                proj_dates = []
+                proj_values = []
+                proj_incoming = []
+                running = float(current_on_hand)
+                d = today
+                while d <= proj_end:
+                    # Add incoming POs for this date
+                    arrived = float(incoming.get(d, 0))
+                    running += arrived
+                    # Subtract daily sales
+                    running -= daily_rate
+                    proj_dates.append(d)
+                    proj_values.append(max(running, 0))
+                    proj_incoming.append(arrived)
+                    d += timedelta(days=1)
+
+                if proj_dates:
+                    fig_proj = go.Figure()
+
+                    # Projected inventory line
+                    fig_proj.add_trace(go.Scatter(
+                        x=proj_dates, y=proj_values,
+                        name="Projected Inventory",
+                        mode="lines",
+                        line=dict(color="#5B9BD5", width=2),
+                        fill="tozeroy",
+                        fillcolor="rgba(91,155,213,0.15)",
+                    ))
+
+                    # Incoming PO markers (only on days with arrivals)
+                    arrival_dates = [d for d, v in zip(proj_dates, proj_incoming) if v > 0]
+                    arrival_vals = [v for v in proj_incoming if v > 0]
+                    arrival_inv = [
+                        proj_values[i]
+                        for i, v in enumerate(proj_incoming) if v > 0
+                    ]
+                    if arrival_dates:
+                        fig_proj.add_trace(go.Scatter(
+                            x=arrival_dates, y=arrival_inv,
+                            name="PO Arrival",
+                            mode="markers+text",
+                            marker=dict(
+                                color="#2ECC71", size=10, symbol="triangle-up",
+                            ),
+                            text=[f"+{v:,.0f}" for v in arrival_vals],
+                            textposition="top center",
+                            textfont=dict(size=9, color="#2ECC71"),
+                        ))
+
+                    # Zero-stock threshold line
+                    fig_proj.add_hline(
+                        y=0, line_dash="dash",
+                        line_color="red", opacity=0.5,
+                        annotation_text="Out of Stock",
+                        annotation_position="bottom right",
+                    )
+
+                    # Stockout date annotation
+                    stockout_date = None
+                    for i, v in enumerate(proj_values):
+                        if v <= 0:
+                            stockout_date = proj_dates[i]
+                            break
+
+                    if stockout_date:
+                        fig_proj.add_vline(
+                            x=stockout_date, line_dash="dot",
+                            line_color="red", opacity=0.6,
+                        )
+                        fig_proj.add_annotation(
+                            x=stockout_date, y=max(proj_values) * 0.8,
+                            text=f"Stockout: {stockout_date:%m/%d/%Y}",
+                            showarrow=True, arrowhead=2,
+                            font=dict(color="red", size=11),
+                        )
+
+                    fig_proj.update_layout(
+                        height=350,
+                        margin=dict(l=50, r=30, t=30, b=40),
+                        legend=dict(
+                            orientation="h", yanchor="bottom",
+                            y=1.02, xanchor="left", x=0,
+                        ),
+                        yaxis=dict(title="Units"),
+                        xaxis=dict(title=""),
+                        annotations=list(fig_proj.layout.annotations or ()) + [
+                            dict(
+                                x=0.01, y=0.98, xref="paper", yref="paper",
+                                text=(
+                                    f"On Hand: {current_on_hand:,.0f}"
+                                    f"  |  Daily Sales: {daily_rate:,.0f}"
+                                    f"  |  Incoming: {sum(proj_incoming):,.0f}"
+                                ),
+                                showarrow=False,
+                                font=dict(size=11),
+                                bgcolor="rgba(0,0,0,0.6)",
+                                bordercolor="rgba(255,255,255,0.2)",
+                                borderwidth=1,
+                            ),
+                        ],
+                    )
+
+                    st.plotly_chart(fig_proj, use_container_width=True)
+
+                    # Summary metrics row
+                    m_cols = st.columns(5)
+                    with m_cols[0]:
+                        st.metric("Current On Hand", f"{current_on_hand:,.0f}")
+                    with m_cols[1]:
+                        st.metric("Daily Avg Sales", f"{daily_rate:,.0f}")
+                    with m_cols[2]:
+                        dos = int(current_on_hand / daily_rate) if daily_rate > 0 else 0
+                        st.metric("Days of Supply", f"{dos:,}")
+                    with m_cols[3]:
+                        st.metric("Open PO Units", f"{sum(proj_incoming):,.0f}")
+                    with m_cols[4]:
+                        if stockout_date:
+                            days_to = (stockout_date - today).days
+                            st.metric("Stockout In", f"{days_to} days")
+                        else:
+                            st.metric("Stockout In", "N/A (covered)")
+                else:
+                    st.info("No projection data available.")
+            else:
+                st.info("No open PO or inventory data for projection.")
 
             st.divider()
 
