@@ -414,7 +414,8 @@ ACCOUNTADMIN
     ├── STREAMLIT_ROLE    → Owns Streamlit apps, SELECT on AD_ANALYTICS.GOLD
     │   └── (app runs with this role's privileges — owner's rights)
     └── DASHBOARD_VIEWER_ROLE  → USAGE on Streamlit apps (viewer access)
-        └── SSO users     → Company email login via SAML 2.0
+        ├── SSO users     → Company email login via SAML 2.0
+        └── TEMP_USER_DELETE_AFTER_PROD → Pre-SSO testing (password auth, DELETE after prod)
 ```
 
 ### Role usage reference
@@ -816,6 +817,106 @@ Streamlit App (runs as STREAMLIT_ROLE — owner's rights)
   │ SELECT on AD_ANALYTICS.GOLD
   ▼
 Dashboard data (F_SALES, D_PRODUCT, etc.)
+```
+
+---
+
+## 14. Temporary test user (pre-SSO validation)
+
+Before Google SSO is configured, a temporary password-authenticated user allows the client to connect and validate the Streamlit dashboard. **Delete this user once production SSO is live.**
+
+### 14.1 Grant SELECT on GOLD to DASHBOARD_VIEWER_ROLE
+
+In production with SiS, viewers don't need direct table access (the app runs under owner's rights via STREAMLIT_ROLE). However, during the testing phase — especially if running the app locally — the viewer role needs SELECT on GOLD tables.
+
+```sql
+USE ROLE SYSADMIN;
+
+-- Temporary: grant SELECT for testing (remove after SiS is deployed and SSO is live)
+GRANT SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
+GRANT SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE DASHBOARD_VIEWER_ROLE;
+```
+
+> **Post-SSO cleanup:** Once the app is deployed to SiS and SSO is configured, revoke these SELECT grants. The app will query data through STREAMLIT_ROLE (owner's rights), so viewers only need USAGE on the Streamlit object.
+>
+> ```sql
+> REVOKE SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+> REVOKE SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+> REVOKE SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+> REVOKE SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+> ```
+
+### 14.2 Create temporary test user
+
+```sql
+USE ROLE SECURITYADMIN;
+
+CREATE USER IF NOT EXISTS TEMP_USER_DELETE_AFTER_PROD
+    PASSWORD = '<strong-password>'
+    DEFAULT_ROLE = DASHBOARD_VIEWER_ROLE
+    DEFAULT_WAREHOUSE = ETL_WH
+    DEFAULT_NAMESPACE = AD_ANALYTICS.GOLD
+    MUST_CHANGE_PASSWORD = FALSE
+    COMMENT = 'Temporary test user for Streamlit validation - DELETE after Google SSO is configured';
+
+GRANT ROLE DASHBOARD_VIEWER_ROLE TO USER TEMP_USER_DELETE_AFTER_PROD;
+ALTER USER TEMP_USER_DELETE_AFTER_PROD SET QUERY_TAG = 'temp-dashboard-test';
+```
+
+> Change `<strong-password>` before sharing with the client. This user has read-only access to GOLD only — no write privileges, no Silver, no source data.
+
+### 14.3 Validate
+
+```sql
+USE ROLE DASHBOARD_VIEWER_ROLE;
+USE WAREHOUSE ETL_WH;
+
+-- Verify identity
+SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE();
+-- Expected: TEMP_USER_DELETE_AFTER_PROD, DASHBOARD_VIEWER_ROLE, ETL_WH
+
+-- Verify Gold access
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.D_STORE;
+
+-- Verify no access to source schemas
+SELECT COUNT(*) FROM AD_AIRBYTE.AD_FISHBOWL.SO;
+-- Expected: error (no USAGE on AD_AIRBYTE)
+
+-- Verify no write access
+CREATE TABLE AD_ANALYTICS.GOLD._test_write (id INT);
+-- Expected: error (no CREATE TABLE privilege)
+```
+
+### 14.4 Connection details for the client
+
+| Parameter | Value |
+|---|---|
+| Account | `iwb48385.us-east-1` |
+| Server | `iwb48385.us-east-1.snowflakecomputing.com` |
+| User | `TEMP_USER_DELETE_AFTER_PROD` |
+| Password | *(shared securely out-of-band)* |
+| Role | `DASHBOARD_VIEWER_ROLE` |
+| Warehouse | `ETL_WH` |
+| Database | `AD_ANALYTICS` |
+| Schema | `GOLD` |
+
+### 14.5 Cleanup (after Google SSO is live)
+
+```sql
+USE ROLE SECURITYADMIN;
+
+-- Drop temporary user
+DROP USER IF EXISTS TEMP_USER_DELETE_AFTER_PROD;
+
+-- Revoke SELECT from DASHBOARD_VIEWER_ROLE (no longer needed with SiS owner's rights)
+USE ROLE SYSADMIN;
+REVOKE SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+REVOKE SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+REVOKE SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
+REVOKE SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD FROM ROLE DASHBOARD_VIEWER_ROLE;
 ```
 
 ---
