@@ -756,8 +756,11 @@ with tab_vendor:
                     "FILLED", "TOTAL", "%",
                     "LT", "LT Expected", "Expected", "Delivers",
                 ]
+                # POID should display as integer (no decimals, no commas)
+                display_po["POID"] = display_po["POID"].astype(int)
                 st.dataframe(
                     display_po.style.format({
+                        "POID": "{:d}",
                         "FILLED": "{:,.0f}",
                         "TOTAL": "{:,.0f}",
                         "%": "{:.2f}%",
