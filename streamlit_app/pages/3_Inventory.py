@@ -923,96 +923,280 @@ with tab_vendor:
 # =============================================================================
 with tab_open_po:
     if not pos_df.empty:
-        # Open POs = quantity_to_fulfill > quantity_fulfilled
+        # Open POs = not yet received, Ammunition only, QTY > 0
         open_df = pos_df[
-            (pos_df["QUANTITY_TO_FULFILL"].notna())
-            & (pos_df["QUANTITY_FULFILLED"].notna())
-            & (pos_df["QUANTITY_TO_FULFILL"] > pos_df["QUANTITY_FULFILLED"])
+            pos_df["DATERECEIVED"].isna()
+            & (pos_df["CATEGORY"] == "Ammunition")
+            & (pos_df["QTY"] != 0)
         ].copy()
 
         if not open_df.empty:
-            open_df["QTY_REMAINING"] = open_df["QUANTITY_TO_FULFILL"] - open_df["QUANTITY_FULFILLED"]
-            open_df["IS_OVERDUE"] = open_df["SCHEDULED_FULFILLMENT_DATE"].apply(
-                lambda x: pd.to_datetime(x).date() < today if pd.notna(x) else False
-            )
+            open_df["DATE_EXPECTED_DT"] = pd.to_datetime(open_df["DATE_EXPECTED"])
+            open_df["SCHED_DT"] = pd.to_datetime(open_df["SCHEDULED_FULFILLMENT_DATE"])
+            open_df["CREATED_DT"] = pd.to_datetime(open_df["PO_CREATED_AT"])
 
-            # KPIs
-            total_open = open_df["PURCHASE_ORDER_ID"].nunique()
-            total_remaining = open_df["QTY_REMAINING"].sum()
-            overdue_count = open_df[open_df["IS_OVERDUE"]]["PURCHASE_ORDER_ID"].nunique()
+            # --- Row 1: Sales Filters + Date Projection | Purchase Order Status ---
+            top_row = st.columns([1, 1])
 
-            st.divider()
-            kpi_cols = st.columns(4)
-            with kpi_cols[0]:
-                st.metric("Open POs", f"{total_open:,}")
-            with kpi_cols[1]:
-                st.metric("Qty Remaining", f"{total_remaining:,.0f}")
-            with kpi_cols[2]:
-                st.metric("Overdue POs", f"{overdue_count:,}")
-            with kpi_cols[3]:
-                avg_lt = open_df["PRECISE_LEADTIME"].mean()
-                st.metric("Avg Lead Time (days)", f"{avg_lt:,.0f}" if pd.notna(avg_lt) else "N/A")
+            with top_row[0]:
+                # Sales Filters (period buttons + custom)
+                filt_cols = st.columns([3, 2])
+                with filt_cols[0]:
+                    st.markdown("**SALES FILTERS**")
+                    op_period = st.radio(
+                        "Period", ["YESTERDAY", "7 DAYS", "MTD", "YTD"],
+                        index=3, horizontal=True, key="op_period",
+                        label_visibility="collapsed",
+                    )
+                with filt_cols[1]:
+                    op_custom = st.checkbox("Custom Filters", key="op_custom")
 
-            st.divider()
+                if op_custom:
+                    cust_cols = st.columns(4)
+                    years = list(range(today.year, 2018, -1))
+                    month_names = [
+                        "All", "January", "February", "March", "April",
+                        "May", "June", "July", "August", "September",
+                        "October", "November", "December",
+                    ]
+                    with cust_cols[0]:
+                        op_year = st.selectbox("Year", years, key="op_year")
+                    with cust_cols[1]:
+                        op_month = st.selectbox("Month", month_names, key="op_month")
+                    with cust_cols[2]:
+                        op_week = st.selectbox(
+                            "Week", ["All", "W1", "W2", "W3", "W4"], key="op_week",
+                        )
+                    with cust_cols[3]:
+                        op_day = st.selectbox(
+                            "Day of Week",
+                            ["All", "Monday", "Tuesday", "Wednesday",
+                             "Thursday", "Friday", "Saturday", "Sunday"],
+                            key="op_day",
+                        )
 
-            # Open PO table
-            st.subheader("Open Purchase Orders")
-            po_table = open_df.groupby(["PURCHASE_ORDER_ID", "VENDOR_NAME"]).agg(
-                QTY_REMAINING=("QTY_REMAINING", "sum"),
-                TOTAL_COST=("TOTAL_COST", "sum"),
-                SCHEDULED=("SCHEDULED_FULFILLMENT_DATE", "max"),
-                DATE_EXPECTED=("DATE_EXPECTED", "max"),
-                LEAD_TIME=("PRECISE_LEADTIME", "mean"),
-                IS_OVERDUE=("IS_OVERDUE", "max"),
-            ).reset_index().sort_values("SCHEDULED", ascending=True)
+                # Date Projection slider
+                st.markdown("**DATE PROJECTION**")
+                min_exp = open_df["DATE_EXPECTED_DT"].dropna().min()
+                max_exp = open_df["DATE_EXPECTED_DT"].dropna().max()
+                if pd.notna(min_exp) and pd.notna(max_exp):
+                    proj_range = st.date_input(
+                        "Projection range",
+                        value=(min_exp.date(), max_exp.date()),
+                        min_value=min_exp.date(),
+                        max_value=max_exp.date(),
+                        key="op_proj_range",
+                        label_visibility="collapsed",
+                    )
+                    if isinstance(proj_range, tuple) and len(proj_range) == 2:
+                        proj_start, proj_end = proj_range
+                    else:
+                        proj_start, proj_end = min_exp.date(), max_exp.date()
+                else:
+                    proj_start, proj_end = today, today
 
-            po_table["STATUS"] = po_table["IS_OVERDUE"].apply(lambda x: "OVERDUE" if x else "On Track")
-            display_cols = [
-                "PURCHASE_ORDER_ID", "VENDOR_NAME", "QTY_REMAINING",
-                "TOTAL_COST", "SCHEDULED", "DATE_EXPECTED",
-                "LEAD_TIME", "STATUS",
-            ]
-            st.dataframe(
-                po_table[display_cols].style.format({
-                    "QTY_REMAINING": "{:,.0f}",
-                    "TOTAL_COST": "${:,.2f}",
-                    "LEAD_TIME": "{:,.0f}",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
-
-            st.divider()
-
-            # Breakdown tables
-            table_cols = st.columns(2)
-            with table_cols[0]:
-                st.subheader("Open POs / By Vendor")
-                v_agg = open_df.groupby("VENDOR_NAME").agg(
-                    QTY_REMAINING=("QTY_REMAINING", "sum"),
-                    POS=("PURCHASE_ORDER_ID", "nunique"),
-                    LEAD_TIME=("PRECISE_LEADTIME", "mean"),
-                ).reset_index().sort_values("QTY_REMAINING", ascending=False)
-                st.dataframe(
-                    v_agg.style.format({
-                        "QTY_REMAINING": "{:,.0f}",
-                        "LEAD_TIME": "{:,.0f}",
-                    }).hide(axis="index"),
-                    use_container_width=True,
+            with top_row[1]:
+                # Purchase Order Status toggle
+                st.markdown("**PURCHASE ORDER STATUS**")
+                # Determine overdue per PO
+                po_status = open_df.groupby("PURCHASE_ORDER_ID").agg(
+                    MAX_EXPECTED=("DATE_EXPECTED_DT", "max"),
+                ).reset_index()
+                po_status["IS_OVERDUE"] = po_status["MAX_EXPECTED"].apply(
+                    lambda x: x.date() < today if pd.notna(x) else False
+                )
+                overdue_poids = set(
+                    po_status[po_status["IS_OVERDUE"]]["PURCHASE_ORDER_ID"]
+                )
+                regular_poids = set(
+                    po_status[~po_status["IS_OVERDUE"]]["PURCHASE_ORDER_ID"]
                 )
 
-            with table_cols[1]:
-                st.subheader("Open POs / By SKU")
-                s_agg = open_df.groupby("SKU").agg(
-                    QTY_REMAINING=("QTY_REMAINING", "sum"),
-                    LEAD_TIME=("PRECISE_LEADTIME", "mean"),
-                ).reset_index().sort_values("QTY_REMAINING", ascending=False).head(20)
-                st.dataframe(
-                    s_agg.style.format({
-                        "QTY_REMAINING": "{:,.0f}",
-                        "LEAD_TIME": "{:,.0f}",
-                    }).hide(axis="index"),
-                    use_container_width=True,
+                status_filter = st.radio(
+                    "Status", ["Select all", "OVERDUE", "REGULAR"],
+                    index=0, horizontal=True, key="op_status",
+                    label_visibility="collapsed",
                 )
+
+                if status_filter == "OVERDUE":
+                    visible_poids = overdue_poids
+                elif status_filter == "REGULAR":
+                    visible_poids = regular_poids
+                else:
+                    visible_poids = overdue_poids | regular_poids
+
+                # Filter open_df by status and date projection
+                filtered_df = open_df[
+                    open_df["PURCHASE_ORDER_ID"].isin(visible_poids)
+                ].copy()
+                filtered_df = filtered_df[
+                    filtered_df["DATE_EXPECTED_DT"].apply(
+                        lambda x: proj_start <= x.date() <= proj_end
+                        if pd.notna(x) else True
+                    )
+                ]
+
+                # TOTAL POS table
+                st.markdown("**TOTAL POS**")
+                if not filtered_df.empty:
+                    po_agg = filtered_df.groupby("PURCHASE_ORDER_ID").agg(
+                        EXPECTED=("DATE_EXPECTED_DT", "max"),
+                        ADJUSTED=("SCHED_DT", "max"),
+                        CREATED=("CREATED_DT", "max"),
+                        L_DELIVER=("DATERECEIVED", "max"),
+                        QTY=("QTY", "sum"),
+                        FILLED=("QUANTITY_FULFILLED", "sum"),
+                        TOTAL=("QUANTITY_TO_FULFILL", "sum"),
+                        LT_EXPECTED=("PRECISE_LEADTIME", "mean"),
+                    ).reset_index().sort_values(
+                        "PURCHASE_ORDER_ID", ascending=False,
+                    )
+                    po_agg["PCT"] = po_agg.apply(
+                        lambda r: (r["FILLED"] / r["TOTAL"] * 100)
+                        if r["TOTAL"] and r["TOTAL"] > 0 else 0,
+                        axis=1,
+                    )
+                    po_agg["POID"] = po_agg["PURCHASE_ORDER_ID"].astype(int)
+                    po_agg["EXPECTED"] = pd.to_datetime(
+                        po_agg["EXPECTED"]
+                    ).dt.strftime("%m/%d/%Y")
+                    po_agg["ADJUSTED"] = pd.to_datetime(
+                        po_agg["ADJUSTED"]
+                    ).dt.strftime("%m/%d/%Y")
+                    po_agg["CREATED"] = pd.to_datetime(
+                        po_agg["CREATED"]
+                    ).dt.strftime("%m/%d/%Y")
+                    po_agg["L_DELIVER"] = pd.to_datetime(
+                        po_agg["L_DELIVER"]
+                    ).dt.strftime("%m/%d/%Y")
+
+                    disp_po = po_agg[[
+                        "POID", "EXPECTED", "ADJUSTED", "CREATED",
+                        "L_DELIVER", "QTY", "FILLED", "TOTAL",
+                        "LT_EXPECTED", "PCT",
+                    ]].copy()
+                    disp_po.columns = [
+                        "POID", "Expected", "Adjusted", "Created",
+                        "L. Deliver", "QTY", "FILLED", "TOTAL",
+                        "LT EXPECTED", "%",
+                    ]
+                    st.dataframe(
+                        disp_po.style.format({
+                            "POID": "{:d}",
+                            "QTY": "{:,.0f}",
+                            "FILLED": "{:,.0f}",
+                            "TOTAL": "{:,.0f}",
+                            "LT EXPECTED": "{:,.0f}",
+                            "%": "{:.2f}%",
+                        }).hide(axis="index"),
+                        use_container_width=True,
+                        height=300,
+                    )
+                else:
+                    st.info("No POs match the current filters.")
+
+            st.divider()
+
+            # --- Row 2: Inventory Projections + Breakdown tables ---
+            bottom_row = st.columns([1, 1])
+
+            with bottom_row[0]:
+                st.subheader("INVENTORY PROJECTIONS")
+                # Placeholder for inventory projections chart
+                st.info("Inventory projections chart — coming soon.")
+
+            with bottom_row[1]:
+                pass  # Space used by TOTAL POS above
+
+            st.divider()
+
+            # --- Row 3: Breakdown tables (VENDOR, CALIBER, PART SKU) ---
+            def _build_open_breakdown(grp_df, group_col, group_label):
+                """Build PBI-matching breakdown for open POs."""
+                agg = grp_df.groupby(group_col).agg(
+                    QTY=("QTY", "sum"),
+                    TOTAL_COST=("TOTAL_COST", "sum"),
+                    LT_EXPECTED=("PRECISE_LEADTIME", "mean"),
+                ).reset_index().sort_values("QTY", ascending=False)
+
+                agg["AVG_COST"] = (agg["TOTAL_COST"] / agg["QTY"]).round(2)
+                agg["W_AVG_COST"] = (agg["TOTAL_COST"] / agg["QTY"]).round(2)
+
+                totals = pd.DataFrame([{
+                    group_col: "Total",
+                    "QTY": agg["QTY"].sum(),
+                    "AVG_COST": (
+                        agg["TOTAL_COST"].sum() / agg["QTY"].sum()
+                        if agg["QTY"].sum() > 0 else 0
+                    ),
+                    "LT_EXPECTED": agg["LT_EXPECTED"].mean(),
+                    "W_AVG_COST": (
+                        agg["TOTAL_COST"].sum() / agg["QTY"].sum()
+                        if agg["QTY"].sum() > 0 else 0
+                    ),
+                    "TOTAL_COST": agg["TOTAL_COST"].sum(),
+                }])
+                agg = pd.concat([agg.head(15), totals], ignore_index=True)
+
+                table = agg[[
+                    group_col, "QTY", "AVG_COST", "LT_EXPECTED",
+                    "W_AVG_COST", "TOTAL_COST",
+                ]].copy()
+                table.columns = [
+                    group_label, "QTY", "Avg. Cost", "LT EXPECTED",
+                    "W. Avg. Cost", "Total Cost",
+                ]
+                return table
+
+            if not filtered_df.empty:
+                tbl_cols = st.columns(3)
+                with tbl_cols[0]:
+                    st.subheader("VENDOR")
+                    vt = _build_open_breakdown(
+                        filtered_df, "VENDOR_NAME", "VENDOR",
+                    )
+                    st.dataframe(
+                        vt.style.format({
+                            "QTY": "{:,.0f}",
+                            "Avg. Cost": "${:,.2f}",
+                            "LT EXPECTED": "{:,.0f}",
+                            "W. Avg. Cost": "${:,.2f}",
+                            "Total Cost": "${:,.0f}",
+                        }).hide(axis="index"),
+                        use_container_width=True,
+                    )
+                with tbl_cols[1]:
+                    st.subheader("CALIBER")
+                    ct = _build_open_breakdown(
+                        filtered_df, "CALIBER", "CALIBER",
+                    )
+                    st.dataframe(
+                        ct.style.format({
+                            "QTY": "{:,.0f}",
+                            "Avg. Cost": "${:,.2f}",
+                            "LT EXPECTED": "{:,.0f}",
+                            "W. Avg. Cost": "${:,.2f}",
+                            "Total Cost": "${:,.0f}",
+                        }).hide(axis="index"),
+                        use_container_width=True,
+                    )
+                with tbl_cols[2]:
+                    st.subheader("PART SKU")
+                    pt = _build_open_breakdown(
+                        filtered_df, "SKU", "PART SKU",
+                    )
+                    st.dataframe(
+                        pt.style.format({
+                            "QTY": "{:,.0f}",
+                            "Avg. Cost": "${:,.2f}",
+                            "LT EXPECTED": "{:,.0f}",
+                            "W. Avg. Cost": "${:,.2f}",
+                            "Total Cost": "${:,.0f}",
+                        }).hide(axis="index"),
+                        use_container_width=True,
+                    )
+            else:
+                st.info("No open PO data for the selected filters.")
         else:
             st.info("No open purchase orders found.")
     else:
