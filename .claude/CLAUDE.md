@@ -74,22 +74,27 @@ streamlit_app/
 ├── app.py                         # Entry point (local)
 ├── streamlit_app.py               # Entry point (SiS)
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales (replaces PBI SALES OVERVIEW FASTER)
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages (replaces PBI SALES OVERVIEW)
-│   └── 3_Inventory.py             # Inventory dashboard
+│   ├── 1_Today_Yesterday.py       # Real-time sales (replaces PBI SALES OVERVIEW FASTER) ~934 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages (replaces PBI SALES OVERVIEW) ~604 lines
+│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,343 lines
 └── utils/
     ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion
     └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps
 ```
 
-**Total:** ~2,450 lines across 8 Python files
+**Total:** ~3,400 lines across 8 Python files
 
 ### SiS Compatibility Notes
 
 - **Plotly**: Use `go.Bar`/`go.Figure` with `.tolist()` — `px.bar` fails serialization in SiS
+- **Plotly x-axis**: Use numeric positions + `tickvals`/`ticktext` to avoid duplicate category merging
 - **Maps**: Scattermapbox (local only, CARTO tiles blocked in SiS), `st.map()` fallback for SiS
 - **Data types**: All plotly data must be plain Python types (`float()`, `.tolist()`), not numpy/pandas
 - **Dual-mode**: `_is_sis` flag in `utils/db.py` controls local vs SiS rendering paths
+- **st.toggle**: Not available in SiS (Python 3.11) — use `st.checkbox` instead
+- **Session state pattern**: Initialize defaults in `st.session_state`, render widgets with `key=` only (no `value=`)
+- **Full-width CSS**: All pages inject CSS to remove Streamlit default max-width padding
+- **PBI data filters**: Vendor Analysis + Open POs filter to `Ammunition` category + `QTY != 0` (matches PBI)
 - **KPI cards**: Custom HTML/CSS with `st.markdown(unsafe_allow_html=True)` — PBI-style icons, colored borders
 - **Default filters**: Order Status preselected to COMPLETE, PROCESSING, UNVERIFIED (matches PBI)
 
@@ -305,7 +310,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ### Snowflake (Migration Target)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
-- **Last build**: PASS=424, WARN=12, ERROR=0, SKIP=0, TOTAL=436 (98 models, 338 tests)
+- **Last build**: PASS=426, WARN=12, ERROR=0, SKIP=0, TOTAL=438 (98 models, 340 tests)
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 
 ---

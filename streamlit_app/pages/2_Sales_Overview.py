@@ -36,7 +36,6 @@ default_statuses = [s for s in all_statuses if s in DEFAULT_STATUSES]
 
 # --- Category pages (mirrors Power BI 9-page structure) ---
 CATEGORIES = [
-    "General",
     "Ammunition",
     "Guns",
     "Magazines",
@@ -181,7 +180,7 @@ if store_names:
         df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids)]
 
 # --- Category filter ---
-if category != "General" and not df_target.empty:
+if not df_target.empty:
     df_target = df_target[df_target["CATEGORY"] == category]
     df_compare = df_compare[df_compare["CATEGORY"] == category]
 
@@ -464,32 +463,19 @@ with chart_cols[0]:
         else:
             st.info("No data for this period.")
 
-# Category / General Purpose chart — metric-aware
+# General Purpose chart — metric-aware
 with chart_cols[1]:
-    if category == "General":
-        st.subheader(f"{metric_label} / Category")
-        if not df_target.empty:
-            cat_agg = _agg_metric(df_target, "CATEGORY", metric_toggle).head(8)
-            if not cat_agg.empty:
-                fig = go.Figure(go.Bar(x=cat_agg["VALUE"].tolist(), y=cat_agg["CATEGORY"].tolist(), orientation="h", marker_color="#00d4aa"))
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No data.")
+    st.subheader(f"{metric_label} / General Purpose")
+    if not df_target.empty:
+        gp_agg = _agg_metric(df_target, "GENERAL_PURPOSE", metric_toggle).head(8)
+        if not gp_agg.empty:
+            fig = go.Figure(go.Bar(x=gp_agg["VALUE"].tolist(), y=gp_agg["GENERAL_PURPOSE"].tolist(), orientation="h", marker_color="#00d4aa"))
+            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
+            fig.update_xaxes(title="")
+            fig.update_yaxes(title="")
+            st.plotly_chart(fig, use_container_width=True)
     else:
-        st.subheader(f"{metric_label} / General Purpose")
-        if not df_target.empty:
-            gp_agg = _agg_metric(df_target, "GENERAL_PURPOSE", metric_toggle).head(8)
-            if not gp_agg.empty:
-                fig = go.Figure(go.Bar(x=gp_agg["VALUE"].tolist(), y=gp_agg["GENERAL_PURPOSE"].tolist(), orientation="h", marker_color="#00d4aa"))
-                fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="")
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No data.")
+        st.info("No data.")
 
 # Manufacturer chart — metric-aware
 with chart_cols[2]:
@@ -507,7 +493,7 @@ with chart_cols[2]:
 
 # Caliber / Fulfilled By chart — metric-aware
 with chart_cols[3]:
-    if category in ("Ammunition", "Guns", "General"):
+    if category in ("Ammunition", "Guns"):
         st.subheader(f"{metric_label} / Caliber")
         if not df_target.empty:
             cal_agg = _agg_metric(df_target, "CALIBER", metric_toggle).head(8)
