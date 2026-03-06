@@ -11,6 +11,15 @@ from datetime import date, timedelta
 
 from utils.db import run_query
 
+# Remove default padding to use full screen width
+st.markdown(
+    "<style>"
+    "   .block-container {padding-left: 1rem; padding-right: 1rem; max-width: 100%;}"
+    "   .stMainBlockContainer {max-width: 100%;}"
+    "</style>",
+    unsafe_allow_html=True,
+)
+
 st.title("INVENTORY")
 
 today = date.today()
@@ -566,7 +575,7 @@ with tab_inv:
         for i, name in enumerate(store_names):
             with store_ui_cols[i]:
                 st.checkbox(
-                    name, value=True,
+                    name,
                     key=f"inv_store_{name}",
                 )
 

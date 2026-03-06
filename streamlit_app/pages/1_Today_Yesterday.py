@@ -12,6 +12,13 @@ from datetime import date, timedelta
 from utils.db import run_query
 
 # --- Page config ---
+st.markdown(
+    "<style>"
+    "   .block-container {padding-left: 1rem; padding-right: 1rem; max-width: 100%;}"
+    "   .stMainBlockContainer {max-width: 100%;}"
+    "</style>",
+    unsafe_allow_html=True,
+)
 st.title("SALES OVERVIEW: TODAY / YESTERDAY")
 
 # Statuses preselected by default (matches Power BI default filter)
