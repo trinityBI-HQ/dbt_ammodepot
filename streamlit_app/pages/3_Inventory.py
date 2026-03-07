@@ -15,7 +15,8 @@ from utils.db import run_query
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
-st.logo(str(_logo_path))
+if hasattr(st, "logo"):
+    st.logo(str(_logo_path))
 
 # Remove default padding to use full screen width
 st.markdown(

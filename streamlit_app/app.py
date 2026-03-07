@@ -31,7 +31,8 @@ st.markdown("""
 - **Inventory** — Stock levels, vendor analysis, open purchase orders
 """)
 
-st.logo(str(_logo_path))
+if hasattr(st, "logo"):
+    st.logo(str(_logo_path))
 
 with st.sidebar:
     st.caption("Analytics Dashboard v0.1")
