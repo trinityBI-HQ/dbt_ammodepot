@@ -4,12 +4,18 @@ Replaces: SALES OVERVIEW REDSHIFT (Power BI — 168 views, #2) + REALTIME
 Source: AD_ANALYTICS.GOLD.F_SALES, D_PRODUCT, D_CUSTOMER, D_STORE
 """
 
+import base64
+import pathlib
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
+
+_logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
+_logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
+st.logo(str(_logo_path))
 
 # --- Page config ---
 st.markdown(
@@ -166,7 +172,13 @@ if custom_active:
 
 # --- Dynamic title (rendered at top via placeholder) ---
 _display_name = CATEGORY_DISPLAY.get(category, category)
-_title_placeholder.title(f"SALES OVERVIEW: {_display_name.upper()}")
+_title_placeholder.markdown(
+    f'<div style="display:flex;align-items:center;gap:12px;">'
+    f'<img src="data:image/png;base64,{_logo_b64}" height="48">'
+    f'<h1 style="margin:0;">SALES OVERVIEW: {_display_name.upper()}</h1>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 # Metric mapping: toggle value → (column, format, chart_label)
 # Chart labels match PBI: "$", "G.P. ($)", "Orders", "Units"
