@@ -48,6 +48,18 @@ CATEGORIES = [
     "Reloading Components",
     "Prep & Survival",
 ]
+# Display name overrides (DB value → UI label) and icons
+CATEGORY_DISPLAY = {"Reloading Components": "Load Comp"}
+CATEGORY_ICONS = {
+    "Ammunition": "✖️",
+    "Guns": "🔫",
+    "Magazines": "🔋",
+    "Gun Parts": "⚙️",
+    "Gear": "🦺",
+    "Optics/Sights": "🎯",
+    "Reloading Components": "🔧",
+    "Prep & Survival": "⛑️",
+}
 
 
 # --- Data loading ---
@@ -90,7 +102,11 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             p."Product Name" as PRODUCT_NAME,
             p."DD Gun Action" as GUN_ACTION,
             p."Capacity" as CAPACITY,
-            p."Material" as MATERIAL
+            p."Material" as MATERIAL,
+            p."DD Gun Parts" as GUN_PART,
+            p."DD Color" as COLOR,
+            p."Primary Category" as PRIMARY_CATEGORY,
+            p."Model" as MODEL
         from F_SALES f
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
@@ -104,7 +120,10 @@ filter_cols = st.columns([2, 3, 3, 3, 3, 2])
 with filter_cols[0]:
     period = st.radio("Period", ["TODAY", "MTD", "YTD"], horizontal=True)
 with filter_cols[1]:
-    category = st.selectbox("Category", CATEGORIES)
+    category = st.selectbox(
+        "Category", CATEGORIES,
+        format_func=lambda c: f"{CATEGORY_ICONS.get(c, '')} {CATEGORY_DISPLAY.get(c, c)}",
+    )
 with filter_cols[2]:
     order_status = st.multiselect(
         "Order Status",
@@ -146,7 +165,8 @@ if custom_active:
         st.selectbox("Day of Week", day_options, index=0, key="so_custom_day")
 
 # --- Dynamic title (rendered at top via placeholder) ---
-_title_placeholder.title(f"SALES OVERVIEW: {category.upper()}")
+_display_name = CATEGORY_DISPLAY.get(category, category)
+_title_placeholder.title(f"SALES OVERVIEW: {_display_name.upper()}")
 
 # Metric mapping: toggle value → (column, format, chart_label)
 # Chart labels match PBI: "$", "G.P. ($)", "Orders", "Units"
@@ -518,7 +538,7 @@ st.divider()
 # Guns: Hourly | Manufacturer | Caliber | Action | Capacity
 # Magazines: Hourly | Manufacturer | Caliber | Capacity | Material
 # Others: Hourly | General Purpose | Manufacturer | Fulfilled By
-if category in ("Guns", "Magazines"):
+if category in ("Guns", "Magazines", "Gun Parts", "Gear"):
     chart_cols = st.columns([30, 14, 14, 14, 14])
 else:
     chart_cols = st.columns([40, 20, 20, 20])
@@ -741,6 +761,50 @@ elif category == "Magazines":
     with chart_cols[3]:
         _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity")
     with chart_cols[4]:
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+elif category == "Gear":
+    # Gear: Manufacturer | Color | Material | Fulfilled By
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "COLOR", metric_toggle, "Color")
+    with chart_cols[3]:
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+    with chart_cols[4]:
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+elif category == "Gun Parts":
+    # Gun Parts: Manufacturer | Part | Material | Fulfilled By
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "GUN_PART", metric_toggle, "Part")
+    with chart_cols[3]:
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+    with chart_cols[4]:
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+elif category == "Reloading Components":
+    # Load Comp: Manufacturer | Color | Material
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "COLOR", metric_toggle, "Color")
+    with chart_cols[3]:
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+elif category == "Optics/Sights":
+    # Optics/Sights: Manufacturer | Category | Fulfilled By
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "PRIMARY_CATEGORY", metric_toggle, "Category")
+    with chart_cols[3]:
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+elif category == "Prep & Survival":
+    # Prep & Survival: Manufacturer | Model | Material
+    with chart_cols[1]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[2]:
+        _render_hbar(df_target, "MODEL", metric_toggle, "Model")
+    with chart_cols[3]:
         _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
 else:
     # Other categories: General Purpose | Manufacturer | Fulfilled By
