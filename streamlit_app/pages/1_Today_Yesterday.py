@@ -4,12 +4,18 @@ Replaces: SALES OVERVIEW FASTER (Power BI — 1,188 views, #1 most used)
 Source: AD_ANALYTICS.GOLD.F_SALES
 """
 
+import base64
+import pathlib
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
+
+_logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
+_logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
+st.logo(str(_logo_path))
 
 # --- Page config ---
 st.markdown(
@@ -19,7 +25,13 @@ st.markdown(
     "</style>",
     unsafe_allow_html=True,
 )
-st.title("SALES OVERVIEW: TODAY / YESTERDAY")
+st.markdown(
+    f'<div style="display:flex;align-items:center;gap:12px;">'
+    f'<img src="data:image/png;base64,{_logo_b64}" height="48">'
+    f'<h1 style="margin:0;">SALES OVERVIEW: TODAY / YESTERDAY</h1>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 # Statuses preselected by default (matches Power BI default filter)
 DEFAULT_STATUSES = {"COMPLETE", "PROCESSING", "UNVERIFIED"}

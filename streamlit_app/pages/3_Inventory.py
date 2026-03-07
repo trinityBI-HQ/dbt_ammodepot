@@ -4,12 +4,18 @@ Replaces: INVENTORY REDSHIFT (Power BI — 10 views, #4)
 Source: AD_ANALYTICS.GOLD.F_INVENTORYVIEW, F_POS, D_PRODUCT, D_VENDOR
 """
 
+import base64
+import pathlib
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
+
+_logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
+_logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
+st.logo(str(_logo_path))
 
 # Remove default padding to use full screen width
 st.markdown(
@@ -20,7 +26,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("INVENTORY")
+st.markdown(
+    f'<div style="display:flex;align-items:center;gap:12px;">'
+    f'<img src="data:image/png;base64,{_logo_b64}" height="48">'
+    f'<h1 style="margin:0;">INVENTORY</h1>'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 today = date.today()
 
