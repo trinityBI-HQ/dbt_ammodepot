@@ -81,7 +81,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
     sql = f"""
         select
             f.CREATED_AT,
-            date_trunc('HOUR', f.CREATED_AT) as HOUR_BUCKET,
+            date_trunc('HOUR', f.TIMEDATE) as HOUR_BUCKET,
             f.INCREMENT_ID as ORDER_ID,
             f.CUSTOMER_EMAIL,
             f.CUSTOMER_NAME,
@@ -99,7 +99,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             f.REGION,
             f.CITY,
             f.POSTCODE,
-            coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED) as UNITS,
+            coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED)::int as UNITS,
             p."Attribute Set" as CATEGORY,
             p."Manufacturer" as MANUFACTURER,
             p."Caliber" as CALIBER,
@@ -140,7 +140,7 @@ with filter_cols[2]:
 with filter_cols[3]:
     analytical_view = st.radio("Analytical View", ["Hourly", "Bar Chart", "Heat Map"], horizontal=True)
 with filter_cols[4]:
-    metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], horizontal=True)
+    metric_toggle = st.radio("Metric", ["$", "GP ($)", "Orders", "Units"], index=2, horizontal=True)
 with filter_cols[5]:
     st.checkbox("Custom Filters", value=False, key="so_custom_toggle")
 
@@ -184,7 +184,7 @@ _title_placeholder.markdown(
 # Metric mapping: toggle value → (column, format, chart_label)
 # Chart labels match PBI: "$", "G.P. ($)", "Orders", "Units"
 METRIC_MAP = {
-    "$": ("NET_SALES", "${:,.0f}", "Orders"),
+    "$": ("NET_SALES", "${:,.0f}", "Sales ($)"),
     "GP ($)": ("GP", "${:,.0f}", "G.P. ($)"),
     "Orders": ("ORDERS", "{:,.0f}", "Orders"),
     "Units": ("UNITS", "{:,.0f}", "Units"),
@@ -438,74 +438,9 @@ kpi_cards = [
     },
 ]
 
-st.markdown(
-    """
-    <style>
-    .kpi-card {
-        background: #1E1E1E;
-        border-radius: 8px;
-        padding: 12px 16px;
-        border-left: 4px solid;
-        height: 100%;
-    }
-    .kpi-header {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-bottom: 4px;
-    }
-    .kpi-icon { font-size: 18px; }
-    .kpi-title {
-        font-size: 12px;
-        color: #AAAAAA;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .kpi-badge {
-        font-size: 10px;
-        color: #00d4aa;
-        background: #1a3a2a;
-        padding: 1px 6px;
-        border-radius: 4px;
-        margin-left: auto;
-    }
-    .kpi-value {
-        font-size: 24px;
-        font-weight: 700;
-        color: #FFFFFF;
-        margin: 2px 0;
-    }
-    .kpi-delta {
-        font-size: 12px;
-        margin-bottom: 6px;
-    }
-    .kpi-delta-pos { color: #2DC653; }
-    .kpi-delta-neg { color: #FF4B4B; }
-    .kpi-delta-zero { color: #AAAAAA; }
-    .kpi-sub {
-        font-size: 11px;
-        color: #888888;
-        border-top: 1px solid #333;
-        padding-top: 6px;
-        margin-top: 4px;
-    }
-    .kpi-sub-val {
-        color: #CCCCCC;
-        font-weight: 600;
-    }
-    .kpi-prev {
-        font-size: 10px;
-        color: #666666;
-        margin-top: 4px;
-        line-height: 1.5;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-kpi_cols = st.columns(5)
-for i, card in enumerate(kpi_cards):
+# Build all KPI cards as a single HTML block (avoids per-column rendering issues)
+_kpi_html_parts = []
+for card in kpi_cards:
     delta = card["delta"]
     if delta and delta.startswith("+"):
         delta_class = "kpi-delta-pos"
@@ -526,23 +461,44 @@ for i, card in enumerate(kpi_cards):
             + "<br>".join(card["prev_lines"]) + "</div>"
         )
 
-    html = f"""
-    <div class="kpi-card" style="border-left-color: {card['color']};">
-        <div class="kpi-header">
-            <span class="kpi-icon">{card['icon']}</span>
-            <span class="kpi-title">{card['title']}</span>
-            {badge_html}
-        </div>
-        <div class="kpi-value">{card['value']}</div>
-        <div class="kpi-delta {delta_class}">{delta_text}</div>
-        <div class="kpi-sub">
-            {card['sub_label']}: <span class="kpi-sub-val">{card['sub_value']}</span>
-        </div>
-        {prev_html}
-    </div>
-    """
-    with kpi_cols[i]:
-        st.markdown(html, unsafe_allow_html=True)
+    _kpi_html_parts.append(
+        f'<div class="kpi-card" style="border-left-color:{card["color"]};">'
+        f'<div class="kpi-header">'
+        f'<span class="kpi-icon">{card["icon"]}</span>'
+        f'<span class="kpi-title">{card["title"]}</span>'
+        f'{badge_html}'
+        f'</div>'
+        f'<div class="kpi-value">{card["value"]}</div>'
+        f'<div class="kpi-delta {delta_class}">{delta_text}</div>'
+        f'<div class="kpi-sub">'
+        f'{card["sub_label"]}: <span class="kpi-sub-val">{card["sub_value"]}</span>'
+        f'</div>'
+        f'{prev_html}'
+        f'</div>'
+    )
+
+_kpi_row_html = (
+    '<style>'
+    '.kpi-row{display:flex;gap:12px;margin-bottom:8px;}'
+    '.kpi-card{background:#1E1E1E;border-radius:8px;padding:12px 16px;border-left:4px solid;flex:1;min-width:0;}'
+    '.kpi-header{display:flex;align-items:center;gap:6px;margin-bottom:4px;}'
+    '.kpi-icon{font-size:18px;}'
+    '.kpi-title{font-size:12px;color:#AAAAAA;text-transform:uppercase;letter-spacing:0.5px;}'
+    '.kpi-badge{font-size:10px;color:#00d4aa;background:#1a3a2a;padding:1px 6px;border-radius:4px;margin-left:auto;}'
+    '.kpi-value{font-size:24px;font-weight:700;color:#FFFFFF;margin:2px 0;}'
+    '.kpi-delta{font-size:12px;margin-bottom:6px;}'
+    '.kpi-delta-pos{color:#2DC653;}'
+    '.kpi-delta-neg{color:#FF4B4B;}'
+    '.kpi-delta-zero{color:#AAAAAA;}'
+    '.kpi-sub{font-size:11px;color:#888888;border-top:1px solid #333;padding-top:6px;margin-top:4px;}'
+    '.kpi-sub-val{color:#CCCCCC;font-weight:600;}'
+    '.kpi-prev{font-size:10px;color:#666666;margin-top:4px;line-height:1.5;}'
+    '</style>'
+    '<div class="kpi-row">'
+    + "".join(_kpi_html_parts)
+    + '</div>'
+)
+st.markdown(_kpi_row_html, unsafe_allow_html=True)
 
 st.divider()
 
@@ -681,9 +637,22 @@ with chart_cols[0]:
                 st.info("No data for this period.")
 
     elif analytical_view == "Bar Chart":
-        st.subheader(f"{metric_label} / Daily Trend")
-        if not df_target.empty:
-            df_bar = _add_gp(df_target)
+        # Historical daily view — last 1 year, newest (left) → oldest (right)
+        bar_end = today
+        bar_start = today - timedelta(days=365)
+        df_bar_raw = load_sales_data(bar_start, bar_end, statuses)
+        # Apply same category filter
+        if not df_bar_raw.empty:
+            df_bar_raw = df_bar_raw[df_bar_raw["CATEGORY"] == category]
+            if selected_storefronts:
+                df_bar_raw = df_bar_raw[df_bar_raw["STOREFRONT"].isin(selected_storefronts)]
+            if selected_store_ids:
+                df_bar_raw = df_bar_raw[df_bar_raw["STORE_ID"].isin(selected_store_ids)]
+
+        title_map = {"$": "Sales ($)", "GP ($)": "Gross Profit ($)", "Orders": "Orders", "Units": "Units Sold"}
+        st.subheader(title_map.get(metric_toggle, metric_label))
+        if not df_bar_raw.empty:
+            df_bar = _add_gp(df_bar_raw)
             daily = df_bar.groupby(df_bar["CREATED_AT"].dt.date).agg(
                 NET_SALES=("NET_SALES", "sum"),
                 COST=("COST", "sum"),
@@ -692,25 +661,60 @@ with chart_cols[0]:
                 UNITS=("UNITS", "sum"),
             ).reset_index()
             daily.columns = ["DAY", "NET_SALES", "COST", "GP", "ORDERS", "UNITS"]
+            # Newest first (left → right = newest → oldest)
+            daily = daily.sort_values("DAY", ascending=False).reset_index(drop=True)
             daily["MARGIN"] = (daily["GP"] / daily["NET_SALES"] * 100).fillna(0)
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
+            # Format bar text labels
+            bar_text = [f"{int(v):,}" for v in daily[val_col].tolist()]
+            # X-axis: numeric positions with day/month labels
+            x_pos = list(range(len(daily)))
+            tick_labels = []
+            prev_month = None
+            for d in daily["DAY"]:
+                mon = d.strftime("%b")
+                if mon != prev_month:
+                    tick_labels.append(f"{d.strftime('%-d')}<br>{mon}")
+                    prev_month = mon
+                else:
+                    tick_labels.append(d.strftime("%-d"))
             fig = go.Figure()
             fig.add_trace(go.Bar(
-                x=daily["DAY"].tolist(), y=daily[val_col].tolist(),
+                x=x_pos, y=daily[val_col].tolist(),
                 name=metric_label, marker_color="#00d4aa",
+                text=bar_text, textposition="outside", textfont=dict(size=10),
             ))
             fig.add_trace(go.Scatter(
-                x=daily["DAY"].tolist(), y=daily["MARGIN"].tolist(), name="Margin %", yaxis="y2",
+                x=x_pos, y=daily["MARGIN"].tolist(), name="Margin %", yaxis="y2",
                 mode="lines+markers+text",
                 text=[f"{m:.0f}%" for m in daily["MARGIN"].tolist()],
-                textposition="top center", line=dict(color="#4CAF50"),
+                textposition="top center", line=dict(color="white", width=2),
+                marker=dict(color="white", size=6),
+                textfont=dict(size=10, color="white"),
             ))
+            # Initial view: last 14 days (positions 0–13), scroll right for history
+            visible_end = min(13, len(x_pos) - 1)
+            # Compute y-axis ranges from visible window only
+            vis_vals = daily[val_col].iloc[:visible_end + 1]
+            vis_margin = daily["MARGIN"].iloc[:visible_end + 1]
+            max_val = vis_vals.max() if not vis_vals.empty else 1
+            y1_max = max_val * 1.35
+            margin_max = vis_margin.max() if not vis_margin.empty else 100
+            y2_range_max = margin_max * 1.6 if margin_max > 0 else 100
             fig.update_layout(
-                height=300, margin=dict(l=0, r=40, t=10, b=0),
-                yaxis2=dict(title="Margin %", overlaying="y", side="right", range=[0, 100]),
-                showlegend=True, legend=dict(orientation="h"),
+                height=400, margin=dict(l=0, r=40, t=30, b=0),
+                yaxis=dict(title="", range=[0, y1_max]),
+                yaxis2=dict(title="", overlaying="y", side="right",
+                            range=[0, y2_range_max], ticksuffix="%", showgrid=False),
+                showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                xaxis=dict(
+                    title="", tickmode="array", tickvals=x_pos, ticktext=tick_labels,
+                    range=[-0.5, visible_end + 0.5],
+                    rangeslider=dict(visible=True, thickness=0.08),
+                ),
+                bargap=0.3,
             )
-            fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No data.")
@@ -831,63 +835,34 @@ else:
 st.divider()
 
 # --- Tables row ---
-table_cols = st.columns(2)
-
-with table_cols[0]:
-    st.subheader(f"Product Performance / {period_label}")
-    if not df_target.empty:
-        product_perf = (
-            df_target.groupby(["SKU", "MANUFACTURER_SKU"])
-            .agg(
-                NET_SALES=("NET_SALES", "sum"),
-                COST=("COST", "sum"),
-                ORDERS=("ORDER_ID", "nunique"),
-                UNITS=("UNITS", "sum"),
-            )
-            .reset_index()
+st.subheader(f"Product Performance / {period_label}")
+if not df_target.empty:
+    product_perf = (
+        df_target.groupby(["SKU", "MANUFACTURER_SKU"])
+        .agg(
+            NET_SALES=("NET_SALES", "sum"),
+            COST=("COST", "sum"),
+            ORDERS=("ORDER_ID", "nunique"),
+            UNITS=("UNITS", "sum"),
         )
-        product_perf["GP"] = product_perf["NET_SALES"] - product_perf["COST"]
-        product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
-        product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
-        product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(25)
-        display_cols = ["MANUFACTURER_SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT"]
-        st.dataframe(
-            product_perf[display_cols].style.format({
-                "NET_SALES": "${:,.2f}",
-                "GP": "${:,.2f}",
-                "MARGIN": "{:.2f}%",
-                "PRICE/UNIT": "${:,.2f}",
-            }).hide(axis="index"),
-            use_container_width=True,
-        )
-    else:
-        st.info("No data.")
-
-with table_cols[1]:
-    st.subheader(f"Customer Overview / {period_label}")
-    if not df_target.empty:
-        customer_perf = (
-            df_target.groupby(["CUSTOMER_EMAIL", "CUSTOMER_NAME"])
-            .agg(
-                NET_SALES=("NET_SALES", "sum"),
-                COST=("COST", "sum"),
-                ORDERS=("ORDER_ID", "nunique"),
-                UNITS=("UNITS", "sum"),
-            )
-            .reset_index()
-        )
-        customer_perf["GP"] = customer_perf["NET_SALES"] - customer_perf["COST"]
-        customer_perf = customer_perf.sort_values("NET_SALES", ascending=False).head(25)
-        display_cols = ["CUSTOMER_EMAIL", "CUSTOMER_NAME", "NET_SALES", "GP", "ORDERS", "UNITS"]
-        st.dataframe(
-            customer_perf[display_cols].style.format({
-                "NET_SALES": "${:,.2f}",
-                "GP": "${:,.2f}",
-            }).hide(axis="index"),
-            use_container_width=True,
-        )
-    else:
-        st.info("No data.")
+        .reset_index()
+    )
+    product_perf["GP"] = product_perf["NET_SALES"] - product_perf["COST"]
+    product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
+    product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
+    product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(25)
+    display_cols = ["MANUFACTURER_SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT"]
+    st.dataframe(
+        product_perf[display_cols].style.format({
+            "NET_SALES": "${:,.2f}",
+            "GP": "${:,.2f}",
+            "MARGIN": "{:.2f}%",
+            "PRICE/UNIT": "${:,.2f}",
+        }).hide(axis="index"),
+        use_container_width=True,
+    )
+else:
+    st.info("No data.")
 
 # --- Geographic / Customer Overview ---
 st.divider()
