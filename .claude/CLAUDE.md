@@ -10,7 +10,7 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 
 Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
 - **Redshift** (`projects/ammodepot/`): Production — dbt Cloud scheduled runs, 95 models
-- **Snowflake** (`ammodepot/`): Operational — 98 models, all passing (3 new Gold models)
+- **Snowflake** (`ammodepot/`): Operational — 99 models, all passing (3 new Gold models, 1 new intermediate)
 - **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys, Power BI access)
 - **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 6 Airbyte connections)
 - **Power BI migration**: `docs/POWERBI_MIGRATION_PLAN.md` (3-phase plan: source swap → consolidate → retire)
@@ -20,8 +20,8 @@ Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
 
 ```
 AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
-├── AD_FISHBOWL (35 streams)       ├── SILVER (78 views)
-├── AD_MAGENTO (29 streams)         └── GOLD (13 tables + 7 views)
+├── AD_FISHBOWL (35 streams)       ├── SILVER (71 views + 7 tables)
+├── AD_MAGENTO (29 streams)         └── GOLD (13 tables + 8 views)
 └── airbyte_internal                     ↑ Power BI reads here
 ```
 
@@ -59,6 +59,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Warehouse | Amazon Redshift (production) + Snowflake (migration target) |
 | Ingestion | Airbyte CDC (6 active connections, 141 streams) |
 | Packages | dbt_utils, dbt_expectations (metaplane fork) |
+| Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
 | Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (local + Streamlit in Snowflake) |
@@ -148,15 +149,19 @@ ammodepot/
 ├── .sqlfluff                   # dialect: snowflake
 ├── macros/
 │   ├── generate_schema_name.sql
-│   └── json_extract_text.sql   # Cross-dialect JSON extraction macro
+│   ├── json_extract_text.sql   # Cross-dialect JSON extraction (adapter.dispatch)
+│   └── cross_db/               # Cross-dialect dispatch macros
+│       ├── convert_tz.sql
+│       ├── string_agg.sql
+│       └── format_timestamp.sql
 ├── tests/generic/              # 16 custom generic tests (same as Redshift)
 ├── models/
 │   ├── bronze/                 # Source definitions (reads from AD_AIRBYTE database)
 │   │   ├── fishbowl/           # schema: AD_FISHBOWL (35 source tables)
 │   │   └── magento/            # schema: AD_MAGENTO (30 source tables)
-│   ├── silver/                 # 78 view models (same as Redshift)
-│   └── gold/                   # 13 table models + 7 intermediate views
-│       ├── intermediate/       # 7 reusable view models (same as Redshift)
+│   ├── silver/                 # 78 models (71 views + 7 high-fan-out tables)
+│   └── gold/                   # 13 table models + 8 intermediate views
+│       ├── intermediate/       # 8 reusable view models (includes int_sales_cost_fallback)
 │       ├── (all Redshift gold models)
 │       ├── f_cohort.sql        # NEW: Customer cohort analysis
 │       ├── f_cohort_detailed.sql  # NEW: Detailed cohort metrics
@@ -166,7 +171,7 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 98 models (34 FB + 23 MG + 21 Inv + 13 Gold + 7 Int), 65 source tables, 16 generic tests, 2 macros
+**Snowflake Counts:** 99 models (34 FB + 23 MG + 21 Inv + 13 Gold + 8 Int), 65 source tables, 16 generic tests, 5 macros (2 root + 3 cross_db)
 
 ### Streamlit App (BI Dashboard)
 
@@ -201,6 +206,8 @@ DISCOVERY_POWERBI.md                   # (root) Power BI dataflow-to-source mapp
 - **Business values parameterized** -- dbt variables in `dbt_project.yml`, zero hardcoded values
 - **All config in dbt_project.yml** -- no per-model `{{ config() }}` blocks
 - **SQL keywords lowercase** -- enforced by sqlfluff
+- **Silver dedup guards** -- all 55 Fishbowl+Magento Silver models use `QUALIFY ROW_NUMBER()` to prevent duplicate rows
+- **Cross-db dispatch macros** -- use `adapter.dispatch` for dialect-specific SQL (`convert_tz`, `string_agg`, `format_timestamp`, `json_extract_text`); dispatch search order configured in `dbt_project.yml`
 
 ### Naming Conventions
 
@@ -220,8 +227,8 @@ DISCOVERY_POWERBI.md                   # (root) Power BI dataflow-to-source mapp
 | Layer | Default | Notes |
 |---|---|---|
 | Bronze | Source YAML only | No SQL models -- Airbyte loads directly |
-| Silver | `view` | Lightweight, real-time freshness |
-| Gold | `table` | Consumption-ready for BI tools |
+| Silver | `view` | Lightweight, real-time freshness; 7 high-fan-out models override to `table` |
+| Gold | `table` | Consumption-ready for BI tools; `+transient: true`, `+query_tag: 'dbt:gold'`; f_sales uses `incremental` (merge, 3-day lookback) |
 | Intermediate | `view` | Reusable pre-computation for Gold tables |
 
 ### Schema Routing
@@ -297,9 +304,9 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 2. **Bronze = source definitions only** -- ammodepot's Bronze layer is purely YAML source definitions. Airbyte loads directly into `fishbowl.*` and `magento.*` schemas.
 
-3. **Silver views, Gold tables** -- Silver is lightweight (views) for real-time freshness. Gold materializes as tables for BI query performance.
+3. **Silver views, Gold tables** -- Silver is lightweight (views) for real-time freshness, with 7 high-fan-out models overridden to tables (fishbowl_soitem, fishbowl_product, fishbowl_uomconversion, fishbowl_part, magento_sales_order_item, magento_sales_order, inventory_qtyinventorytotals). Gold materializes as tables for BI query performance.
 
-4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 7 reusable intermediate views, materialized in the `gold` schema.
+4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 8 reusable intermediate views, materialized in the `gold` schema. Includes `int_sales_cost_fallback` (cost fallback logic extracted from f_sales) and `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution).
 
 5. **UPPER_CASE gold columns** -- Gold layer output uses UPPER_CASE aliases for backward compatibility with existing Power BI consumers.
 
@@ -309,9 +316,15 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 8. **Generic tests in `tests/generic/`** -- 16 reusable test macros using `{% test %}` wrapper syntax.
 
-9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI). Power BI migration plan in `docs/POWERBI_MIGRATION_PLAN.md`. Cross-dialect `json_extract_text` macro handles Snowflake vs Redshift JSON syntax.
+9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI). Power BI migration plan in `docs/POWERBI_MIGRATION_PLAN.md`.
 
 10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/PIPELINE_ASSESSMENT.md` for pipeline details.
+
+11. **Cross-db dispatch macros** -- All dialect-specific SQL uses `adapter.dispatch` pattern (`macros/cross_db/`). Dispatch search order `[ammodepot, dbt_utils, dbt]` configured in `dbt_project.yml`. Zero raw Snowflake/Redshift-specific calls in models.
+
+12. **Silver dedup guards** -- All 55 Fishbowl+Magento Silver models include `QUALIFY ROW_NUMBER()` to prevent duplicate rows from CDC replication.
+
+13. **f_sales incremental merge** -- `f_sales` uses incremental materialization with merge strategy and 3-day lookback window, avoiding full table rebuilds.
 
 ---
 
@@ -325,8 +338,9 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ### Snowflake (Migration Target)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
-- **Last build**: PASS=426, WARN=12, ERROR=0, SKIP=0, TOTAL=438 (98 models, 340 tests)
+- **Last build**: PASS=427, WARN=12, ERROR=0, SKIP=0, TOTAL=439 (99 models, 340 tests)
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
+- **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
 
 ---
 
