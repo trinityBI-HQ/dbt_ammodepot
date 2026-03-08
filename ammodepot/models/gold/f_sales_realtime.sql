@@ -1,15 +1,7 @@
 with interaction as (
     select
-        convert_timezone(
-            'UTC',
-            '{{ var("ammodepot_timezone") }}',
-            cast(z.item_created_at as timestamp)
-        ) as created_at,
-        convert_timezone(
-            'UTC',
-            '{{ var("ammodepot_timezone") }}',
-            cast(z.item_created_at as timestamp)
-        ) as timedate,
+        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(z.item_created_at as timestamp)') }} as created_at,
+        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(z.item_created_at as timestamp)') }} as timedate,
         z.item_created_at                                           as trickat,
         z.product_id                                                as product_id,
         z.order_id                                                  as order_id,
@@ -65,7 +57,7 @@ last_today as (
     select *
     from last_step
     where cast(created_at as date) = cast(
-        convert_timezone('UTC', '{{ var("ammodepot_timezone") }}', current_timestamp()) as date
+        {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_timestamp()') }} as date
     )
 ),
 

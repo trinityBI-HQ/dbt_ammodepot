@@ -9,7 +9,7 @@ with attribute_id_cte as (
 category_data as (
     select
         ccp.product_id,
-        listagg(ccv.value, ' > ') within group (order by ccv.value) as categories
+        {{ string_agg('ccv.value', ' > ', 'ccv.value') }} as categories
     from {{ ref('magento_catalog_category_product') }} as ccp
     inner join {{ ref('magento_catalog_category_entity_varchar') }} as ccv
         on ccp.category_id = ccv.entity_id

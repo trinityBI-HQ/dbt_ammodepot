@@ -15,6 +15,10 @@ clean-targets:
   - target
   - dbt_packages
 
+dispatch:
+  - macro_namespace: ammodepot
+    search_order: [ammodepot, dbt_utils, dbt]
+
 vars:
   # Timezone for all convert_timezone() calls
   ammodepot_timezone: 'America/New_York'
@@ -87,9 +91,42 @@ models:
     silver:
       +schema: silver
       +materialized: view
+      # High-fan-out Silver views materialized as tables to avoid
+      # repeated QUALIFY ROW_NUMBER scans across Gold models
+      fishbowl:
+        fishbowl_soitem:
+          +materialized: table
+        fishbowl_product:
+          +materialized: table
+        fishbowl_uomconversion:
+          +materialized: table
+        fishbowl_part:
+          +materialized: table
+      magento:
+        magento_sales_order_item:
+          +materialized: table
+        magento_sales_order:
+          +materialized: table
+      inventory:
+        inventory_qtyinventorytotals:
+          +materialized: table
     gold:
       +schema: gold
       +materialized: table
+      +transient: true
+      +query_tag: 'dbt:gold'
       intermediate:
         +schema: gold
         +materialized: view
+        +query_tag: 'dbt:gold:intermediate'
+        # Critical bottlenecks materialized as tables
+        int_fishbowl_order_cost:
+          +materialized: table
+        int_magento_product_eav_lookups:
+          +materialized: table
+        int_sales_cost_fallback:
+          +materialized: table
+      f_sales:
+        +materialized: incremental
+        +incremental_strategy: merge
+        +unique_key: 'ID'
