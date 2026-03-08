@@ -12,7 +12,7 @@ Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
 - **Redshift** (`projects/ammodepot/`): Production — dbt Cloud scheduled runs, 95 models
 - **Snowflake** (`ammodepot/`): Operational — 98 models, all passing (3 new Gold models)
 - **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys, Power BI access)
-- **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 7 Airbyte connections)
+- **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 6 Airbyte connections)
 - **Power BI migration**: `docs/POWERBI_MIGRATION_PLAN.md` (3-phase plan: source swap → consolidate → retire)
 - **Adapters**: dbt-redshift 1.10.1 (Redshift) + dbt-snowflake 1.11.2 (Snowflake)
 
@@ -20,8 +20,8 @@ Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
 
 ```
 AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
-├── AD_FISHBOWL (35 tables)        ├── SILVER (78 views)
-├── AD_MAGENTO (30 tables)          └── GOLD (13 tables + 7 views)
+├── AD_FISHBOWL (35 streams)       ├── SILVER (78 views)
+├── AD_MAGENTO (29 streams)         └── GOLD (13 tables + 7 views)
 └── airbyte_internal                     ↑ Power BI reads here
 ```
 
@@ -57,7 +57,7 @@ Airbyte CDC (Fishbowl, Magento)
 |---|---|
 | Transformation | dbt-core 1.11.6 + dbt-redshift 1.10.1 / dbt-snowflake 1.11.2 |
 | Warehouse | Amazon Redshift (production) + Snowflake (migration target) |
-| Ingestion | Airbyte CDC (7 active connections) |
+| Ingestion | Airbyte CDC (6 active connections, 141 streams) |
 | Packages | dbt_utils, dbt_expectations (metaplane fork) |
 | Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
 | Python | uv (package manager) |
@@ -74,15 +74,15 @@ streamlit_app/
 ├── app.py                         # Entry point (local)
 ├── streamlit_app.py               # Entry point (SiS)
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales (replaces PBI SALES OVERVIEW FASTER) ~934 lines
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages (replaces PBI SALES OVERVIEW) ~604 lines
-│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,343 lines
+│   ├── 1_Today_Yesterday.py       # Real-time sales (replaces PBI SALES OVERVIEW FASTER) ~958 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages (replaces PBI SALES OVERVIEW) ~1,090 lines
+│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,356 lines
 └── utils/
     ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion
     └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps
 ```
 
-**Total:** ~3,400 lines across 8 Python files
+**Total:** ~3,936 lines across 8 Python files
 
 ### SiS Compatibility Notes
 
@@ -178,9 +178,10 @@ streamlit_app/                          # See "Streamlit Dashboard App" section 
 
 ```
 docs/
-├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access (section 11)
+├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access, temp users
 ├── POWERBI_MIGRATION_PLAN.md          # 3-phase Power BI migration: Redshift → Snowflake AD_ANALYTICS.GOLD
 ├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
+├── AIRBYTE_MAINTENANCE.md             # EC2/Kind maintenance, cleanup scripts, emergency recovery
 └── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
 DISCOVERY_POWERBI.md                   # (root) Power BI dataflow-to-source mapping
 ```
@@ -237,12 +238,26 @@ DISCOVERY_POWERBI.md                   # (root) Power BI dataflow-to-source mapp
 Inventory management / ERP system. Key tables: `so`, `soitem`, `product`, `part`, `vendor`, `ship`, `po`, `poitem`, `receipt`, `receiptitem`, `uomconversion`, `kititem`, `objecttoobject`
 - Redshift: `fishbowl` schema | Snowflake: `AD_AIRBYTE.AD_FISHBOWL`
 
-### Magento (25 Redshift / 30 Snowflake tables)
+### Magento (25 Redshift / 30 Snowflake source tables, 29 Airbyte streams)
 E-commerce platform. Key tables: `sales_order`, `sales_order_item`, `customer_entity`, `catalog_product_entity`, `quote`, `store`, EAV attribute tables (`eav_attribute`, `catalog_product_entity_varchar/int/text/decimal`)
 - Redshift: `magento` schema | Snowflake: `AD_AIRBYTE.AD_MAGENTO`
 
 ### Source Freshness
 Both sources have freshness configured: warn after 24h, error after 48h, using `_airbyte_extracted_at` as the loaded_at_field.
+
+### Airbyte Connections (6 active, updated 2026-03-07)
+
+| # | Connection | Dest | Frequency | Streams | Sync Mode |
+|---|---|---|---|---|---|
+| 1 | Fishbowl → Redshift | RS | Hourly | 21 | All Incremental+Dedup |
+| 2 | Fishbowl → Redshift (Low Frequency) | RS | Hourly+7min | 16 | All Full Refresh+Overwrite |
+| 3 | Fishbowl → Snowflake | SF | 5 min | 35 | 33 Incremental + 2 FR (`tagserialview`, `upsview_ad_a`) |
+| 4 | Magento → Snowflake | SF | 5 min | 29 | All Incremental+Dedup |
+| 5 | Magento → Redshift | RS | Hourly | 39 | All Incremental+Dedup |
+| 6 | Snowflake → Redshift | RS | Daily | 1 | FR (`UPS_INVOICE` from UPS_INVOICE_HISTORY) |
+
+- **Full audit**: `Connections Audit - Ammo Depot.xlsx` (per-stream detail)
+- **Deleted**: FB→RS (so+soitem), MGT→RS (SALES), MGT→RS (CATALOG) — merged into main connections
 
 ### EAV Pattern
 Magento uses Entity-Attribute-Value for product attributes. Product attributes are resolved in `int_magento_product_eav_lookups.sql` and `int_magento_product_attributes.sql`, then consumed by `d_product.sql`. Attribute IDs are configured as dbt variables with prefix `ammodepot_magento_attr_id_*`.

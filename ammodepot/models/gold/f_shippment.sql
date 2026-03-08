@@ -107,11 +107,8 @@ f_ship as (
         so.order_increment_id                       as ID,
         so.order_id                                 as ORDER_ID,
         so.customer_email                           as CUSTOMER_EMAIL,
-        convert_timezone(
-            'UTC',
-            '{{ var("ammodepot_timezone") }}',
-            cast(so.created_at as timestamp)
-        )                                           as CREATED_AT,
+        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(so.created_at as timestamp)') }}
+                                                    as CREATED_AT,
         so.customer_firstname
         || ' '
         || so.customer_lastname                     as CUSTOMER_NAME,

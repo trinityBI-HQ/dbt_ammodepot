@@ -1,10 +1,7 @@
 with interaction_base as (
     select
-        convert_timezone(
-          'UTC',
-          '{{ var("ammodepot_timezone") }}',
-          cast(z.item_created_at as timestamp)
-        )                                                   as created_at,
+        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(z.item_created_at as timestamp)') }}
+                                                            as created_at,
 
         z.product_id,
         z.order_id,
@@ -71,6 +68,9 @@ with interaction_base as (
     left join {{ ref('magento_sales_order') }}         as o  on z.order_id           = o.order_id
     left join {{ ref('magento_sales_order_address') }} as a  on o.billing_address_id = a.order_address_id
     left join {{ ref('int_fishbowl_order_cost') }}     as c  on z.order_item_id      = c.order_item_id
+    {% if is_incremental() %}
+    where z.item_created_at >= dateadd(day, -3, current_date())
+    {% endif %}
 ),
 
 skubase as (
@@ -78,7 +78,7 @@ skubase as (
         cast(ib.created_at as date)                                as created_at,
         ib.created_at                                      as timedate,
         date_trunc('hour', ib.created_at)                  as tiniciodahora_copiar,
-        to_char(date_trunc('hour', ib.created_at), 'HH24:MI:SS') as tiniciodaHora,
+        {{ format_timestamp("date_trunc('hour', ib.created_at)", 'HH24:MI:SS') }} as tiniciodaHora,
         ib.product_id,
         ib.order_id,
 
@@ -226,40 +226,6 @@ last as (
      from skubase as z
     left join to_transfer as ty
            on ty.id = z.parent_item_id
-),
-
-last_day_cost_last as (
-    select
-        l.product_id,
-        max(l.trickat) as last_scheduled_date
-    from last as l
-    where l.cost > 0
-      and l.qty_ordered > 0
-    group by l.product_id
-),
-
-filtered_cost_prep as (
-    select
-        l.product_id,
-        l.cost,
-        l.qty_ordered as qty,
-        l.trickat
-    from last as l
-    inner join last_day_cost_last as ld
-      on     l.product_id = ld.product_id
-         and l.trickat    = ld.last_scheduled_date
-    where l.cost > 0
-      and l.qty_ordered > 0
-),
-
-filtered_cost_final as (
-    select
-        product_id,
-        sum(cost) / nullif(sum(qty), 0) as cost,
-        sum(qty)                        as qty,
-        trickat                         as trickat
-    from filtered_cost_prep
-    group by product_id, trickat
 )
 
 select
@@ -293,7 +259,7 @@ select
     end                                     as STOREFRONT,
     l.status                                as STATUS,
     l.row_total                             as ROW_TOTAL,
-    coalesce(l.cost, fcf.cost * l.qty_ordered) as COST,
+    coalesce(l.cost, fcf.fallback_unit_cost * l.qty_ordered) as COST,
     l.qty_ordered                           as QTY_ORDERED,
     l.freight_revenue                       as FREIGHT_REVENUE,
     l.freight_cost                          as FREIGHT_COST,
@@ -306,7 +272,7 @@ select
     l.testfr                                as TESTFR,
     l.testfc                                as TESTFC
 from last as l
-left join filtered_cost_final as fcf
+left join {{ ref("int_sales_cost_fallback") }} as fcf
   on fcf.product_id = l.product_id
 left join {{ ref("magento_d_customerupdated") }} as cu
   on lower(

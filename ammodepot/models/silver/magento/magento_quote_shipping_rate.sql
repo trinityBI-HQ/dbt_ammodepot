@@ -22,7 +22,11 @@ with source_data as (
         carriergroup_shipping_details
     from {{ source('magento', 'quote_shipping_rate') }}
     where _ab_cdc_deleted_at is null
-
+    qualify
+        row_number() over (
+            partition by rate_id
+            order by coalesce(_ab_cdc_updated_at, _airbyte_extracted_at) desc nulls last
+        ) = 1
 )
 
 select

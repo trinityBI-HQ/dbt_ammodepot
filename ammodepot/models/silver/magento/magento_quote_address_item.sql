@@ -64,6 +64,11 @@ with source_data as (
         {{ source('magento', 'quote_address_item') }}
     where
         _ab_cdc_deleted_at is null
+    qualify
+        row_number() over (
+            partition by address_item_id
+            order by coalesce(_ab_cdc_updated_at, _airbyte_extracted_at) desc nulls last
+        ) = 1
 )
 
 select

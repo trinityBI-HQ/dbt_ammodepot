@@ -18,7 +18,12 @@ with source_data as (
         -- _airbyte_raw_id, _airbyte_extracted_at, _airbyte_generation_id, _airbyte_meta
     from
         {{ source('fishbowl', 'tagserialview') }}
-    -- No WHERE clause for _ab_cdc_deleted_at as this is likely a view
+    -- No WHERE clause for _ab_cdc_deleted_at as this is a Full Refresh stream
+    qualify
+        row_number() over (
+            partition by tagid
+            order by _airbyte_extracted_at desc nulls last
+        ) = 1
 )
 
 select

@@ -34,7 +34,7 @@ customer_sales as (
           max(fs.created_at),
           dateadd(
             day, -1,
-            date_trunc('month', convert_timezone('UTC','{{ var("ammodepot_timezone") }}',current_date))
+            date_trunc('month', {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_date') }})
           )
         )                                             as days_since_last_purchase
     from {{ ref('f_sales') }}           as fs
@@ -43,9 +43,9 @@ customer_sales as (
     where
       fs.created_at >= dateadd(
         year, -1,
-        date_trunc('month', convert_timezone('UTC','{{ var("ammodepot_timezone") }}',current_date))
+        date_trunc('month', {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_date') }})
       )
-      and fs.created_at < date_trunc('month', convert_timezone('UTC','{{ var("ammodepot_timezone") }}',current_date))
+      and fs.created_at < date_trunc('month', {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_date') }})
       and fs.status in ({{ var('ammodepot_valid_order_statuses') }})
     group by cb.rank_id
 ),

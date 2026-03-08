@@ -13,7 +13,13 @@ with source_data as (
         -- Source is defined in DDL as PC_FIVETRAN_DB.FB_TESTING1234.CARRIERSERVICE
         -- Adjust 'fishbowl_fivetran' if your source name for this schema is different
         {{ source('fishbowl', 'carrierservice') }}
-
+    where
+        _ab_cdc_deleted_at is null
+    qualify
+        row_number() over (
+            partition by id
+            order by coalesce(_ab_cdc_updated_at, _airbyte_extracted_at) desc nulls last
+        ) = 1
 )
 
 select

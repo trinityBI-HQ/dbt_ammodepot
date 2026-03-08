@@ -63,7 +63,11 @@ with source_data as (
         store_to_quote_rate
     from {{ source('magento', 'quote') }}
     where _ab_cdc_deleted_at is null
-
+    qualify
+        row_number() over (
+            partition by entity_id
+            order by coalesce(_ab_cdc_updated_at, _airbyte_extracted_at) desc nulls last
+        ) = 1
 )
 
 select

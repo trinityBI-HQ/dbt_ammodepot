@@ -32,6 +32,11 @@ with source_data as (
         -- This IS NULL check assumes it behaves like a standard timestamp NULL marker.
         -- If deletion is marked by empty strings or specific text, adjust this condition.
         _ab_cdc_deleted_at is null
+    qualify
+        row_number() over (
+            partition by id
+            order by coalesce(_ab_cdc_updated_at, _airbyte_extracted_at) desc nulls last
+        ) = 1
 )
 
 select
