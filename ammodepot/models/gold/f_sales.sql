@@ -222,7 +222,8 @@ last as (
         ty.cost            as testc,
         ty.row_total       as testr,
         ty.freight_revenue as testfr,
-        ty.freight_cost    as testfc
+        ty.freight_cost    as testfc,
+        z.cost_magento
      from skubase as z
     left join to_transfer as ty
            on ty.id = z.parent_item_id
@@ -259,7 +260,7 @@ select
     end                                     as STOREFRONT,
     l.status                                as STATUS,
     l.row_total                             as ROW_TOTAL,
-    coalesce(l.cost, fcf.fallback_unit_cost * l.qty_ordered) as COST,
+    coalesce(l.cost, fcf.fallback_unit_cost * l.qty_ordered, l.cost_magento) as COST,
     l.qty_ordered                           as QTY_ORDERED,
     l.freight_revenue                       as FREIGHT_REVENUE,
     l.freight_cost                          as FREIGHT_COST,
