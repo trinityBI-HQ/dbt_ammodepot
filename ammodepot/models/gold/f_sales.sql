@@ -144,13 +144,13 @@ skubase as (
                     (case when ib.row_total = 0 then 0 else ib.qty_ordered end)
                     /
                     nullif( (fr.product_count * (case when ib.row_total = 0 then 0 else ib.qty_ordered end)), 0)
-                ) * fr.freight_amount
+                ) * coalesce(fr.freight_amount, fr.net_sales)
             else
                 (
                     (ib.weight * (case when ib.row_total = 0 then 0 else ib.qty_ordered end) )
                     /
                     nullif( (fr.total_weight * (case when ib.row_total = 0 then 0 else ib.qty_ordered end)), 0)
-                ) * fr.freight_amount
+                ) * coalesce(fr.freight_amount, fr.net_sales)
         end as freight_cost,
 
         ps.part_qty_sold,

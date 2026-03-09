@@ -894,17 +894,18 @@ with geo_left:
         if geo_view == "Geographic":
             st.caption(f"Geographic Overview / {period_label}")
             geo_agg = (
-                geo_df.groupby("CITY")
+                geo_df.groupby("REGION")
                 .agg(NET_SALES=("NET_SALES", "sum"), COST=("COST", "sum"),
                      ORDERS=("ORDER_ID", "nunique"), UNITS=("UNITS", "sum"))
                 .reset_index()
             )
+            geo_agg.rename(columns={"REGION": "STATE"}, inplace=True)
             geo_agg["GP"] = geo_agg["NET_SALES"] - geo_agg["COST"]
             geo_agg["MARGIN"] = (geo_agg["GP"] / geo_agg["NET_SALES"] * 100).fillna(0).round(2)
             geo_agg = geo_agg.sort_values("NET_SALES", ascending=False)
 
             totals = pd.DataFrame([{
-                "CITY": "Total",
+                "STATE": "Total",
                 "NET_SALES": geo_agg["NET_SALES"].sum(),
                 "GP": geo_agg["GP"].sum(),
                 "ORDERS": geo_agg["ORDERS"].sum(),
@@ -912,7 +913,7 @@ with geo_left:
                 "MARGIN": (geo_agg["GP"].sum() / geo_agg["NET_SALES"].sum() * 100) if geo_agg["NET_SALES"].sum() else 0,
             }])
             geo_display = pd.concat([geo_agg, totals], ignore_index=True)
-            cols = ["CITY", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN"]
+            cols = ["STATE", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN"]
             st.dataframe(
                 geo_display[cols].style.format({
                     "NET_SALES": "${:,.0f}", "GP": "${:,.0f}", "MARGIN": "{:.2f}%",
