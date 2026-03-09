@@ -113,7 +113,8 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             p."DD Gun Parts" as GUN_PART,
             p."DD Color" as COLOR,
             p."Primary Category" as PRIMARY_CATEGORY,
-            p."Model" as MODEL
+            p."Model" as MODEL,
+            p.USE_TYPE_CATEGORY as GENERAL_PURPOSE_AMMO
         from F_SALES f
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
@@ -503,11 +504,11 @@ st.markdown(_kpi_row_html, unsafe_allow_html=True)
 st.divider()
 
 # --- Charts row (layout varies by category) ---
-# Ammunition: Hourly | Caliber | Manufacturer | Projectile
+# Ammunition: Hourly | General Purpose | Caliber | Manufacturer | Projectile
 # Guns: Hourly | Manufacturer | Caliber | Action | Capacity
 # Magazines: Hourly | Manufacturer | Caliber | Capacity | Material
 # Others: Hourly | General Purpose | Manufacturer | Fulfilled By
-if category in ("Guns", "Magazines", "Gun Parts", "Gear"):
+if category in ("Ammunition", "Guns", "Magazines", "Gun Parts", "Gear"):
     chart_cols = st.columns([30, 14, 14, 14, 14])
 else:
     chart_cols = st.columns([40, 20, 20, 20])
@@ -792,12 +793,14 @@ with chart_cols[0]:
 
 # Category-specific charts (columns 1+ vary by category)
 if category == "Ammunition":
-    # Ammunition: Caliber | Manufacturer | Projectile
+    # Ammunition: General Purpose | Caliber | Manufacturer | Projectile
     with chart_cols[1]:
-        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+        _render_hbar(df_target, "GENERAL_PURPOSE_AMMO", metric_toggle, "General Purpose")
     with chart_cols[2]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
     with chart_cols[3]:
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+    with chart_cols[4]:
         _render_hbar(df_target, "PROJECTILE", metric_toggle, "Projectile")
 elif category == "Guns":
     # Guns: Manufacturer | Caliber | Action | Capacity
