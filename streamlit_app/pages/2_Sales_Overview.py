@@ -525,6 +525,8 @@ def _agg_metric(df, group_col, metric):
     if df.empty:
         return pd.DataFrame()
     df = _add_gp(df)
+    # Fill NaN so NULL dimension values appear in charts (matches PBI behavior)
+    df[group_col] = df[group_col].fillna("(Blank)")
     if metric == "Orders":
         r = df.groupby(group_col)["ORDER_ID"].nunique().reset_index()
     elif metric == "Units":
@@ -634,18 +636,41 @@ with chart_cols[0]:
             else:
                 st.info("No data for this period.")
         else:
-            st.subheader(f"{metric_label} / Daily")
+            st.subheader(f"{metric_label} / Hourly")
             if not df_target.empty:
-                daily_target = _agg_time_metric(df_target, df_target["CREATED_AT"].dt.date, metric_toggle)
+                # Average hourly across days with data in the period (matches PBI "AVG MTD")
+                hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
+                # Use days with data (PBI excludes days with no orders for the category)
+                n_days_target = max(df_target["CREATED_AT"].dt.date.nunique(), 1)
+                if n_days_target > 1:
+                    hourly_target["VALUE"] = hourly_target["VALUE"] / n_days_target
                 fig = go.Figure()
-                fig.add_trace(go.Bar(
-                    x=daily_target["BUCKET"], y=daily_target["VALUE"],
-                    name=period_label, marker_color="#00d4aa",
+                fig.add_trace(go.Scatter(
+                    x=[_hour_label(int(h)) for h in hourly_target["BUCKET"].tolist()],
+                    y=[round(float(v), 2) for v in hourly_target["VALUE"].tolist()],
+                    name=f"AVG {period_label}", marker_color="#00d4aa",
+                    mode="lines+markers", marker=dict(size=6),
                 ))
+                if not df_compare.empty:
+                    hourly_compare = _agg_time_metric(
+                        df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle,
+                    )
+                    # Use days with data for compare period too
+                    n_days_compare = max(df_compare["CREATED_AT"].dt.date.nunique(), 1)
+                    if n_days_compare > 1:
+                        hourly_compare["VALUE"] = hourly_compare["VALUE"] / n_days_compare
+                    fig.add_trace(go.Scatter(
+                        x=[_hour_label(int(h)) for h in hourly_compare["BUCKET"].tolist()],
+                        y=[round(float(v), 2) for v in hourly_compare["VALUE"].tolist()],
+                        name=f"AVG {compare_label}", line=dict(color="gray", dash="dash"),
+                    ))
                 fig.update_layout(
-                    height=300, margin=dict(l=0, r=0, t=10, b=0),
-                    showlegend=True, legend=dict(orientation="h"),
+                    height=300, margin=dict(l=0, r=0, t=30, b=0),
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=11)),
+                    xaxis=dict(categoryorder="array", categoryarray=[_hour_label(h) for h in range(24)]),
                 )
+                fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
                 st.plotly_chart(fig, use_container_width=True)
             else:
