@@ -102,7 +102,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED)::int as UNITS,
             p."Attribute Set" as CATEGORY,
             p."Manufacturer" as MANUFACTURER,
-            p."Caliber" as CALIBER,
+            coalesce(p."DD Caliber", p."Caliber") as CALIBER,
             p."Projectile" as PROJECTILE,
             p."General Purpose" as GENERAL_PURPOSE,
             p."Manufacturer SKU" as MANUFACTURER_SKU,
@@ -537,21 +537,36 @@ def _agg_metric(df, group_col, metric):
 
 
 def _render_hbar(df, group_col, metric, label, limit=8):
-    """Render a horizontal bar chart for a dimension."""
+    """Render a horizontal bar chart for a dimension with PBI-style labels."""
     st.subheader(f"{metric_label} / {label}")
     if not df.empty:
         agg = _agg_metric(df, group_col, metric).head(limit)
         if not agg.empty:
+            total = agg["VALUE"].sum()
+            vals = agg["VALUE"].tolist()
+            labels = agg[group_col].tolist()
+            pcts = [(v / total * 100) if total else 0 for v in vals]
+            # PBI-style text: "value (pct%)"
+            if metric in ("$", "GP ($)", "GP ($) After VC"):
+                text_labels = [f"${v:,.0f} ({p:.0f}%)" for v, p in zip(vals, pcts)]
+            else:
+                text_labels = [f"{int(v)} ({p:.2f}%)" for v, p in zip(vals, pcts)]
+            y_pos = list(range(len(labels)))
             fig = go.Figure(go.Bar(
-                x=agg["VALUE"].tolist(), y=agg[group_col].tolist(),
+                x=vals, y=y_pos,
                 orientation="h", marker_color="#00d4aa",
+                text=text_labels, textposition="auto",
             ))
             fig.update_layout(
-                height=300, margin=dict(l=0, r=0, t=10, b=0),
+                height=max(200, len(labels) * 40 + 40),
+                margin=dict(l=0, r=0, t=10, b=0),
                 showlegend=False,
+                yaxis=dict(
+                    tickvals=y_pos, ticktext=labels,
+                    autorange="reversed",
+                ),
             )
-            fig.update_xaxes(title="")
-            fig.update_yaxes(title="")
+            fig.update_xaxes(title="", visible=False)
             st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No data.")
