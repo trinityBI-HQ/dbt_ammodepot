@@ -326,65 +326,53 @@ with tab_inv:
     inv_col = INV_COL_MAP[(inv_unit, inv_stock)]
     is_cost = inv_unit == "COST"
 
+    # Helper: PBI-style horizontal bar chart
+    def _render_inv_hbar(labels, values, is_cost_fmt):
+        """Render PBI-style horizontal bars with blue color for inventory."""
+        if not labels or not values:
+            st.info("No data.")
+            return
+        total = sum(values)
+        max_val = max(values) if values else 1
+        html_rows = []
+        for lbl, val in zip(labels, values):
+            pct = (val / total * 100) if total else 0
+            val_str = f"${val:,.0f}" if is_cost_fmt else f"{int(val):,}"
+            bar_pct = (val / max_val * 100) if max_val else 0
+            html_rows.append(
+                f'<div style="margin-bottom:6px;">'
+                f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+                f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span></div>'
+                f'<div style="background:#5B9BD5; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
+                f'</div>'
+            )
+        st.markdown(
+            f'<div style="padding:4px 0;">{"".join(html_rows)}</div>',
+            unsafe_allow_html=True,
+        )
+
     # Charts
     chart_cols = st.columns(3)
     with chart_cols[0]:
         st.subheader("Inventory Per Category")
         if not df.empty:
-            cat_df = df.groupby("CATEGORY")[inv_col].sum().sort_values(ascending=True).tail(8).reset_index()
+            cat_df = df.groupby("CATEGORY")[inv_col].sum().sort_values(ascending=False).head(15).reset_index()
             if not cat_df.empty:
-                # Add value labels
-                text_vals = [f"${v:,.2f}" if is_cost else f"{v:,.0f}" for v in cat_df[inv_col]]
-                fig = go.Figure(go.Bar(
-                    x=cat_df[inv_col].tolist(),
-                    y=cat_df["CATEGORY"].tolist(),
-                    orientation="h",
-                    marker_color="#5B9BD5",
-                    text=text_vals,
-                    textposition="outside",
-                ))
-                fig.update_layout(height=300, margin=dict(l=0, r=100, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="", visible=False)
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
+                _render_inv_hbar(cat_df["CATEGORY"].tolist(), cat_df[inv_col].tolist(), is_cost)
 
     with chart_cols[1]:
         st.subheader("Inventory Per Caliber")
         if not df.empty:
-            cal_df = df.groupby("CALIBER")[inv_col].sum().sort_values(ascending=True).tail(8).reset_index()
+            cal_df = df.groupby("CALIBER")[inv_col].sum().sort_values(ascending=False).head(15).reset_index()
             if not cal_df.empty:
-                text_vals = [f"${v:,.2f}" if is_cost else f"{v:,.0f}" for v in cal_df[inv_col]]
-                fig = go.Figure(go.Bar(
-                    x=cal_df[inv_col].tolist(),
-                    y=cal_df["CALIBER"].tolist(),
-                    orientation="h",
-                    marker_color="#5B9BD5",
-                    text=text_vals,
-                    textposition="outside",
-                ))
-                fig.update_layout(height=300, margin=dict(l=0, r=100, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="", visible=False)
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
+                _render_inv_hbar(cal_df["CALIBER"].tolist(), cal_df[inv_col].tolist(), is_cost)
 
     with chart_cols[2]:
         st.subheader("Inventory Per Projectile")
         if not df.empty:
-            proj_df = df.groupby("PROJECTILE")[inv_col].sum().sort_values(ascending=True).tail(8).reset_index()
+            proj_df = df.groupby("PROJECTILE")[inv_col].sum().sort_values(ascending=False).head(15).reset_index()
             if not proj_df.empty:
-                text_vals = [f"${v:,.2f}" if is_cost else f"{v:,.0f}" for v in proj_df[inv_col]]
-                fig = go.Figure(go.Bar(
-                    x=proj_df[inv_col].tolist(),
-                    y=proj_df["PROJECTILE"].tolist(),
-                    orientation="h",
-                    marker_color="#5B9BD5",
-                    text=text_vals,
-                    textposition="outside",
-                ))
-                fig.update_layout(height=300, margin=dict(l=0, r=100, t=10, b=0), showlegend=False)
-                fig.update_xaxes(title="", visible=False)
-                fig.update_yaxes(title="")
-                st.plotly_chart(fig, use_container_width=True)
+                _render_inv_hbar(proj_df["PROJECTILE"].tolist(), proj_df[inv_col].tolist(), is_cost)
 
     st.divider()
 
