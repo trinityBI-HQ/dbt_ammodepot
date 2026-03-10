@@ -210,6 +210,99 @@ if selected_store_ids and not df_target.empty:
             df_last_month["STORE_ID"].isin(selected_store_ids)
         ]
 
+# --- Cross-filters (PBI-style click-to-filter) ---
+_XF_KEYS = ["ty_xf_cat", "ty_xf_mfr", "ty_xf_vendor", "ty_xf_sku", "ty_xf_cust"]
+
+# Apply any pending chart-click filter BEFORE widgets render
+_pending = st.session_state.pop("_ty_xf_pending", None)
+if _pending:
+    _pkey, _pval = _pending
+    st.session_state[_pkey] = _pval
+
+for _k in _XF_KEYS:
+    if _k not in st.session_state:
+        st.session_state[_k] = "All"
+
+
+def _clear_ty_xf():
+    """Callback to clear all cross-filters (runs before widgets render)."""
+    for _k in _XF_KEYS:
+        st.session_state[_k] = "All"
+
+
+if not df_target.empty:
+    _df_opts = df_target  # dropdown options from pre-cross-filter data
+    xf_cols = st.columns([2, 2, 2, 2, 2, 1])
+    with xf_cols[0]:
+        xf_cat = st.selectbox(
+            "Category",
+            ["All"] + sorted(_df_opts["CATEGORY"].dropna().unique().tolist()),
+            key="ty_xf_cat",
+        )
+    with xf_cols[1]:
+        xf_mfr = st.selectbox(
+            "Manufacturer",
+            ["All"] + sorted(_df_opts["MANUFACTURER"].dropna().unique().tolist()),
+            key="ty_xf_mfr",
+        )
+    with xf_cols[2]:
+        xf_vendor = st.selectbox(
+            "Fulfilled By",
+            ["All"] + sorted(_df_opts["VENDOR"].dropna().unique().tolist()),
+            key="ty_xf_vendor",
+        )
+    with xf_cols[3]:
+        xf_sku = st.selectbox(
+            "SKU",
+            ["All"] + sorted(_df_opts["MANUFACTURER_SKU"].dropna().unique().tolist()),
+            key="ty_xf_sku",
+        )
+    with xf_cols[4]:
+        xf_cust = st.selectbox(
+            "Customer",
+            ["All"] + sorted(_df_opts["CUSTOMER_EMAIL"].dropna().unique().tolist()),
+            key="ty_xf_cust",
+        )
+    with xf_cols[5]:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.button("Clear All", key="ty_xf_clear", on_click=_clear_ty_xf)
+
+    # Apply cross-filters to target + compare
+    _xf_pairs = [
+        ("CATEGORY", xf_cat), ("MANUFACTURER", xf_mfr),
+        ("VENDOR", xf_vendor), ("MANUFACTURER_SKU", xf_sku),
+        ("CUSTOMER_EMAIL", xf_cust),
+    ]
+    for _col, _val in _xf_pairs:
+        if _val != "All":
+            df_target = df_target[df_target[_col] == _val]
+            if not df_compare.empty:
+                df_compare = df_compare[df_compare[_col] == _val]
+
+    # Active filter pills
+    _active = [
+        (lbl, st.session_state.get(k, "All"))
+        for lbl, k in [
+            ("Category", "ty_xf_cat"), ("Manufacturer", "ty_xf_mfr"),
+            ("Fulfilled By", "ty_xf_vendor"), ("SKU", "ty_xf_sku"),
+            ("Customer", "ty_xf_cust"),
+        ]
+        if st.session_state.get(k, "All") != "All"
+    ]
+    if _active:
+        _pills = " ".join(
+            f'<span style="background:#2a3f5f;color:#00d4aa;padding:2px 10px;'
+            f'border-radius:12px;font-size:12px;margin-right:4px;">'
+            f'{lbl}: {val}</span>'
+            for lbl, val in _active
+        )
+        st.markdown(
+            f'<div style="margin:4px 0 8px 0;">'
+            f'<span style="color:#888;font-size:12px;">Active filters: </span>'
+            f'{_pills}</div>',
+            unsafe_allow_html=True,
+        )
+
 # --- Compute GP for downstream use ---
 if not df_target.empty:
     df_target = df_target.copy()
@@ -617,108 +710,144 @@ def agg_by_metric(df, group_col, metric):
     return result.sort_values("VALUE", ascending=False).head(8)
 
 
-def _render_html_hbar(labels, values, metric, limit=15, compare_map=None):
-    """Render PBI-style horizontal bars: label + value + comparison above, colored bar below."""
+def _build_cmp_map(df_cmp, group_col, metric):
+    """Build comparison lookup dict for a dimension."""
+    if df_cmp is None or df_cmp.empty:
+        return {}
+    cmp_agg = agg_by_metric(df_cmp, group_col, metric)
+    if cmp_agg.empty:
+        return {}
+    return dict(zip(cmp_agg[group_col].tolist(), cmp_agg["VALUE"].tolist()))
+
+
+def _render_clickable_hbar(labels, values, metric, limit=15, compare_map=None,
+                           filter_key=None, chart_key=None):
+    """Render clickable Plotly horizontal bars. Click a bar to cross-filter."""
     if not labels or not values:
         st.info("No data.")
         return
     labels = labels[:limit]
     values = values[:limit]
     total = sum(values)
-    max_val = max(values) if values else 1
     is_money = metric in ("$", "GP ($)", "GP ($) After VC")
     if compare_map is None:
         compare_map = {}
-    html_rows = []
-    for lbl, val in zip(labels, values):
+
+    # Active filter highlighting
+    active_val = (
+        st.session_state.get(filter_key, "All") if filter_key else "All"
+    )
+
+    # Reverse for bottom-up (highest at top)
+    labels_r = labels[::-1]
+    values_r = [float(v) for v in values[::-1]]
+
+    colors = []
+    for lbl in labels_r:
+        if active_val == "All" or lbl == active_val:
+            colors.append("#00d4aa")
+        else:
+            colors.append("rgba(0,212,170,0.2)")
+
+    text_items = []
+    for lbl, val in zip(labels_r, values_r):
         pct = (val / total * 100) if total else 0
         val_str = f"${val:,.0f}" if is_money else f"{int(val):,}"
-        chg_html = ""
+        chg_str = ""
         if compare_map:
             cmp_val = compare_map.get(lbl, 0)
             if cmp_val > 0:
                 chg = (val - cmp_val) / cmp_val * 100
-                color = "#4CAF50" if chg >= 0 else "#f44336"
-                dot = f'<span style="color:{color}; font-size:10px;">&#9679;</span>'
-                chg_html = f'&nbsp;&nbsp;{dot} <span style="color:{color}; font-size:11px;">{chg:+.1f}%</span>'
+                arrow = "\u25b2" if chg >= 0 else "\u25bc"
+                clr = "#4CAF50" if chg >= 0 else "#f44336"
+                chg_str = f"  {arrow}{abs(chg):.0f}%"
             else:
-                chg_html = '&nbsp;&nbsp;<span style="color:#4CAF50; font-size:10px;">&#9679;</span> <span style="color:#4CAF50; font-size:11px;">New</span>'
-        bar_pct = (val / max_val * 100) if max_val else 0
-        html_rows.append(
-            f'<div style="margin-bottom:6px;">'
-            f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-            f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span>{chg_html}</div>'
-            f'<div style="background:#00d4aa; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
-            f'</div>'
-        )
-    st.markdown(
-        f'<div style="padding:4px 0;">{"".join(html_rows)}</div>',
-        unsafe_allow_html=True,
+                chg_str = "  \u25cf New"
+        text_items.append(f"{lbl}  {val_str} ({pct:.0f}%){chg_str}")
+
+    fig = go.Figure(go.Bar(
+        y=list(range(len(labels_r))),
+        x=values_r,
+        orientation="h",
+        marker_color=colors,
+        text=text_items,
+        textposition="inside",
+        insidetextanchor="start",
+        textfont=dict(size=11, color="#eee"),
+        hoverinfo="skip",
+    ))
+    fig.update_layout(
+        height=max(len(labels_r) * 32, 100),
+        margin=dict(l=0, r=0, t=0, b=0),
+        yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        bargap=0.25,
     )
 
+    if chart_key and filter_key:
+        event = st.plotly_chart(
+            fig, use_container_width=True,
+            on_select="rerun", key=chart_key,
+        )
+        if (event and hasattr(event, "selection")
+                and event.selection and event.selection.points):
+            idx = event.selection.points[0]["point_index"]
+            clicked = labels_r[idx]
+            current = st.session_state.get(filter_key, "All")
+            new_val = "All" if current == clicked else clicked
+            # Store as pending — applied before widgets on next rerun
+            st.session_state["_ty_xf_pending"] = (filter_key, new_val)
+            st.rerun()
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
-# Category chart
+
+# Category chart (clickable → sets Category cross-filter)
 with chart_cols[1]:
     st.subheader(f"{metric_label} / Category")
     if not df_target.empty:
         cat_agg = agg_by_metric(df_target, "CATEGORY", metric_toggle).head(15)
         if not cat_agg.empty:
-            cmp_map = {}
-            if not df_compare.empty:
-                cmp_agg = agg_by_metric(df_compare, "CATEGORY", metric_toggle)
-                if not cmp_agg.empty:
-                    cmp_map = dict(zip(
-                        cmp_agg["CATEGORY"].tolist(),
-                        cmp_agg["VALUE"].tolist(),
-                    ))
-            _render_html_hbar(
+            _render_clickable_hbar(
                 cat_agg["CATEGORY"].tolist(),
                 cat_agg["VALUE"].tolist(),
-                metric_toggle, compare_map=cmp_map,
+                metric_toggle,
+                compare_map=_build_cmp_map(df_compare, "CATEGORY", metric_toggle),
+                filter_key="ty_xf_cat", chart_key="ty_cat_chart",
             )
     else:
         st.info("No data.")
 
-# Fulfilled By chart
+# Fulfilled By chart (clickable → sets Fulfilled By cross-filter)
 with chart_cols[2]:
     st.subheader(f"{metric_label} / Fulfilled By")
     if not df_target.empty:
         vendor_agg = agg_by_metric(df_target, "VENDOR", metric_toggle).head(15)
         if not vendor_agg.empty:
-            cmp_map = {}
-            if not df_compare.empty:
-                cmp_agg = agg_by_metric(df_compare, "VENDOR", metric_toggle)
-                if not cmp_agg.empty:
-                    cmp_map = dict(zip(
-                        cmp_agg["VENDOR"].tolist(),
-                        cmp_agg["VALUE"].tolist(),
-                    ))
-            _render_html_hbar(
+            _render_clickable_hbar(
                 vendor_agg["VENDOR"].tolist(),
                 vendor_agg["VALUE"].tolist(),
-                metric_toggle, compare_map=cmp_map,
+                metric_toggle,
+                compare_map=_build_cmp_map(df_compare, "VENDOR", metric_toggle),
+                filter_key="ty_xf_vendor", chart_key="ty_vendor_chart",
             )
     else:
         st.info("No data.")
 
-# Manufacturer chart
+# Manufacturer chart (clickable → sets Manufacturer cross-filter)
 with chart_cols[3]:
     st.subheader(f"{metric_label} / Manufacturer")
     if not df_target.empty:
         mfr_agg = agg_by_metric(df_target, "MANUFACTURER", metric_toggle).head(15)
         if not mfr_agg.empty:
-            cmp_map = {}
-            if not df_compare.empty:
-                cmp_agg = agg_by_metric(df_compare, "MANUFACTURER", metric_toggle)
-                if not cmp_agg.empty:
-                    cmp_map = dict(zip(
-                        cmp_agg["MANUFACTURER"].tolist(),
-                        cmp_agg["VALUE"].tolist(),
-                    ))
-            _render_html_hbar(
+            _render_clickable_hbar(
                 mfr_agg["MANUFACTURER"].tolist(),
                 mfr_agg["VALUE"].tolist(),
-                metric_toggle, compare_map=cmp_map,
+                metric_toggle,
+                compare_map=_build_cmp_map(df_compare, "MANUFACTURER", metric_toggle),
+                filter_key="ty_xf_mfr", chart_key="ty_mfr_chart",
             )
     else:
         st.info("No data.")
