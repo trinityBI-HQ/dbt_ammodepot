@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
-from utils.db import run_query
+from utils.db import run_query, _is_sis
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -786,20 +786,22 @@ def _render_clickable_hbar(labels, values, metric, limit=15, compare_map=None,
         bargap=0.25,
     )
 
-    if chart_key and filter_key:
+    if chart_key and filter_key and not _is_sis:
         event = st.plotly_chart(
             fig, use_container_width=True,
             on_select="rerun", key=chart_key,
         )
-        if (event and hasattr(event, "selection")
-                and event.selection and event.selection.points):
-            idx = event.selection.points[0]["point_index"]
-            clicked = labels_r[idx]
-            current = st.session_state.get(filter_key, "All")
-            new_val = "All" if current == clicked else clicked
-            # Store as pending — applied before widgets on next rerun
-            st.session_state["_ty_xf_pending"] = (filter_key, new_val)
-            st.rerun()
+        try:
+            sel = event.selection if event else None
+            if sel and not callable(sel) and hasattr(sel, "points") and sel.points:
+                idx = sel.points[0]["point_index"]
+                clicked = labels_r[idx]
+                current = st.session_state.get(filter_key, "All")
+                new_val = "All" if current == clicked else clicked
+                st.session_state["_ty_xf_pending"] = (filter_key, new_val)
+                st.rerun()
+        except (AttributeError, TypeError, IndexError):
+            pass  # Older Streamlit — chart click not supported
     else:
         st.plotly_chart(fig, use_container_width=True)
 
