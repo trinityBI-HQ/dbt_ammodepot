@@ -43,8 +43,8 @@ products:
       file_sources:
         - S3
         - GCS
-        file_formats:
-          - Avro
+      file_formats:
+        - Avro
           - CSV
           - JSON
           - Parquet
