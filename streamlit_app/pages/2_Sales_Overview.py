@@ -118,6 +118,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             p."DD Gun Parts" as GUN_PART,
             p."DD Color" as COLOR,
             p."Primary Category" as PRIMARY_CATEGORY,
+            p."Categories" as CATEGORIES,
             p."Model" as MODEL,
             p.USE_TYPE_CATEGORY as GENERAL_PURPOSE_AMMO
         from F_SALES f
@@ -632,11 +633,15 @@ with chart_cols[0]:
             if not df_target.empty:
                 hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
                 fig = go.Figure()
+                target_vals = hourly_target["VALUE"].tolist()
+                target_text = [f"{int(round(v))}" for v in target_vals]
                 fig.add_trace(go.Scatter(
                     x=[_hour_label(int(h)) for h in hourly_target["BUCKET"].tolist()],
-                    y=hourly_target["VALUE"].tolist(),
+                    y=target_vals,
                     name="TODAY", marker_color="#00d4aa",
-                    mode="lines+markers", marker=dict(size=6),
+                    mode="lines+markers+text", marker=dict(size=6),
+                    text=target_text, textposition="top center",
+                    textfont=dict(size=10, color="#00d4aa"),
                 ))
                 if not df_compare.empty:
                     hourly_compare = _agg_time_metric(
@@ -661,25 +666,28 @@ with chart_cols[0]:
         else:
             st.subheader(f"{metric_label} / Hourly")
             if not df_target.empty:
-                # Average hourly across days with data in the period (matches PBI "AVG MTD")
+                # Average hourly across calendar days in the period (PBI excludes today)
                 hourly_target = _agg_time_metric(df_target, df_target["HOUR_BUCKET"].dt.hour, metric_toggle)
-                # Use days with data (PBI excludes days with no orders for the category)
-                n_days_target = max(df_target["CREATED_AT"].dt.date.nunique(), 1)
+                n_days_target = max((end_date - start_date).days, 1)
                 if n_days_target > 1:
                     hourly_target["VALUE"] = hourly_target["VALUE"] / n_days_target
                 fig = go.Figure()
+                avg_vals = [round(float(v), 2) for v in hourly_target["VALUE"].tolist()]
+                avg_text = [f"{int(round(v))}" for v in avg_vals]
                 fig.add_trace(go.Scatter(
                     x=[_hour_label(int(h)) for h in hourly_target["BUCKET"].tolist()],
-                    y=[round(float(v), 2) for v in hourly_target["VALUE"].tolist()],
+                    y=avg_vals,
                     name=f"AVG {period_label}", marker_color="#00d4aa",
-                    mode="lines+markers", marker=dict(size=6),
+                    mode="lines+markers+text", marker=dict(size=6),
+                    text=avg_text, textposition="top center",
+                    textfont=dict(size=10, color="#00d4aa"),
                 ))
                 if not df_compare.empty:
                     hourly_compare = _agg_time_metric(
                         df_compare, df_compare["HOUR_BUCKET"].dt.hour, metric_toggle,
                     )
-                    # Use days with data for compare period too
-                    n_days_compare = max(df_compare["CREATED_AT"].dt.date.nunique(), 1)
+                    # Use all calendar days in compare period
+                    n_days_compare = max((compare_end - compare_start).days + 1, 1)
                     if n_days_compare > 1:
                         hourly_compare["VALUE"] = hourly_compare["VALUE"] / n_days_compare
                     fig.add_trace(go.Scatter(
@@ -865,11 +873,11 @@ elif category == "Gun Parts":
     with chart_cols[4]:
         _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
 elif category == "Loading Components":
-    # Load Comp: Manufacturer | Color | Material
+    # Load Comp: Manufacturer | Categories | Material
     with chart_cols[1]:
         _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "COLOR", metric_toggle, "Color", df_compare=df_compare)
+        _render_hbar(df_target, "CATEGORIES", metric_toggle, "Categories", df_compare=df_compare)
     with chart_cols[3]:
         _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
 elif category == "Optics":
