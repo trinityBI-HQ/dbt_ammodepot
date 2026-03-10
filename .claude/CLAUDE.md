@@ -75,20 +75,32 @@ streamlit_app/
 ├── app.py                         # Entry point (local)
 ├── streamlit_app.py               # Entry point (SiS)
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales (replaces PBI SALES OVERVIEW FASTER) ~958 lines
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages (replaces PBI SALES OVERVIEW) ~1,090 lines
-│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,356 lines
+│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,360 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,502 lines
+│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,344 lines
 └── utils/
-    ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion
+    ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion (~155 lines)
     └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps
 ```
 
-**Total:** ~3,936 lines across 8 Python files
+**Total:** ~4,738 lines across 8 Python files
+
+### Cross-Filtering (PBI-style)
+
+Pages 1 and 2 implement PBI-style cross-filtering with selectbox dropdowns + clickable Plotly charts:
+- **Session state keys**: `ty_xf_cat`, `ty_xf_mfr`, `ty_xf_vendor`, `ty_xf_sku`, `ty_xf_cust` (Today/Yesterday) and `so_xf_mfr`, `so_xf_vendor`, `so_xf_sku`, `so_xf_cust` (Sales Overview)
+- **Pending-state pattern**: Chart clicks store `(key, value)` in `_ty_xf_pending`/`_so_xf_pending`, consumed before widget rendering on next rerun
+- **`on_click` callback**: Clear All button uses `st.button(on_click=fn)` — avoids `StreamlitAPIException` from setting widget keys after instantiation
+- **Active filter pills**: HTML spans with colored badges showing current filters
+- **Bar dimming**: Non-selected Plotly bars render at 20% opacity when a filter is active
+- **Clickable charts**: Local only — SiS older Streamlit returns `event.selection` as callable, guarded with `_is_sis`
+- **Dropdown options**: Built from pre-filter data (PBI behavior — show all values regardless of active filters)
 
 ### SiS Compatibility Notes
 
 - **Plotly**: Use `go.Bar`/`go.Figure` with `.tolist()` — `px.bar` fails serialization in SiS
 - **Plotly x-axis**: Use numeric positions + `tickvals`/`ticktext` to avoid duplicate category merging
+- **Plotly on_select**: Guard with `if not _is_sis:` — SiS returns `event.selection` as a function, not data object
 - **Maps**: Scattermapbox (local only, CARTO tiles blocked in SiS), `st.map()` fallback for SiS
 - **Data types**: All plotly data must be plain Python types (`float()`, `.tolist()`), not numpy/pandas
 - **Dual-mode**: `_is_sis` flag in `utils/db.py` controls local vs SiS rendering paths
@@ -188,7 +200,9 @@ docs/
 ├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
 ├── AIRBYTE_MAINTENANCE.md             # EC2/Kind maintenance, cleanup scripts, emergency recovery
 └── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
-DISCOVERY_POWERBI.md                   # (root) Power BI dataflow-to-source mapping
+├── DISCOVERY_POWERBI.md               # Power BI dataflow-to-source mapping
+├── DISCOVERY_SNOWFLAKE.sql            # Snowflake discovery queries
+└── OUR_DELIVERIES.MD                  # Project deliverables summary
 ```
 
 ---
@@ -338,7 +352,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ### Snowflake (Migration Target)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
-- **Last build**: PASS=427, WARN=12, ERROR=0, SKIP=0, TOTAL=439 (99 models, 340 tests)
+- **Last build**: PASS=99, WARN=0, ERROR=0 (99 models, 2m 22s — 2026-03-10)
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
 

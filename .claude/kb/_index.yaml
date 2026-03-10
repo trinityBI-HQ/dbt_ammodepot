@@ -2,7 +2,7 @@
 # Machine-readable registry for KB domains
 
 version: "2.0"
-last_updated: "2026-03-03"
+last_updated: "2026-03-02"
 
 # File Size Limits (SINGLE SOURCE OF TRUTH)
 limits:
@@ -29,7 +29,7 @@ templates:
   - name: domain-manifest
     path: _templates/domain-manifest.md.template
 
-# Domain Registry (46 technologies)
+# Domain Registry (45 technologies)
 domains:
   gemini:
     name: Gemini
@@ -262,39 +262,6 @@ domains:
         path: patterns/data-flow-diagrams.md
       - name: integration-patterns
         path: patterns/integration-patterns.md
-
-  streamlit:
-    name: Streamlit
-    description: Python framework for building interactive data apps and dashboards
-    path: automation/app-builders/streamlit/
-    mcp_validated: "2026-03-03"
-    entry_points:
-      index: index.md
-      quick_reference: quick-reference.md
-    concepts:
-      - name: components
-        path: concepts/components.md
-      - name: state-management
-        path: concepts/state-management.md
-      - name: caching
-        path: concepts/caching.md
-      - name: layouts
-        path: concepts/layouts.md
-      - name: data-display
-        path: concepts/data-display.md
-    patterns:
-      - name: data-dashboard
-        path: patterns/data-dashboard.md
-      - name: form-handling
-        path: patterns/form-handling.md
-      - name: multi-page-apps
-        path: patterns/multi-page-apps.md
-      - name: database-integration
-        path: patterns/database-integration.md
-      - name: llm-chat-app
-        path: patterns/llm-chat-app.md
-      - name: deployment
-        path: patterns/deployment.md
 
   n8n:
     name: n8n
