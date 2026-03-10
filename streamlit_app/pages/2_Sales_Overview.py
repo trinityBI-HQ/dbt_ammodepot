@@ -1125,14 +1125,15 @@ if store_names:
 
 # --- Footer ---
 st.divider()
-from datetime import datetime
-now = datetime.now()
+from datetime import datetime, timezone, timedelta
+now = datetime.now(timezone(timedelta(hours=-4)))  # Eastern Time (EDT)
 if not df_target.empty:
-    last_order_time = df_target["TIMEDATE"].max() if "TIMEDATE" in df_target.columns else df_target["CREATED_AT"].max()
+    _lot = df_target["TIMEDATE"].max() if "TIMEDATE" in df_target.columns else df_target["CREATED_AT"].max()
+    last_order_fmt = pd.Timestamp(_lot).strftime("%m/%d/%y %H:%M:%S") if pd.notna(_lot) else "--"
     row_count = len(df_target)
     st.caption(
         f"Last Update: {now:%m/%d/%y %H:%M:%S} | "
-        f"Last Order: {last_order_time} | {row_count:,} line items"
+        f"Last Order: {last_order_fmt} | {row_count:,} line items"
         f" | {period_label} vs {compare_label} | Data cached 5 min"
     )
 else:
