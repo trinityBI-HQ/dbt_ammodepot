@@ -300,22 +300,90 @@ if not df_target.empty:
     df_target = df_target[df_target["CATEGORY"] == category]
     df_compare = df_compare[df_compare["CATEGORY"] == category]
 
-# --- Additional filters row (Vendor + Product Name) ---
-if not df_target.empty:
-    adv_cols = st.columns([3, 3, 6])
-    with adv_cols[0]:
-        vendors = sorted(df_target["VENDOR"].dropna().unique().tolist())
-        selected_vendors = st.multiselect("Vendor", vendors, key="so_vendor")
-    with adv_cols[1]:
-        products = sorted(df_target["PRODUCT_NAME"].dropna().unique().tolist())
-        selected_products = st.multiselect("Product Name", products, key="so_product")
+# --- Cross-filters (PBI-style click-to-filter) ---
+_SO_XF_KEYS = ["so_xf_mfr", "so_xf_vendor", "so_xf_sku", "so_xf_cust"]
 
-    if selected_vendors:
-        df_target = df_target[df_target["VENDOR"].isin(selected_vendors)]
-        df_compare = df_compare[df_compare["VENDOR"].isin(selected_vendors)]
-    if selected_products:
-        df_target = df_target[df_target["PRODUCT_NAME"].isin(selected_products)]
-        df_compare = df_compare[df_compare["PRODUCT_NAME"].isin(selected_products)]
+# Apply any pending chart-click filter BEFORE widgets render
+_pending = st.session_state.pop("_so_xf_pending", None)
+if _pending:
+    _pkey, _pval = _pending
+    st.session_state[_pkey] = _pval
+
+for _k in _SO_XF_KEYS:
+    if _k not in st.session_state:
+        st.session_state[_k] = "All"
+
+
+def _clear_so_xf():
+    """Callback to clear all cross-filters (runs before widgets render)."""
+    for _k in _SO_XF_KEYS:
+        st.session_state[_k] = "All"
+
+
+if not df_target.empty:
+    _df_opts = df_target  # dropdown options from pre-cross-filter data
+    xf_cols = st.columns([2, 2, 2, 2, 1])
+    with xf_cols[0]:
+        xf_mfr = st.selectbox(
+            "Manufacturer",
+            ["All"] + sorted(_df_opts["MANUFACTURER"].dropna().unique().tolist()),
+            key="so_xf_mfr",
+        )
+    with xf_cols[1]:
+        xf_vendor = st.selectbox(
+            "Fulfilled By",
+            ["All"] + sorted(_df_opts["VENDOR"].dropna().unique().tolist()),
+            key="so_xf_vendor",
+        )
+    with xf_cols[2]:
+        xf_sku = st.selectbox(
+            "SKU",
+            ["All"] + sorted(_df_opts["MANUFACTURER_SKU"].dropna().unique().tolist()),
+            key="so_xf_sku",
+        )
+    with xf_cols[3]:
+        xf_cust = st.selectbox(
+            "Customer",
+            ["All"] + sorted(_df_opts["CUSTOMER_EMAIL"].dropna().unique().tolist()),
+            key="so_xf_cust",
+        )
+    with xf_cols[4]:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.button("Clear All", key="so_xf_clear", on_click=_clear_so_xf)
+
+    # Apply cross-filters to target + compare
+    _xf_pairs = [
+        ("MANUFACTURER", xf_mfr), ("VENDOR", xf_vendor),
+        ("MANUFACTURER_SKU", xf_sku), ("CUSTOMER_EMAIL", xf_cust),
+    ]
+    for _col, _val in _xf_pairs:
+        if _val != "All":
+            df_target = df_target[df_target[_col] == _val]
+            if not df_compare.empty:
+                df_compare = df_compare[df_compare[_col] == _val]
+
+    # Active filter pills
+    _active = [
+        (lbl, st.session_state.get(k, "All"))
+        for lbl, k in [
+            ("Manufacturer", "so_xf_mfr"), ("Fulfilled By", "so_xf_vendor"),
+            ("SKU", "so_xf_sku"), ("Customer", "so_xf_cust"),
+        ]
+        if st.session_state.get(k, "All") != "All"
+    ]
+    if _active:
+        _pills = " ".join(
+            f'<span style="background:#2a3f5f;color:#00d4aa;padding:2px 10px;'
+            f'border-radius:12px;font-size:12px;margin-right:4px;">'
+            f'{lbl}: {val}</span>'
+            for lbl, val in _active
+        )
+        st.markdown(
+            f'<div style="margin:4px 0 8px 0;">'
+            f'<span style="color:#888;font-size:12px;">Active filters: </span>'
+            f'{_pills}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 # --- KPI calculations ---
@@ -545,57 +613,101 @@ def _agg_metric(df, group_col, metric):
     return r.sort_values("VALUE", ascending=False)
 
 
-def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None):
-    """Render PBI-style horizontal bars: label + comparison above each bar."""
+def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None,
+                 filter_key=None, chart_key=None):
+    """Render clickable Plotly horizontal bars. Click a bar to cross-filter."""
     st.subheader(f"{metric_label} / {label}")
-    if not df.empty:
-        agg = _agg_metric(df, group_col, metric).head(limit)
-        if not agg.empty:
-            total = agg["VALUE"].sum()
-            vals = agg["VALUE"].tolist()
-            labels = agg[group_col].tolist()
-            pcts = [(v / total * 100) if total else 0 for v in vals]
-            # Build comparison lookup
-            compare_map = {}
-            if df_compare is not None and not df_compare.empty:
-                agg_cmp = _agg_metric(df_compare, group_col, metric)
-                if not agg_cmp.empty:
-                    compare_map = dict(zip(agg_cmp[group_col].tolist(), agg_cmp["VALUE"].tolist()))
-            # Render as HTML: each item = label line + bar div
-            max_val = max(vals) if vals else 1
-            html_rows = []
-            for lbl, val, pct in zip(labels, vals, pcts):
-                # Format value
-                if metric in ("$", "GP ($)", "GP ($) After VC"):
-                    val_str = f"${val:,.0f}"
-                else:
-                    val_str = f"{int(val):,}"
-                # Comparison indicator
-                chg_html = ""
-                if compare_map:
-                    cmp_val = compare_map.get(lbl, 0)
-                    if cmp_val > 0:
-                        chg = (val - cmp_val) / cmp_val * 100
-                        color = "#4CAF50" if chg >= 0 else "#f44336"
-                        dot = f'<span style="color:{color}; font-size:10px;">&#9679;</span>'
-                        chg_html = f'&nbsp;&nbsp;{dot} <span style="color:{color}; font-size:11px;">{chg:+.1f}%</span>'
-                    else:
-                        chg_html = '&nbsp;&nbsp;<span style="color:#4CAF50; font-size:10px;">&#9679;</span> <span style="color:#4CAF50; font-size:11px;">New</span>'
-                # Bar width as percentage of max
-                bar_pct = (val / max_val * 100) if max_val else 0
-                html_rows.append(
-                    f'<div style="margin-bottom:6px;">'
-                    f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-                    f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span>{chg_html}</div>'
-                    f'<div style="background:#00d4aa; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
-                    f'</div>'
-                )
-            st.markdown(
-                f'<div style="padding:4px 0;">{"".join(html_rows)}</div>',
-                unsafe_allow_html=True,
-            )
-    else:
+    if df.empty:
         st.info("No data.")
+        return
+    agg = _agg_metric(df, group_col, metric).head(limit)
+    if agg.empty:
+        st.info("No data.")
+        return
+
+    labels = agg[group_col].tolist()
+    values = [float(v) for v in agg["VALUE"].tolist()]
+    total = sum(values)
+    is_money = metric in ("$", "GP ($)", "GP ($) After VC")
+
+    # Comparison map
+    compare_map = {}
+    if df_compare is not None and not df_compare.empty:
+        agg_cmp = _agg_metric(df_compare, group_col, metric)
+        if not agg_cmp.empty:
+            compare_map = dict(zip(
+                agg_cmp[group_col].tolist(),
+                [float(v) for v in agg_cmp["VALUE"].tolist()],
+            ))
+
+    # Active filter highlighting
+    active_val = (
+        st.session_state.get(filter_key, "All") if filter_key else "All"
+    )
+
+    # Reverse for bottom-up (highest at top)
+    labels_r = labels[::-1]
+    values_r = values[::-1]
+
+    colors = []
+    for lbl in labels_r:
+        if active_val == "All" or lbl == active_val:
+            colors.append("#00d4aa")
+        else:
+            colors.append("rgba(0,212,170,0.2)")
+
+    text_items = []
+    for lbl, val in zip(labels_r, values_r):
+        pct = (val / total * 100) if total else 0
+        val_str = f"${val:,.0f}" if is_money else f"{int(val):,}"
+        chg_str = ""
+        if compare_map:
+            cmp_val = compare_map.get(lbl, 0)
+            if cmp_val > 0:
+                chg = (val - cmp_val) / cmp_val * 100
+                arrow = "\u25b2" if chg >= 0 else "\u25bc"
+                chg_str = f"  {arrow}{abs(chg):.0f}%"
+            else:
+                chg_str = "  \u25cf New"
+        text_items.append(f"{lbl}  {val_str} ({pct:.0f}%){chg_str}")
+
+    fig = go.Figure(go.Bar(
+        y=list(range(len(labels_r))),
+        x=values_r,
+        orientation="h",
+        marker_color=colors,
+        text=text_items,
+        textposition="inside",
+        insidetextanchor="start",
+        textfont=dict(size=11, color="#eee"),
+        hoverinfo="skip",
+    ))
+    fig.update_layout(
+        height=max(len(labels_r) * 32, 100),
+        margin=dict(l=0, r=0, t=0, b=0),
+        yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        bargap=0.25,
+    )
+
+    if chart_key and filter_key:
+        event = st.plotly_chart(
+            fig, use_container_width=True,
+            on_select="rerun", key=chart_key,
+        )
+        if (event and hasattr(event, "selection")
+                and event.selection and event.selection.points):
+            idx = event.selection.points[0]["point_index"]
+            clicked = labels_r[idx]
+            current = st.session_state.get(filter_key, "All")
+            new_val = "All" if current == clicked else clicked
+            # Store as pending — applied before widgets on next rerun
+            st.session_state["_so_xf_pending"] = (filter_key, new_val)
+            st.rerun()
+    else:
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # Helper: aggregate by time bucket (Series-based groupby)
@@ -719,6 +831,15 @@ with chart_cols[0]:
                 df_bar_raw = df_bar_raw[df_bar_raw["STOREFRONT"].isin(selected_storefronts)]
             if selected_store_ids:
                 df_bar_raw = df_bar_raw[df_bar_raw["STORE_ID"].isin(selected_store_ids)]
+            # Apply cross-filters to bar chart data
+            _xf_bar = [
+                ("MANUFACTURER", "so_xf_mfr"), ("VENDOR", "so_xf_vendor"),
+                ("MANUFACTURER_SKU", "so_xf_sku"), ("CUSTOMER_EMAIL", "so_xf_cust"),
+            ]
+            for _col, _key in _xf_bar:
+                _v = st.session_state.get(_key, "All")
+                if _v != "All" and _col in df_bar_raw.columns:
+                    df_bar_raw = df_bar_raw[df_bar_raw[_col] == _v]
 
         title_map = {"$": "Sales ($)", "GP ($)": "Gross Profit ($)", "Orders": "Orders", "Units": "Units Sold"}
         st.subheader(title_map.get(metric_toggle, metric_label))
@@ -822,6 +943,10 @@ with chart_cols[0]:
             st.info("No data.")
 
 # Category-specific charts (columns 1+ vary by category)
+# Manufacturer and Vendor charts are clickable → set cross-filters
+_MFR = dict(filter_key="so_xf_mfr", chart_key="so_mfr_chart")
+_VND = dict(filter_key="so_xf_vendor", chart_key="so_vendor_chart")
+
 if category == "Ammunition":
     # Ammunition: General Purpose | Caliber | Manufacturer | Projectile
     with chart_cols[1]:
@@ -829,13 +954,13 @@ if category == "Ammunition":
     with chart_cols[2]:
         _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[4]:
         _render_hbar(df_target, "PROJECTILE", metric_toggle, "Projectile", df_compare=df_compare)
 elif category == "Guns":
     # Guns: Manufacturer | Caliber | Action | Capacity
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber", df_compare=df_compare)
     with chart_cols[3]:
@@ -845,7 +970,7 @@ elif category == "Guns":
 elif category == "Magazines":
     # Magazines: Manufacturer | Caliber | Capacity | Material
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber", df_compare=df_compare)
     with chart_cols[3]:
@@ -855,27 +980,27 @@ elif category == "Magazines":
 elif category == "Gear":
     # Gear: Manufacturer | Color | Material | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "COLOR", metric_toggle, "Color", df_compare=df_compare)
     with chart_cols[3]:
         _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare, **_VND)
 elif category == "Gun Parts":
     # Gun Parts: Manufacturer | Part | Material | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "GUN_PART", metric_toggle, "Part", df_compare=df_compare)
     with chart_cols[3]:
         _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare, **_VND)
 elif category == "Loading Components":
     # Load Comp: Manufacturer | Categories | Material
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "CATEGORIES", metric_toggle, "Categories", df_compare=df_compare)
     with chart_cols[3]:
@@ -883,15 +1008,15 @@ elif category == "Loading Components":
 elif category == "Optics":
     # Optics: Manufacturer | Category | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "PRIMARY_CATEGORY", metric_toggle, "Category", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare, **_VND)
 elif category == "Survival":
     # Survival: Manufacturer | Model | Material
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[2]:
         _render_hbar(df_target, "MODEL", metric_toggle, "Model", df_compare=df_compare)
     with chart_cols[3]:
@@ -901,9 +1026,9 @@ else:
     with chart_cols[1]:
         _render_hbar(df_target, "GENERAL_PURPOSE", metric_toggle, "General Purpose", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare, **_MFR)
     with chart_cols[3]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare, **_VND)
 
 st.divider()
 
