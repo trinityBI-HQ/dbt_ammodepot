@@ -106,6 +106,8 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
             p."Manufacturer" as MANUFACTURER,
             f.PRODUCT_ID,
             f.TESTSKU as SKU,
+            p."Manufacturer SKU" as MANUFACTURER_SKU,
+            p."Product Name" as PRODUCT_NAME,
             f.PART_QTY_SOLD::int as UNITS,
             f.REGION,
             f.CITY,
@@ -723,37 +725,204 @@ with chart_cols[3]:
 
 st.divider()
 
-# --- Tables row ---
-st.subheader(f"Product Performance / {period}")
-if not df_target.empty:
-    product_perf = (
-        df_target.groupby("SKU")
-        .agg(
-            NET_SALES=("NET_SALES", "sum"),
-            COST=("COST", "sum"),
-            ORDERS=("ORDER_ID", "nunique"),
-            UNITS=("UNITS", "sum"),
-            S_REVENUE=("FREIGHT_REVENUE", "sum"),
+# --- Product Performance: PBI-style expandable table ---
+
+
+def _render_product_perf(df, df_cmp, title):
+    """Render expandable Manufacturer SKU table with product name detail rows."""
+    st.subheader(title)
+    if df.empty:
+        st.info("No data.")
+        return
+    df = df.copy()
+    df["GP"] = df["NET_SALES"] - df["COST"]
+    df["MANUFACTURER_SKU"] = df["MANUFACTURER_SKU"].fillna("(No SKU)")
+    df["PRODUCT_NAME"] = df["PRODUCT_NAME"].fillna("(No Name)")
+
+    has_freight = "FREIGHT_REVENUE" in df.columns
+    sku = df.groupby("MANUFACTURER_SKU").agg(
+        **{"NET_SALES": ("NET_SALES", "sum"), "COST": ("COST", "sum"),
+           "ORDERS": ("ORDER_ID", "nunique"), "UNITS": ("UNITS", "sum"),
+           **({"S_REV": ("FREIGHT_REVENUE", "sum")} if has_freight else {})},
+    ).reset_index()
+    sku["GP"] = sku["NET_SALES"] - sku["COST"]
+    sku["MARGIN"] = (sku["GP"] / sku["NET_SALES"] * 100).fillna(0)
+    sku["PU"] = (sku["NET_SALES"] / sku["UNITS"]).fillna(0)
+    sku = sku.sort_values("NET_SALES", ascending=False).head(25)
+    top = set(sku["MANUFACTURER_SKU"])
+
+    det = df[df["MANUFACTURER_SKU"].isin(top)].groupby(
+        ["MANUFACTURER_SKU", "PRODUCT_NAME"]
+    ).agg(
+        **{"NET_SALES": ("NET_SALES", "sum"), "COST": ("COST", "sum"),
+           "ORDERS": ("ORDER_ID", "nunique"), "UNITS": ("UNITS", "sum"),
+           **({"S_REV": ("FREIGHT_REVENUE", "sum")} if has_freight else {})},
+    ).reset_index()
+    det["GP"] = det["NET_SALES"] - det["COST"]
+    det["MARGIN"] = (det["GP"] / det["NET_SALES"] * 100).fillna(0)
+    det["PU"] = (det["NET_SALES"] / det["UNITS"]).fillna(0)
+
+    cmp_s, cmp_d = {}, {}
+    if df_cmp is not None and not df_cmp.empty:
+        dc = df_cmp.copy()
+        dc["GP"] = dc["NET_SALES"] - dc["COST"]
+        dc["MANUFACTURER_SKU"] = dc["MANUFACTURER_SKU"].fillna("(No SKU)")
+        dc["PRODUCT_NAME"] = dc["PRODUCT_NAME"].fillna("(No Name)")
+        cmp_has_freight = "FREIGHT_REVENUE" in dc.columns
+        cs = dc.groupby("MANUFACTURER_SKU").agg(
+            **{"NET_SALES": ("NET_SALES", "sum"), "COST": ("COST", "sum"),
+               "ORDERS": ("ORDER_ID", "nunique"), "UNITS": ("UNITS", "sum"),
+               **({"S_REV": ("FREIGHT_REVENUE", "sum")} if cmp_has_freight else {})},
+        ).reset_index()
+        cs["GP"] = cs["NET_SALES"] - cs["COST"]
+        cmp_s = {r["MANUFACTURER_SKU"]: r for _, r in cs.iterrows()}
+        cd = dc.groupby(["MANUFACTURER_SKU", "PRODUCT_NAME"]).agg(
+            **{"NET_SALES": ("NET_SALES", "sum"), "COST": ("COST", "sum"),
+               "ORDERS": ("ORDER_ID", "nunique"), "UNITS": ("UNITS", "sum"),
+               **({"S_REV": ("FREIGHT_REVENUE", "sum")} if cmp_has_freight else {})},
+        ).reset_index()
+        cd["GP"] = cd["NET_SALES"] - cd["COST"]
+        cmp_d = {
+            (r["MANUFACTURER_SKU"], r["PRODUCT_NAME"]): r
+            for _, r in cd.iterrows()
+        }
+
+    def _arrow(cur, prev):
+        if prev is None or prev == 0:
+            return ""
+        if cur > prev:
+            return '<span style="color:#4CAF50;">&#9650;</span>'
+        if cur < prev:
+            return '<span style="color:#f44336;">&#9660;</span>'
+        return ""
+
+    def _cells(r, cr=None):
+        def g(k):
+            return cr[k] if cr is not None else None
+        return (
+            f'<div class="pp-c">'
+            f'{_arrow(r["NET_SALES"], g("NET_SALES"))} '
+            f'${r["NET_SALES"]:,.0f}</div>'
+            f'<div class="pp-c">'
+            f'{_arrow(r["GP"], g("GP"))} '
+            f'${r["GP"]:,.0f}</div>'
+            f'<div class="pp-c">'
+            f'{_arrow(r["ORDERS"], g("ORDERS"))} '
+            f'{int(r["ORDERS"]):,}</div>'
+            f'<div class="pp-c">'
+            f'{_arrow(r["UNITS"], g("UNITS"))} '
+            f'{int(r["UNITS"]):,}</div>'
+            f'<div class="pp-c">{r["MARGIN"]:.2f}%</div>'
+            f'<div class="pp-c">${r["PU"]:,.0f}</div>'
+            + (
+                f'<div class="pp-c">'
+                f'{_arrow(r["S_REV"], g("S_REV"))} '
+                f'${r["S_REV"]:,.2f}</div>'
+                if has_freight and "S_REV" in r.index else ""
+            )
         )
-        .reset_index()
+
+    rows = []
+    for _, r in sku.iterrows():
+        sk = r["MANUFACTURER_SKU"]
+        cells = _cells(r, cmp_s.get(sk))
+        sk_det = det[det["MANUFACTURER_SKU"] == sk].sort_values(
+            "NET_SALES", ascending=False,
+        )
+        if len(sk_det) <= 1:
+            rows.append(
+                f'<div class="pp-row pp-sku">'
+                f'<div class="pp-n">{sk}</div>{cells}</div>'
+            )
+        else:
+            dh = ""
+            for _, dr in sk_det.iterrows():
+                dc = _cells(dr, cmp_d.get((sk, dr["PRODUCT_NAME"])))
+                dh += (
+                    f'<div class="pp-row pp-det">'
+                    f'<div class="pp-n pp-ind">'
+                    f'{dr["PRODUCT_NAME"]}</div>{dc}</div>'
+                )
+            rows.append(
+                f'<details class="pp-grp"><summary>'
+                f'<div class="pp-row pp-sku">'
+                f'<div class="pp-n">'
+                f'<span class="pp-x">&#9654;</span> {sk}'
+                f'</div>{cells}</div>'
+                f'</summary>{dh}</details>'
+            )
+
+    t_ns = sku["NET_SALES"].sum()
+    t_gp = sku["GP"].sum()
+    t_or = int(sku["ORDERS"].sum())
+    t_un = int(sku["UNITS"].sum())
+    t_mg = (t_gp / t_ns * 100) if t_ns else 0
+    t_pu = (t_ns / t_un) if t_un else 0
+    t_sr = float(sku["S_REV"].sum()) if has_freight else 0
+
+    grid_cols = (
+        "1fr 110px 90px 70px 70px 75px 85px 95px"
+        if has_freight
+        else "1fr 110px 90px 70px 70px 75px 85px"
     )
-    product_perf["GP"] = product_perf["NET_SALES"] - product_perf["COST"]
-    product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
-    product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
-    product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(20)
-    display_cols = ["SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT", "S_REVENUE"]
-    st.dataframe(
-        product_perf[display_cols].style.format({
-            "NET_SALES": "${:,.2f}",
-            "GP": "${:,.2f}",
-            "MARGIN": "{:.2f}%",
-            "PRICE/UNIT": "${:,.2f}",
-            "S_REVENUE": "${:,.2f}",
-        }).hide(axis="index"),
-        use_container_width=True,
+    sr_hdr = (
+        '<div class="pp-c">S. Revenue ($)</div>' if has_freight else ""
     )
-else:
-    st.info("No data.")
+    sr_tot = (
+        f'<div class="pp-c">${t_sr:,.2f}</div>' if has_freight else ""
+    )
+
+    st.markdown(
+        '<style>'
+        '.pp-tbl{font-size:13px;width:100%;}'
+        '.pp-row{display:grid;'
+        f'grid-template-columns:{grid_cols};'
+        'gap:4px;padding:6px 10px;border-bottom:1px solid #333;'
+        'align-items:center;}'
+        '.pp-hdr{background:#2a3f5f;color:#fff;font-weight:700;'
+        'border-radius:4px 4px 0 0;}'
+        '.pp-sku{background:#1E1E1E;}'
+        '.pp-det{background:#161616;}'
+        '.pp-tot{background:#2a3f5f;color:#fff;font-weight:700;'
+        'border-radius:0 0 4px 4px;border:none;}'
+        '.pp-n{color:#fff;font-weight:700;white-space:nowrap;'
+        'overflow:hidden;text-overflow:ellipsis;}'
+        '.pp-ind{padding-left:20px;color:#aaa;'
+        'font-weight:400;font-size:12px;}'
+        '.pp-c{text-align:right;color:#ccc;}'
+        '.pp-grp>summary{list-style:none;cursor:pointer;}'
+        '.pp-grp>summary::-webkit-details-marker{display:none;}'
+        '.pp-grp>summary .pp-sku:hover{background:#2a2a2a;}'
+        '.pp-x{font-size:9px;color:#888;display:inline-block;'
+        'transition:transform 0.15s;}'
+        '.pp-grp[open] .pp-x{transform:rotate(90deg);}'
+        '</style>'
+        '<div class="pp-tbl">'
+        '<div class="pp-row pp-hdr">'
+        '<div>Manufacturer SKU</div>'
+        '<div class="pp-c">Net Sales ($)</div>'
+        '<div class="pp-c">GP ($)</div>'
+        '<div class="pp-c">Orders</div>'
+        '<div class="pp-c">Units</div>'
+        '<div class="pp-c">Margin</div>'
+        '<div class="pp-c">Price/Unit</div>'
+        + sr_hdr
+        + '</div>'
+        + "".join(rows)
+        + f'<div class="pp-row pp-tot"><div>Total</div>'
+        f'<div class="pp-c">${t_ns:,.0f}</div>'
+        f'<div class="pp-c">${t_gp:,.0f}</div>'
+        f'<div class="pp-c">{t_or:,}</div>'
+        f'<div class="pp-c">{t_un:,}</div>'
+        f'<div class="pp-c">{t_mg:.2f}%</div>'
+        f'<div class="pp-c">${t_pu:,.0f}</div>'
+        + sr_tot
+        + '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+_render_product_perf(df_target, df_compare, f"Product Performance / {period}")
 
 # --- Geographic / Customer Overview ---
 st.divider()
@@ -813,6 +982,7 @@ with geo_left:
             )
         else:  # Customer
             st.caption(f"Customer Overview / {period}")
+            # Email-level aggregation
             cust_agg = (
                 geo_df.groupby(["CUSTOMER_EMAIL", "CUSTOMER_NAME"])
                 .agg(NET_SALES=("NET_SALES", "sum"), COST=("COST", "sum"),
@@ -820,22 +990,116 @@ with geo_left:
                 .reset_index()
             )
             cust_agg["GP"] = cust_agg["NET_SALES"] - cust_agg["COST"]
-            cust_agg = cust_agg.sort_values("NET_SALES", ascending=False)
-
-            totals = pd.DataFrame([{
-                "CUSTOMER_EMAIL": "Total", "CUSTOMER_NAME": "",
-                "NET_SALES": cust_agg["NET_SALES"].sum(),
-                "GP": cust_agg["GP"].sum(),
-                "ORDERS": cust_agg["ORDERS"].sum(),
-                "UNITS": cust_agg["UNITS"].sum(),
-            }])
-            cust_display = pd.concat([cust_agg, totals], ignore_index=True)
-            cols = ["CUSTOMER_EMAIL", "CUSTOMER_NAME", "NET_SALES", "GP", "ORDERS", "UNITS"]
-            st.dataframe(
-                cust_display[cols].style.format({
-                    "NET_SALES": "${:,.0f}", "GP": "${:,.0f}",
-                }).hide(axis="index"),
-                use_container_width=True, height=250,
+            cust_agg = cust_agg.sort_values(
+                "NET_SALES", ascending=False,
+            ).head(25)
+            # Order-level detail
+            top_emails = set(cust_agg["CUSTOMER_EMAIL"])
+            cust_det = (
+                geo_df[geo_df["CUSTOMER_EMAIL"].isin(top_emails)]
+                .groupby(["CUSTOMER_EMAIL", "ORDER_ID"])
+                .agg(NET_SALES=("NET_SALES", "sum"), COST=("COST", "sum"),
+                     UNITS=("UNITS", "sum"))
+                .reset_index()
+            )
+            cust_det["GP"] = cust_det["NET_SALES"] - cust_det["COST"]
+            # Totals
+            t_ns = cust_agg["NET_SALES"].sum()
+            t_gp = cust_agg["GP"].sum()
+            t_or = int(cust_agg["ORDERS"].sum())
+            t_un = int(cust_agg["UNITS"].sum())
+            # Build HTML rows
+            co_rows = []
+            for _, r in cust_agg.iterrows():
+                email = r["CUSTOMER_EMAIL"]
+                name = r["CUSTOMER_NAME"]
+                cells = (
+                    f'<div class="co-c">{name}</div>'
+                    f'<div class="co-c">${r["NET_SALES"]:,.0f}</div>'
+                    f'<div class="co-c">${r["GP"]:,.0f}</div>'
+                    f'<div class="co-c">{int(r["ORDERS"]):,}</div>'
+                    f'<div class="co-c">{int(r["UNITS"]):,}</div>'
+                )
+                orders = cust_det[
+                    cust_det["CUSTOMER_EMAIL"] == email
+                ].sort_values("NET_SALES", ascending=False)
+                if len(orders) <= 1:
+                    co_rows.append(
+                        f'<div class="co-row co-cust">'
+                        f'<div class="co-n">{email}</div>'
+                        f'{cells}</div>'
+                    )
+                else:
+                    dh = ""
+                    for _, dr in orders.iterrows():
+                        dh += (
+                            f'<div class="co-row co-det">'
+                            f'<div class="co-n co-ind">'
+                            f'{dr["ORDER_ID"]}</div>'
+                            f'<div class="co-c"></div>'
+                            f'<div class="co-c">'
+                            f'${dr["NET_SALES"]:,.0f}</div>'
+                            f'<div class="co-c">'
+                            f'${dr["GP"]:,.0f}</div>'
+                            f'<div class="co-c">1</div>'
+                            f'<div class="co-c">'
+                            f'{int(dr["UNITS"]):,}</div>'
+                            f'</div>'
+                        )
+                    co_rows.append(
+                        f'<details class="co-grp"><summary>'
+                        f'<div class="co-row co-cust">'
+                        f'<div class="co-n">'
+                        f'<span class="co-x">&#9654;</span> '
+                        f'{email}</div>{cells}</div>'
+                        f'</summary>{dh}</details>'
+                    )
+            st.markdown(
+                '<style>'
+                '.co-tbl{font-size:13px;width:100%;}'
+                '.co-row{display:grid;'
+                'grid-template-columns:1fr 100px 90px 70px 60px 55px;'
+                'gap:4px;padding:5px 8px;border-bottom:1px solid #333;'
+                'align-items:center;}'
+                '.co-hdr{background:#2a3f5f;color:#fff;'
+                'font-weight:700;border-radius:4px 4px 0 0;}'
+                '.co-cust{background:#1E1E1E;}'
+                '.co-det{background:#161616;}'
+                '.co-tot{background:#2a3f5f;color:#fff;'
+                'font-weight:700;border-radius:0 0 4px 4px;}'
+                '.co-n{color:#fff;font-weight:700;font-size:12px;'
+                'white-space:nowrap;overflow:hidden;'
+                'text-overflow:ellipsis;}'
+                '.co-ind{padding-left:20px;color:#aaa;'
+                'font-weight:400;}'
+                '.co-c{text-align:right;color:#ccc;}'
+                '.co-grp>summary{list-style:none;cursor:pointer;}'
+                '.co-grp>summary::-webkit-details-marker'
+                '{display:none;}'
+                '.co-grp>summary .co-cust:hover'
+                '{background:#2a2a2a;}'
+                '.co-x{font-size:9px;color:#888;'
+                'display:inline-block;transition:transform 0.15s;}'
+                '.co-grp[open] .co-x{transform:rotate(90deg);}'
+                '</style>'
+                '<div class="co-tbl">'
+                '<div class="co-row co-hdr">'
+                '<div>Customer</div>'
+                '<div class="co-c">Name</div>'
+                '<div class="co-c">Net Sales ($)</div>'
+                '<div class="co-c">GP ($)</div>'
+                '<div class="co-c">Orders</div>'
+                '<div class="co-c">Units</div>'
+                '</div>'
+                + "".join(co_rows)
+                + f'<div class="co-row co-tot">'
+                f'<div>Total</div><div class="co-c"></div>'
+                f'<div class="co-c">${t_ns:,.0f}</div>'
+                f'<div class="co-c">${t_gp:,.0f}</div>'
+                f'<div class="co-c">{t_or:,}</div>'
+                f'<div class="co-c">{t_un:,}</div>'
+                f'</div></div>',
+                unsafe_allow_html=True,
             )
     else:
         st.info("No data.")
