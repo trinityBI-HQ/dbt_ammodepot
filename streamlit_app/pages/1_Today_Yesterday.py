@@ -87,30 +87,31 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
     status_list = ", ".join(f"'{s}'" for s in statuses)
     sql = f"""
         select
-            CREATED_AT,
-            TIMEDATE,
-            extract(HOUR from TIMEDATE) as HOUR_NUM,
-            INCREMENT_ID as ORDER_ID,
-            CUSTOMER_EMAIL,
-            CUSTOMER_NAME,
-            STORE_ID,
-            STOREFRONT,
-            STATUS,
-            ROW_TOTAL as NET_SALES,
-            COST,
-            QTY_ORDERED,
-            FREIGHT_REVENUE,
-            FREIGHT_COST,
-            VENDOR,
-            PRODUCT_ID,
-            TESTSKU as SKU,
-            PART_QTY_SOLD as UNITS,
-            REGION,
-            CITY,
-            POSTCODE
-        from F_SALES
-        where CREATED_AT = '{dt}'
-          and STATUS in ({status_list})
+            f.CREATED_AT,
+            f.TIMEDATE,
+            extract(HOUR from f.TIMEDATE) as HOUR_NUM,
+            f.INCREMENT_ID as ORDER_ID,
+            f.CUSTOMER_EMAIL,
+            f.CUSTOMER_NAME,
+            f.STORE_ID,
+            f.STOREFRONT,
+            f.STATUS,
+            f.ROW_TOTAL as NET_SALES,
+            f.COST,
+            f.QTY_ORDERED,
+            f.FREIGHT_REVENUE,
+            f.FREIGHT_COST,
+            coalesce(v.VENDOR_NAME, f.VENDOR::varchar) as VENDOR,
+            f.PRODUCT_ID,
+            f.TESTSKU as SKU,
+            f.PART_QTY_SOLD as UNITS,
+            f.REGION,
+            f.CITY,
+            f.POSTCODE
+        from F_SALES f
+        left join D_VENDOR v on f.VENDOR = v.VENDOR_ID
+        where f.CREATED_AT = '{dt}'
+          and f.STATUS in ({status_list})
     """
     return run_query(sql)
 
@@ -607,6 +608,34 @@ def agg_by_metric(df, group_col, metric):
     return result.sort_values("VALUE", ascending=False).head(8)
 
 
+def _render_html_hbar(labels, values, metric, limit=15):
+    """Render PBI-style horizontal bars: label + value above, colored bar below."""
+    if not labels or not values:
+        st.info("No data.")
+        return
+    labels = labels[:limit]
+    values = values[:limit]
+    total = sum(values)
+    max_val = max(values) if values else 1
+    is_money = metric in ("$", "GP ($)", "GP ($) After VC")
+    html_rows = []
+    for lbl, val in zip(labels, values):
+        pct = (val / total * 100) if total else 0
+        val_str = f"${val:,.0f}" if is_money else f"{int(val):,}"
+        bar_pct = (val / max_val * 100) if max_val else 0
+        html_rows.append(
+            f'<div style="margin-bottom:6px;">'
+            f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+            f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span></div>'
+            f'<div style="background:#00d4aa; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
+            f'</div>'
+        )
+    st.markdown(
+        f'<div style="padding:4px 0;">{"".join(html_rows)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
 # Category chart
 with chart_cols[1]:
     st.subheader(f"{metric_label} / Category")
@@ -630,15 +659,7 @@ with chart_cols[1]:
             cat_df["GP"] = cat_df["NET_SALES"] - cat_df["COST"]
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             cat_df = cat_df.sort_values(val_col, ascending=False)
-            fig = go.Figure(go.Bar(
-                x=cat_df[val_col].tolist(),
-                y=cat_df["CATEGORY"].tolist(),
-                orientation="h", marker_color="#00d4aa",
-            ))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-            fig.update_xaxes(title="")
-            fig.update_yaxes(title="")
-            st.plotly_chart(fig, use_container_width=True)
+            _render_html_hbar(cat_df["CATEGORY"].tolist(), cat_df[val_col].tolist(), metric_toggle)
     else:
         st.info("No data.")
 
@@ -646,17 +667,9 @@ with chart_cols[1]:
 with chart_cols[2]:
     st.subheader(f"{metric_label} / Fulfilled By")
     if not df_target.empty:
-        vendor_agg = agg_by_metric(df_target, "VENDOR", metric_toggle).head(6)
+        vendor_agg = agg_by_metric(df_target, "VENDOR", metric_toggle).head(15)
         if not vendor_agg.empty:
-            fig = go.Figure(go.Bar(
-                x=vendor_agg["VALUE"].tolist(),
-                y=vendor_agg["VENDOR"].tolist(),
-                orientation="h", marker_color="#00d4aa",
-            ))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-            fig.update_xaxes(title="")
-            fig.update_yaxes(title="")
-            st.plotly_chart(fig, use_container_width=True)
+            _render_html_hbar(vendor_agg["VENDOR"].tolist(), vendor_agg["VALUE"].tolist(), metric_toggle)
     else:
         st.info("No data.")
 
@@ -676,22 +689,14 @@ with chart_cols[3]:
               and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
             group by p."Manufacturer"
             order by NET_SALES desc
-            limit 8
+            limit 15
         """
         mfr_df = run_query(mfr_sql)
         if not mfr_df.empty:
             mfr_df["GP"] = mfr_df["NET_SALES"] - mfr_df["COST"]
             val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
             mfr_df = mfr_df.sort_values(val_col, ascending=False)
-            fig = go.Figure(go.Bar(
-                x=mfr_df[val_col].tolist(),
-                y=mfr_df["MANUFACTURER"].tolist(),
-                orientation="h", marker_color="#00d4aa",
-            ))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0), showlegend=False)
-            fig.update_xaxes(title="")
-            fig.update_yaxes(title="")
-            st.plotly_chart(fig, use_container_width=True)
+            _render_html_hbar(mfr_df["MANUFACTURER"].tolist(), mfr_df[val_col].tolist(), metric_toggle)
     else:
         st.info("No data.")
 
@@ -954,5 +959,5 @@ if store_names:
 # --- Footer ---
 st.divider()
 if not df_target.empty:
-    last_order_time = df_target["CREATED_AT"].max()
+    last_order_time = df_target["TIMEDATE"].max() if "TIMEDATE" in df_target.columns else df_target["CREATED_AT"].max()
     st.caption(f"Last Order: {last_order_time} | Data cached for 5 minutes")

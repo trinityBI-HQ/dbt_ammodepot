@@ -81,6 +81,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
     sql = f"""
         select
             f.CREATED_AT,
+            f.TIMEDATE,
             date_trunc('HOUR', f.TIMEDATE) as HOUR_BUCKET,
             f.INCREMENT_ID as ORDER_ID,
             f.CUSTOMER_EMAIL,
@@ -93,7 +94,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             f.QTY_ORDERED,
             f.FREIGHT_REVENUE,
             f.FREIGHT_COST,
-            f.VENDOR,
+            coalesce(v.VENDOR_NAME, f.VENDOR::varchar) as VENDOR,
             f.PRODUCT_ID,
             f.TESTSKU as SKU,
             f.REGION,
@@ -117,6 +118,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             p.USE_TYPE_CATEGORY as GENERAL_PURPOSE_AMMO
         from F_SALES f
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
+        left join D_VENDOR v on f.VENDOR = v.VENDOR_ID
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
           and f.STATUS in ({status_list})
     """
@@ -539,8 +541,8 @@ def _agg_metric(df, group_col, metric):
     return r.sort_values("VALUE", ascending=False)
 
 
-def _render_hbar(df, group_col, metric, label, limit=8):
-    """Render a horizontal bar chart for a dimension with PBI-style labels."""
+def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None):
+    """Render PBI-style horizontal bars: label + comparison above each bar."""
     st.subheader(f"{metric_label} / {label}")
     if not df.empty:
         agg = _agg_metric(df, group_col, metric).head(limit)
@@ -549,28 +551,45 @@ def _render_hbar(df, group_col, metric, label, limit=8):
             vals = agg["VALUE"].tolist()
             labels = agg[group_col].tolist()
             pcts = [(v / total * 100) if total else 0 for v in vals]
-            # PBI-style text: "value (pct%)"
-            if metric in ("$", "GP ($)", "GP ($) After VC"):
-                text_labels = [f"${v:,.0f} ({p:.0f}%)" for v, p in zip(vals, pcts)]
-            else:
-                text_labels = [f"{int(v)} ({p:.2f}%)" for v, p in zip(vals, pcts)]
-            y_pos = list(range(len(labels)))
-            fig = go.Figure(go.Bar(
-                x=vals, y=y_pos,
-                orientation="h", marker_color="#00d4aa",
-                text=text_labels, textposition="auto",
-            ))
-            fig.update_layout(
-                height=max(200, len(labels) * 40 + 40),
-                margin=dict(l=0, r=0, t=10, b=0),
-                showlegend=False,
-                yaxis=dict(
-                    tickvals=y_pos, ticktext=labels,
-                    autorange="reversed",
-                ),
+            # Build comparison lookup
+            compare_map = {}
+            if df_compare is not None and not df_compare.empty:
+                agg_cmp = _agg_metric(df_compare, group_col, metric)
+                if not agg_cmp.empty:
+                    compare_map = dict(zip(agg_cmp[group_col].tolist(), agg_cmp["VALUE"].tolist()))
+            # Render as HTML: each item = label line + bar div
+            max_val = max(vals) if vals else 1
+            html_rows = []
+            for lbl, val, pct in zip(labels, vals, pcts):
+                # Format value
+                if metric in ("$", "GP ($)", "GP ($) After VC"):
+                    val_str = f"${val:,.0f}"
+                else:
+                    val_str = f"{int(val):,}"
+                # Comparison indicator
+                chg_html = ""
+                if compare_map:
+                    cmp_val = compare_map.get(lbl, 0)
+                    if cmp_val > 0:
+                        chg = (val - cmp_val) / cmp_val * 100
+                        color = "#4CAF50" if chg >= 0 else "#f44336"
+                        dot = f'<span style="color:{color}; font-size:10px;">&#9679;</span>'
+                        chg_html = f'&nbsp;&nbsp;{dot} <span style="color:{color}; font-size:11px;">{chg:+.1f}%</span>'
+                    else:
+                        chg_html = '&nbsp;&nbsp;<span style="color:#4CAF50; font-size:10px;">&#9679;</span> <span style="color:#4CAF50; font-size:11px;">New</span>'
+                # Bar width as percentage of max
+                bar_pct = (val / max_val * 100) if max_val else 0
+                html_rows.append(
+                    f'<div style="margin-bottom:6px;">'
+                    f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+                    f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span>{chg_html}</div>'
+                    f'<div style="background:#00d4aa; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
+                    f'</div>'
+                )
+            st.markdown(
+                f'<div style="padding:4px 0;">{"".join(html_rows)}</div>',
+                unsafe_allow_html=True,
             )
-            fig.update_xaxes(title="", visible=False)
-            st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No data.")
 
@@ -795,85 +814,85 @@ with chart_cols[0]:
 if category == "Ammunition":
     # Ammunition: General Purpose | Caliber | Manufacturer | Projectile
     with chart_cols[1]:
-        _render_hbar(df_target, "GENERAL_PURPOSE_AMMO", metric_toggle, "General Purpose")
+        _render_hbar(df_target, "GENERAL_PURPOSE_AMMO", metric_toggle, "General Purpose", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "PROJECTILE", metric_toggle, "Projectile")
+        _render_hbar(df_target, "PROJECTILE", metric_toggle, "Projectile", df_compare=df_compare)
 elif category == "Guns":
     # Guns: Manufacturer | Caliber | Action | Capacity
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "GUN_ACTION", metric_toggle, "Action")
+        _render_hbar(df_target, "GUN_ACTION", metric_toggle, "Action", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity")
+        _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity", df_compare=df_compare)
 elif category == "Magazines":
     # Magazines: Manufacturer | Caliber | Capacity | Material
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber")
+        _render_hbar(df_target, "CALIBER", metric_toggle, "Caliber", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity")
+        _render_hbar(df_target, "CAPACITY", metric_toggle, "Capacity", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
 elif category == "Gear":
     # Gear: Manufacturer | Color | Material | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "COLOR", metric_toggle, "Color")
+        _render_hbar(df_target, "COLOR", metric_toggle, "Color", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
 elif category == "Gun Parts":
     # Gun Parts: Manufacturer | Part | Material | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "GUN_PART", metric_toggle, "Part")
+        _render_hbar(df_target, "GUN_PART", metric_toggle, "Part", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
     with chart_cols[4]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
 elif category == "Reloading Components":
     # Load Comp: Manufacturer | Color | Material
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "COLOR", metric_toggle, "Color")
+        _render_hbar(df_target, "COLOR", metric_toggle, "Color", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
 elif category == "Optics/Sights":
     # Optics/Sights: Manufacturer | Category | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "PRIMARY_CATEGORY", metric_toggle, "Category")
+        _render_hbar(df_target, "PRIMARY_CATEGORY", metric_toggle, "Category", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
 elif category == "Prep & Survival":
     # Prep & Survival: Manufacturer | Model | Material
     with chart_cols[1]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "MODEL", metric_toggle, "Model")
+        _render_hbar(df_target, "MODEL", metric_toggle, "Model", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material")
+        _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
 else:
     # Other categories: General Purpose | Manufacturer | Fulfilled By
     with chart_cols[1]:
-        _render_hbar(df_target, "GENERAL_PURPOSE", metric_toggle, "General Purpose")
+        _render_hbar(df_target, "GENERAL_PURPOSE", metric_toggle, "General Purpose", df_compare=df_compare)
     with chart_cols[2]:
-        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer")
+        _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[3]:
-        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6)
+        _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
 
 st.divider()
 
@@ -881,7 +900,7 @@ st.divider()
 st.subheader(f"Product Performance / {period_label}")
 if not df_target.empty:
     product_perf = (
-        df_target.groupby(["SKU", "MANUFACTURER_SKU"])
+        df_target.groupby("MANUFACTURER_SKU")
         .agg(
             NET_SALES=("NET_SALES", "sum"),
             COST=("COST", "sum"),
@@ -1098,7 +1117,7 @@ st.divider()
 from datetime import datetime
 now = datetime.now()
 if not df_target.empty:
-    last_order_time = df_target["CREATED_AT"].max()
+    last_order_time = df_target["TIMEDATE"].max() if "TIMEDATE" in df_target.columns else df_target["CREATED_AT"].max()
     row_count = len(df_target)
     st.caption(
         f"Last Update: {now:%m/%d/%y %H:%M:%S} | "
