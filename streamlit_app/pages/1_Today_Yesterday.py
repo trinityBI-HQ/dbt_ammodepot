@@ -101,7 +101,7 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
             f.QTY_ORDERED,
             f.FREIGHT_REVENUE,
             f.FREIGHT_COST,
-            coalesce(v.VENDOR_NAME, f.VENDOR::varchar) as VENDOR,
+            p."Vendor" as VENDOR,
             f.PRODUCT_ID,
             f.TESTSKU as SKU,
             f.PART_QTY_SOLD as UNITS,
@@ -109,7 +109,7 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
             f.CITY,
             f.POSTCODE
         from F_SALES f
-        left join D_VENDOR v on f.VENDOR = v.VENDOR_ID
+        left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
         where f.CREATED_AT = '{dt}'
           and f.STATUS in ({status_list})
     """

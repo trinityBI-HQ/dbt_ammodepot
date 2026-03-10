@@ -51,21 +51,25 @@ CATEGORIES = [
     "Magazines",
     "Gun Parts",
     "Gear",
-    "Optics/Sights",
-    "Reloading Components",
-    "Prep & Survival",
+    "Optics",
+    "Loading Components",
+    "Survival",
 ]
 # Display name overrides (DB value → UI label) and icons
-CATEGORY_DISPLAY = {"Reloading Components": "Load Comp"}
+CATEGORY_DISPLAY = {
+    "Optics": "Optics/Sights",
+    "Loading Components": "Load Comp",
+    "Survival": "Prep & Survival",
+}
 CATEGORY_ICONS = {
     "Ammunition": "✖️",
     "Guns": "🔫",
     "Magazines": "🔋",
     "Gun Parts": "⚙️",
     "Gear": "🦺",
-    "Optics/Sights": "🎯",
-    "Reloading Components": "🔧",
-    "Prep & Survival": "⛑️",
+    "Optics": "🎯",
+    "Loading Components": "🔧",
+    "Survival": "⛑️",
 }
 
 
@@ -94,7 +98,7 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             f.QTY_ORDERED,
             f.FREIGHT_REVENUE,
             f.FREIGHT_COST,
-            coalesce(v.VENDOR_NAME, f.VENDOR::varchar) as VENDOR,
+            p."Vendor" as VENDOR,
             f.PRODUCT_ID,
             f.TESTSKU as SKU,
             f.REGION,
@@ -118,7 +122,6 @@ def load_sales_data(start_date: date, end_date: date, statuses: tuple) -> pd.Dat
             p.USE_TYPE_CATEGORY as GENERAL_PURPOSE_AMMO
         from F_SALES f
         left join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
-        left join D_VENDOR v on f.VENDOR = v.VENDOR_ID
         where f.CREATED_AT::date between '{start_date}' and '{end_date}'
           and f.STATUS in ({status_list})
     """
@@ -861,7 +864,7 @@ elif category == "Gun Parts":
         _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
     with chart_cols[4]:
         _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
-elif category == "Reloading Components":
+elif category == "Loading Components":
     # Load Comp: Manufacturer | Color | Material
     with chart_cols[1]:
         _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
@@ -869,16 +872,16 @@ elif category == "Reloading Components":
         _render_hbar(df_target, "COLOR", metric_toggle, "Color", df_compare=df_compare)
     with chart_cols[3]:
         _render_hbar(df_target, "MATERIAL", metric_toggle, "Material", df_compare=df_compare)
-elif category == "Optics/Sights":
-    # Optics/Sights: Manufacturer | Category | Fulfilled By
+elif category == "Optics":
+    # Optics: Manufacturer | Category | Fulfilled By
     with chart_cols[1]:
         _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
         _render_hbar(df_target, "PRIMARY_CATEGORY", metric_toggle, "Category", df_compare=df_compare)
     with chart_cols[3]:
         _render_hbar(df_target, "VENDOR", metric_toggle, "Fulfilled By", limit=6, df_compare=df_compare)
-elif category == "Prep & Survival":
-    # Prep & Survival: Manufacturer | Model | Material
+elif category == "Survival":
+    # Survival: Manufacturer | Model | Material
     with chart_cols[1]:
         _render_hbar(df_target, "MANUFACTURER", metric_toggle, "Manufacturer", df_compare=df_compare)
     with chart_cols[2]:
@@ -900,7 +903,7 @@ st.divider()
 st.subheader(f"Product Performance / {period_label}")
 if not df_target.empty:
     product_perf = (
-        df_target.groupby("MANUFACTURER_SKU")
+        df_target.groupby("PRODUCT_NAME")
         .agg(
             NET_SALES=("NET_SALES", "sum"),
             COST=("COST", "sum"),
@@ -913,7 +916,7 @@ if not df_target.empty:
     product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
     product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
     product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(25)
-    display_cols = ["MANUFACTURER_SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT"]
+    display_cols = ["PRODUCT_NAME", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT"]
     st.dataframe(
         product_perf[display_cols].style.format({
             "NET_SALES": "${:,.2f}",
