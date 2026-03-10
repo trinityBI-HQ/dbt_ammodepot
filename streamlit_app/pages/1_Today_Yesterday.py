@@ -102,9 +102,11 @@ def load_sales(dt: date, statuses: tuple) -> pd.DataFrame:
             f.FREIGHT_REVENUE,
             f.FREIGHT_COST,
             p."Vendor" as VENDOR,
+            p."Attribute Set" as CATEGORY,
+            p."Manufacturer" as MANUFACTURER,
             f.PRODUCT_ID,
             f.TESTSKU as SKU,
-            f.PART_QTY_SOLD as UNITS,
+            f.PART_QTY_SOLD::int as UNITS,
             f.REGION,
             f.CITY,
             f.POSTCODE
@@ -129,7 +131,7 @@ def load_sales_range(start_dt: date, end_dt: date, statuses: tuple) -> pd.DataFr
             STATUS,
             ROW_TOTAL as NET_SALES,
             COST,
-            coalesce(PART_QTY_SOLD, QTY_ORDERED) as UNITS
+            coalesce(PART_QTY_SOLD, QTY_ORDERED)::int as UNITS
         from F_SALES
         where CREATED_AT between '{start_dt}' and '{end_dt}'
           and STATUS in ({status_list})
@@ -148,7 +150,7 @@ def load_last_month_sales(statuses: tuple) -> pd.DataFrame:
             INCREMENT_ID as ORDER_ID,
             ROW_TOTAL as NET_SALES,
             COST,
-            coalesce(PART_QTY_SOLD, QTY_ORDERED) as UNITS,
+            coalesce(PART_QTY_SOLD, QTY_ORDERED)::int as UNITS,
             STORE_ID,
             STOREFRONT
         from F_SALES
@@ -447,12 +449,16 @@ with chart_cols[0]:
         if not df_target.empty:
             hourly_target = _hourly_agg(df_target, metric_toggle)
             fig = go.Figure()
+            target_vals = hourly_target["VALUE"].tolist()
+            target_text = [f"{int(round(v))}" for v in target_vals]
             fig.add_trace(go.Scatter(
                 x=hourly_target["HOUR_LABEL"].tolist(),
-                y=hourly_target["VALUE"].tolist(),
+                y=target_vals,
                 name=period, marker_color="#00d4aa",
-                mode="lines+markers",
+                mode="lines+markers+text",
                 marker=dict(size=6),
+                text=target_text, textposition="top center",
+                textfont=dict(size=10, color="#00d4aa"),
             ))
             if not df_compare.empty:
                 hourly_compare = _hourly_agg(df_compare, metric_toggle)
@@ -594,6 +600,7 @@ def agg_by_metric(df, group_col, metric):
     if df.empty:
         return pd.DataFrame()
     df = df.copy()
+    df[group_col] = df[group_col].fillna("(Blank)")
     df["GP"] = df["NET_SALES"] - df["COST"]
     if metric == "Orders":
         result = df.groupby(group_col)["ORDER_ID"].nunique().reset_index()
@@ -608,8 +615,8 @@ def agg_by_metric(df, group_col, metric):
     return result.sort_values("VALUE", ascending=False).head(8)
 
 
-def _render_html_hbar(labels, values, metric, limit=15):
-    """Render PBI-style horizontal bars: label + value above, colored bar below."""
+def _render_html_hbar(labels, values, metric, limit=15, compare_map=None):
+    """Render PBI-style horizontal bars: label + value + comparison above, colored bar below."""
     if not labels or not values:
         st.info("No data.")
         return
@@ -618,15 +625,27 @@ def _render_html_hbar(labels, values, metric, limit=15):
     total = sum(values)
     max_val = max(values) if values else 1
     is_money = metric in ("$", "GP ($)", "GP ($) After VC")
+    if compare_map is None:
+        compare_map = {}
     html_rows = []
     for lbl, val in zip(labels, values):
         pct = (val / total * 100) if total else 0
         val_str = f"${val:,.0f}" if is_money else f"{int(val):,}"
+        chg_html = ""
+        if compare_map:
+            cmp_val = compare_map.get(lbl, 0)
+            if cmp_val > 0:
+                chg = (val - cmp_val) / cmp_val * 100
+                color = "#4CAF50" if chg >= 0 else "#f44336"
+                dot = f'<span style="color:{color}; font-size:10px;">&#9679;</span>'
+                chg_html = f'&nbsp;&nbsp;{dot} <span style="color:{color}; font-size:11px;">{chg:+.1f}%</span>'
+            else:
+                chg_html = '&nbsp;&nbsp;<span style="color:#4CAF50; font-size:10px;">&#9679;</span> <span style="color:#4CAF50; font-size:11px;">New</span>'
         bar_pct = (val / max_val * 100) if max_val else 0
         html_rows.append(
             f'<div style="margin-bottom:6px;">'
             f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-            f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span></div>'
+            f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span>{chg_html}</div>'
             f'<div style="background:#00d4aa; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
             f'</div>'
         )
@@ -640,26 +659,21 @@ def _render_html_hbar(labels, values, metric, limit=15):
 with chart_cols[1]:
     st.subheader(f"{metric_label} / Category")
     if not df_target.empty:
-        cat_sql = f"""
-            select p."Attribute Set" as CATEGORY,
-                   sum(f.ROW_TOTAL)::float as NET_SALES,
-                   sum(f.COST)::float as COST,
-                   count(distinct f.INCREMENT_ID) as ORDERS,
-                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED))::float as UNITS
-            from F_SALES f
-            join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
-            where f.CREATED_AT = '{target_date}'
-              and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
-            group by p."Attribute Set"
-            order by NET_SALES desc
-            limit 8
-        """
-        cat_df = run_query(cat_sql)
-        if not cat_df.empty:
-            cat_df["GP"] = cat_df["NET_SALES"] - cat_df["COST"]
-            val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
-            cat_df = cat_df.sort_values(val_col, ascending=False)
-            _render_html_hbar(cat_df["CATEGORY"].tolist(), cat_df[val_col].tolist(), metric_toggle)
+        cat_agg = agg_by_metric(df_target, "CATEGORY", metric_toggle).head(15)
+        if not cat_agg.empty:
+            cmp_map = {}
+            if not df_compare.empty:
+                cmp_agg = agg_by_metric(df_compare, "CATEGORY", metric_toggle)
+                if not cmp_agg.empty:
+                    cmp_map = dict(zip(
+                        cmp_agg["CATEGORY"].tolist(),
+                        cmp_agg["VALUE"].tolist(),
+                    ))
+            _render_html_hbar(
+                cat_agg["CATEGORY"].tolist(),
+                cat_agg["VALUE"].tolist(),
+                metric_toggle, compare_map=cmp_map,
+            )
     else:
         st.info("No data.")
 
@@ -669,7 +683,19 @@ with chart_cols[2]:
     if not df_target.empty:
         vendor_agg = agg_by_metric(df_target, "VENDOR", metric_toggle).head(15)
         if not vendor_agg.empty:
-            _render_html_hbar(vendor_agg["VENDOR"].tolist(), vendor_agg["VALUE"].tolist(), metric_toggle)
+            cmp_map = {}
+            if not df_compare.empty:
+                cmp_agg = agg_by_metric(df_compare, "VENDOR", metric_toggle)
+                if not cmp_agg.empty:
+                    cmp_map = dict(zip(
+                        cmp_agg["VENDOR"].tolist(),
+                        cmp_agg["VALUE"].tolist(),
+                    ))
+            _render_html_hbar(
+                vendor_agg["VENDOR"].tolist(),
+                vendor_agg["VALUE"].tolist(),
+                metric_toggle, compare_map=cmp_map,
+            )
     else:
         st.info("No data.")
 
@@ -677,91 +703,57 @@ with chart_cols[2]:
 with chart_cols[3]:
     st.subheader(f"{metric_label} / Manufacturer")
     if not df_target.empty:
-        mfr_sql = f"""
-            select p."Manufacturer" as MANUFACTURER,
-                   sum(f.ROW_TOTAL)::float as NET_SALES,
-                   sum(f.COST)::float as COST,
-                   count(distinct f.INCREMENT_ID) as ORDERS,
-                   sum(coalesce(f.PART_QTY_SOLD, f.QTY_ORDERED))::float as UNITS
-            from F_SALES f
-            join D_PRODUCT p on f.PRODUCT_ID = p."Product ID"
-            where f.CREATED_AT = '{target_date}'
-              and f.STATUS in ({", ".join(f"'{s}'" for s in statuses)})
-            group by p."Manufacturer"
-            order by NET_SALES desc
-            limit 15
-        """
-        mfr_df = run_query(mfr_sql)
-        if not mfr_df.empty:
-            mfr_df["GP"] = mfr_df["NET_SALES"] - mfr_df["COST"]
-            val_col = {"$": "NET_SALES", "GP ($)": "GP", "Orders": "ORDERS", "Units": "UNITS"}[metric_toggle]
-            mfr_df = mfr_df.sort_values(val_col, ascending=False)
-            _render_html_hbar(mfr_df["MANUFACTURER"].tolist(), mfr_df[val_col].tolist(), metric_toggle)
+        mfr_agg = agg_by_metric(df_target, "MANUFACTURER", metric_toggle).head(15)
+        if not mfr_agg.empty:
+            cmp_map = {}
+            if not df_compare.empty:
+                cmp_agg = agg_by_metric(df_compare, "MANUFACTURER", metric_toggle)
+                if not cmp_agg.empty:
+                    cmp_map = dict(zip(
+                        cmp_agg["MANUFACTURER"].tolist(),
+                        cmp_agg["VALUE"].tolist(),
+                    ))
+            _render_html_hbar(
+                mfr_agg["MANUFACTURER"].tolist(),
+                mfr_agg["VALUE"].tolist(),
+                metric_toggle, compare_map=cmp_map,
+            )
     else:
         st.info("No data.")
 
 st.divider()
 
 # --- Tables row ---
-table_cols = st.columns(2)
-
-with table_cols[0]:
-    st.subheader(f"Product Performance / {period}")
-    if not df_target.empty:
-        product_perf = (
-            df_target.groupby("SKU")
-            .agg(
-                NET_SALES=("NET_SALES", "sum"),
-                COST=("COST", "sum"),
-                ORDERS=("ORDER_ID", "nunique"),
-                UNITS=("UNITS", "sum"),
-                S_REVENUE=("FREIGHT_REVENUE", "sum"),
-            )
-            .reset_index()
+st.subheader(f"Product Performance / {period}")
+if not df_target.empty:
+    product_perf = (
+        df_target.groupby("SKU")
+        .agg(
+            NET_SALES=("NET_SALES", "sum"),
+            COST=("COST", "sum"),
+            ORDERS=("ORDER_ID", "nunique"),
+            UNITS=("UNITS", "sum"),
+            S_REVENUE=("FREIGHT_REVENUE", "sum"),
         )
-        product_perf["GP"] = product_perf["NET_SALES"] - product_perf["COST"]
-        product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
-        product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
-        product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(20)
-        display_cols = ["SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT", "S_REVENUE"]
-        st.dataframe(
-            product_perf[display_cols].style.format({
-                "NET_SALES": "${:,.2f}",
-                "GP": "${:,.2f}",
-                "MARGIN": "{:.2f}%",
-                "PRICE/UNIT": "${:,.2f}",
-                "S_REVENUE": "${:,.2f}",
-            }).hide(axis="index"),
-            use_container_width=True,
-        )
-    else:
-        st.info("No data.")
-
-with table_cols[1]:
-    st.subheader(f"Customer Overview / {period}")
-    if not df_target.empty:
-        customer_perf = (
-            df_target.groupby(["CUSTOMER_EMAIL", "CUSTOMER_NAME"])
-            .agg(
-                NET_SALES=("NET_SALES", "sum"),
-                COST=("COST", "sum"),
-                ORDERS=("ORDER_ID", "nunique"),
-                UNITS=("UNITS", "sum"),
-            )
-            .reset_index()
-        )
-        customer_perf["GP"] = customer_perf["NET_SALES"] - customer_perf["COST"]
-        customer_perf = customer_perf.sort_values("NET_SALES", ascending=False).head(20)
-        display_cols = ["CUSTOMER_EMAIL", "CUSTOMER_NAME", "NET_SALES", "GP", "ORDERS", "UNITS"]
-        st.dataframe(
-            customer_perf[display_cols].style.format({
-                "NET_SALES": "${:,.2f}",
-                "GP": "${:,.2f}",
-            }).hide(axis="index"),
-            use_container_width=True,
-        )
-    else:
-        st.info("No data.")
+        .reset_index()
+    )
+    product_perf["GP"] = product_perf["NET_SALES"] - product_perf["COST"]
+    product_perf["MARGIN"] = (product_perf["GP"] / product_perf["NET_SALES"] * 100).round(2)
+    product_perf["PRICE/UNIT"] = (product_perf["NET_SALES"] / product_perf["UNITS"]).round(2)
+    product_perf = product_perf.sort_values("NET_SALES", ascending=False).head(20)
+    display_cols = ["SKU", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN", "PRICE/UNIT", "S_REVENUE"]
+    st.dataframe(
+        product_perf[display_cols].style.format({
+            "NET_SALES": "${:,.2f}",
+            "GP": "${:,.2f}",
+            "MARGIN": "{:.2f}%",
+            "PRICE/UNIT": "${:,.2f}",
+            "S_REVENUE": "${:,.2f}",
+        }).hide(axis="index"),
+        use_container_width=True,
+    )
+else:
+    st.info("No data.")
 
 # --- Geographic / Customer Overview ---
 st.divider()
@@ -958,6 +950,15 @@ if store_names:
 
 # --- Footer ---
 st.divider()
+from datetime import datetime
+now = datetime.now()
 if not df_target.empty:
     last_order_time = df_target["TIMEDATE"].max() if "TIMEDATE" in df_target.columns else df_target["CREATED_AT"].max()
-    st.caption(f"Last Order: {last_order_time} | Data cached for 5 minutes")
+    row_count = len(df_target)
+    st.caption(
+        f"Last Update: {now:%m/%d/%y %H:%M:%S} | "
+        f"Last Order: {last_order_time} | {row_count:,} line items"
+        f" | Data cached 5 min"
+    )
+else:
+    st.caption(f"Last Update: {now:%m/%d/%y %H:%M:%S} | No data for selected filters")
