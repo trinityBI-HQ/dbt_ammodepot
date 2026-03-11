@@ -16,6 +16,24 @@
 | `dbt seed` | Load CSV seed files | `--select`, `--full-refresh` |
 | `dbt run --sample` | Time-based sample mode (v1.10+) | `--sample` |
 
+## Running dbt with uv
+
+When a project uses [uv](https://docs.astral.sh/uv/) as package manager, run from the directory containing `dbt_project.yml`:
+
+```bash
+uv run --env-file .env dbt <command>
+```
+
+- `uv run` — uses the project virtual environment (no manual activation)
+- `--env-file .env` — loads warehouse credentials (e.g., `DBT_SNOWFLAKE_*`)
+
+| Command | Purpose |
+|---------|---------|
+| `uv run --env-file .env dbt debug` | Test warehouse connection |
+| `uv run --env-file .env dbt build` | Run all models + tests |
+| `uv run --env-file .env dbt run --select model+` | Run model + downstream |
+| `uv run --env-file .env dbt run --select model --full-refresh` | Full rebuild (after incremental logic changes) |
+
 ## Materializations
 
 | Type | Use Case | Rebuild Behavior |
