@@ -742,28 +742,48 @@ def _render_clickable_hbar(labels, values, metric, limit=15, compare_map=None,
     labels_r = labels[::-1]
     values_r = [float(v) for v in values[::-1]]
 
-    colors = []
-    for lbl in labels_r:
-        if active_val == "All" or lbl == active_val:
-            colors.append("#00d4aa")
+    # Pre-compute % change per label for bar color assignment
+    chg_map = {}
+    for lbl, val in zip(labels_r, values_r):
+        if compare_map:
+            cmp_val = compare_map.get(lbl, 0)
+            chg_map[lbl] = (val - cmp_val) / cmp_val * 100 if cmp_val > 0 else None
         else:
-            colors.append("rgba(0,212,170,0.2)")
+            chg_map[lbl] = None
+
+    n = len(labels_r)
+    colors = []
+    for i, lbl in enumerate(labels_r):
+        chg = chg_map.get(lbl)
+        is_top = (i == n - 1)
+        if active_val != "All":
+            if lbl == active_val:
+                colors.append("#00c853" if (chg is not None and chg >= 0) else "#f44336" if chg is not None else "#00d4aa")
+            else:
+                colors.append("rgba(128,128,128,0.15)")
+        else:
+            if chg is None:
+                colors.append("#00d4aa" if is_top else "rgba(0,212,170,0.60)")
+            elif chg >= 0:
+                colors.append("#00c853" if is_top else "rgba(0,200,83,0.60)")
+            else:
+                colors.append("#f44336" if is_top else "rgba(244,67,54,0.60)")
 
     text_items = []
     for lbl, val in zip(labels_r, values_r):
         pct = (val / total * 100) if total else 0
         val_str = f"${val:,.0f}" if is_money else f"{int(val):,}"
+        lbl_display = lbl[:20] + "…" if len(lbl) > 20 else lbl
         chg_str = ""
         if compare_map:
             cmp_val = compare_map.get(lbl, 0)
             if cmp_val > 0:
                 chg = (val - cmp_val) / cmp_val * 100
                 arrow = "\u25b2" if chg >= 0 else "\u25bc"
-                clr = "#4CAF50" if chg >= 0 else "#f44336"
                 chg_str = f"  {arrow}{abs(chg):.0f}%"
             else:
                 chg_str = "  \u25cf New"
-        text_items.append(f"{lbl}  {val_str} ({pct:.0f}%){chg_str}")
+        text_items.append(f"{lbl_display}  {val_str} ({pct:.0f}%){chg_str}")
 
     fig = go.Figure(go.Bar(
         y=list(range(len(labels_r))),
@@ -771,9 +791,11 @@ def _render_clickable_hbar(labels, values, metric, limit=15, compare_map=None,
         orientation="h",
         marker_color=colors,
         text=text_items,
-        textposition="inside",
+        textposition="auto",
         insidetextanchor="start",
-        textfont=dict(size=11, color="#eee"),
+        textfont=dict(size=10, color="#eee"),
+        outsidetextfont=dict(size=10, color="#ccc"),
+        cliponaxis=False,
         hoverinfo="skip",
     ))
     fig.update_layout(
