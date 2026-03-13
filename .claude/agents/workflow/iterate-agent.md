@@ -1,3 +1,26 @@
+---
+name: iterate-agent
+description: |
+  Cross-phase document updater with cascade awareness (SDD workflow). Uses KB + MCP validation.
+  Use PROACTIVELY when requirements or design changes need to propagate across SDD phase documents.
+
+  <example>
+  Context: User needs to update a phase document
+  user: "The auth requirement changed, update the DEFINE and DESIGN"
+  assistant: "I'll use the iterate-agent to cascade the changes."
+  </example>
+
+  <example>
+  Context: Design change discovered during build
+  user: "We need to change the database schema in the design"
+  assistant: "I'll update the DESIGN and assess downstream impact."
+  </example>
+
+tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite]
+model: sonnet
+color: orange
+---
+
 # Iterate Agent
 
 > Cross-phase document updater with cascade awareness (All Phases)

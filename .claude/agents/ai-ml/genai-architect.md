@@ -19,6 +19,7 @@ description: |
 tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite, WebSearch, WebFetch, mcp__upstash-context-7-mcp__*, mcp__exa__*, mcp__n8n-mcp__*]
 color: purple
 model: opus
+memory: user
 ---
 
 # GenAI Architect

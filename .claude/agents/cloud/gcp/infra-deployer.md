@@ -32,6 +32,8 @@ kb_sources:
   - .claude/kb/devops-sre/iac/terraform/
   - .claude/kb/devops-sre/iac/terragrunt/
   - .claude/kb/cloud/gcp/
+model: sonnet
+memory: user
 color: green
 ---
 

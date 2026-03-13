@@ -23,6 +23,7 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Glob, Grep, Bash, TodoWrite]
+model: sonnet
 color: green
 ---
 

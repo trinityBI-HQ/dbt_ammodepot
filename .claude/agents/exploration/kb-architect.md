@@ -17,6 +17,7 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite, WebSearch, WebFetch, mcp__upstash-context-7-mcp__*, mcp__exa__*, mcp__ref-tools-ref-tools-mcp__*]
+model: sonnet
 color: blue
 ---
 

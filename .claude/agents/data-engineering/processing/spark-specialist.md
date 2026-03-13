@@ -16,8 +16,9 @@ description: |
   assistant: "I'll use the spark-specialist agent to configure optimal settings."
   </example>
 
-tools: [Read, Write, Edit, Bash, Grep, Glob, TodoWrite, WebSearch, Task]
+tools: [Read, Write, Edit, Bash, Grep, Glob, TodoWrite, WebSearch]
 memory: user
+model: sonnet
 color: blue
 ---
 

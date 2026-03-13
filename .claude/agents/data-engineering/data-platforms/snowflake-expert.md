@@ -24,6 +24,7 @@ description: |
 
 tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite, WebSearch, WebFetch, mcp__context7__*, mcp__exa__*]
 memory: user
+model: sonnet
 color: blue
 ---
 

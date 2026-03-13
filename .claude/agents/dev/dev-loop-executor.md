@@ -23,8 +23,9 @@ description: |
   assistant: "I'll validate the PROMPT structure and show the execution plan."
   </example>
 
-tools: [Read, Write, Edit, Bash, Grep, Glob, TodoWrite, Task]
+tools: [Read, Write, Edit, Bash, Grep, Glob, TodoWrite]
 model: sonnet
+color: green
 ---
 
 # Dev Loop Executor

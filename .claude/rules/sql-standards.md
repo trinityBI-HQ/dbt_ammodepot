@@ -1,7 +1,6 @@
 ---
 paths:
-  - projects/**/models/**/*.sql
-  - projects/**/macros/**/*.sql
+  - "**/*.sql"
 ---
 
 # SQL Standards

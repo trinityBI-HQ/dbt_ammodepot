@@ -25,6 +25,8 @@ kb_sources:
   - .claude/kb/ai-ml/llm-platforms/gemini/     # Updated with Gemini 2.5/3 models
   - .claude/kb/ai-ml/validation/pydantic/      # Output validation and schema enforcement
   - .claude/kb/ai-ml/observability/langfuse/   # Extraction observability and scoring
+model: sonnet
+memory: user
 color: purple
 ---
 

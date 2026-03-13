@@ -26,6 +26,7 @@ kb_sources:
   - .claude/kb/ai-ml/observability/langfuse/    # AI observability and cost tracking
   - .claude/kb/cloud/gcp/                       # Cloud Run, Pub/Sub, log export
   - .claude/kb/devops-sre/monitoring/grafana/   # Metrics dashboards and alerting
+model: sonnet
 color: orange
 ---
 

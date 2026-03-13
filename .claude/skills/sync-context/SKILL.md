@@ -1,6 +1,7 @@
 ---
 name: sync-context
 description: Sync project context to CLAUDE.md by analyzing codebase patterns and conventions
+argument-hint: "[--section <name>]"
 ---
 
 # Sync Context Command

@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query, _is_sis
+from utils.chart_theme import apply_theme, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -586,21 +587,12 @@ with chart_cols[0]:
             avg_text = f"Average  **{target_avg:,.0f}**"
             if lm_avg is not None:
                 avg_text += f"  &nbsp;·&nbsp;  Average LM  **{lm_avg:,.2f}**"
-            fig.update_layout(
-                height=300, margin=dict(l=0, r=0, t=30, b=0),
-                showlegend=True,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom", y=1.02,
-                    xanchor="left", x=0,
-                    font=dict(size=11),
-                ),
-                xaxis=dict(
-                    categoryorder="array",
-                    categoryarray=[_hour_label(h) for h in range(24)],
-                ),
+            apply_theme(fig)
+            fig.update_xaxes(
+                categoryorder="array",
+                categoryarray=[_hour_label(h) for h in range(24)],
+                title="Hour",
             )
-            fig.update_xaxes(title="Hour")
             fig.update_yaxes(title="")
             st.caption(avg_text)
             st.plotly_chart(fig, use_container_width=True)
@@ -640,10 +632,13 @@ with chart_cols[0]:
                 text=[f"{m:.0f}%" for m in daily["MARGIN"].tolist()],
                 textposition="top center", line=dict(color="#4CAF50"),
             ))
+            apply_theme(fig, margin=dict(l=0, r=40, t=10, b=0))
             fig.update_layout(
-                height=300, margin=dict(l=0, r=40, t=10, b=0),
-                yaxis2=dict(title="Margin %", overlaying="y", side="right", range=[0, 100]),
-                showlegend=True, legend=dict(orientation="h"),
+                yaxis2=dict(
+                    title="Margin %", overlaying="y", side="right",
+                    range=[0, 100], color=TEXT_SECONDARY,
+                    tickfont=dict(color=TEXT_SECONDARY),
+                ),
             )
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
@@ -681,7 +676,7 @@ with chart_cols[0]:
                 colorscale="Greens",
                 hoverongaps=False,
             ))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0))
+            apply_theme(fig, show_legend=False, margin=dict(l=0, r=0, t=10, b=0))
             fig.update_xaxes(title="Hour", dtick=2)
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
@@ -798,13 +793,16 @@ def _render_clickable_hbar(labels, values, metric, limit=15, compare_map=None,
         cliponaxis=False,
         hoverinfo="skip",
     ))
-    fig.update_layout(
+    apply_theme(
+        fig,
         height=max(len(labels_r) * 32, 100),
+        transparent=True,
+        show_legend=False,
         margin=dict(l=0, r=0, t=0, b=0),
+    )
+    fig.update_layout(
         yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
         bargap=0.25,
     )
 
@@ -1334,15 +1332,16 @@ with geo_right:
                     text=hover_texts,
                     hoverinfo="text",
                 ))
+                apply_theme(
+                    fig, height=350, show_legend=False,
+                    margin=dict(l=0, r=0, t=0, b=0),
+                )
                 fig.update_layout(
                     mapbox=dict(
                         style="carto-darkmatter",
                         center=dict(lat=38, lon=-97),
                         zoom=3,
                     ),
-                    height=350,
-                    margin=dict(l=0, r=0, t=0, b=0),
-                    showlegend=False,
                 )
                 st.plotly_chart(fig, use_container_width=True)
         else:

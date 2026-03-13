@@ -33,4 +33,4 @@ Each technology folder must contain:
 - Include practical, copy-paste ready examples in every pattern file
 
 ## Master Index
-`.claude/kb/README.md` provides navigation, decision frameworks, and cross-references across all 42 technologies.
+`.claude/kb/README.md` provides navigation, decision frameworks, and cross-references across all 45 technologies.

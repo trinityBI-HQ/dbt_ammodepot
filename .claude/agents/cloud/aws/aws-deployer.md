@@ -25,6 +25,7 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Bash, TodoWrite, mcp__upstash-context-7-mcp__*, mcp__exa__*]
+model: sonnet
 color: green
 ---
 

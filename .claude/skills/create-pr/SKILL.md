@@ -1,6 +1,7 @@
 ---
 name: create-pr
 description: Automate professional pull request creation with conventional commits and structured descriptions
+argument-hint: "[<title>] [--draft]"
 ---
 
 # Create PR Command

@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query, _is_sis
+from utils.chart_theme import apply_theme, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -705,13 +706,16 @@ def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None,
         cliponaxis=False,
         hoverinfo="skip",
     ))
-    fig.update_layout(
+    apply_theme(
+        fig,
         height=max(len(labels_r) * 32, 100),
+        transparent=True,
+        show_legend=False,
         margin=dict(l=0, r=0, t=0, b=0),
+    )
+    fig.update_layout(
         yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
         xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
         bargap=0.25,
     )
 
@@ -789,13 +793,12 @@ with chart_cols[0]:
                         y=hourly_compare["VALUE"].tolist(),
                         name="YESTERDAY", line=dict(color="gray", dash="dash"),
                     ))
-                fig.update_layout(
-                    height=300, margin=dict(l=0, r=0, t=30, b=0),
-                    showlegend=True,
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=11)),
-                    xaxis=dict(categoryorder="array", categoryarray=[_hour_label(h) for h in range(24)]),
+                apply_theme(fig)
+                fig.update_xaxes(
+                    categoryorder="array",
+                    categoryarray=[_hour_label(h) for h in range(24)],
+                    title="Hour",
                 )
-                fig.update_xaxes(title="Hour")
                 fig.update_yaxes(title="")
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -832,13 +835,12 @@ with chart_cols[0]:
                         y=[round(float(v), 2) for v in hourly_compare["VALUE"].tolist()],
                         name=f"AVG {compare_label}", line=dict(color="gray", dash="dash"),
                     ))
-                fig.update_layout(
-                    height=300, margin=dict(l=0, r=0, t=30, b=0),
-                    showlegend=True,
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0, font=dict(size=11)),
-                    xaxis=dict(categoryorder="array", categoryarray=[_hour_label(h) for h in range(24)]),
+                apply_theme(fig)
+                fig.update_xaxes(
+                    categoryorder="array",
+                    categoryarray=[_hour_label(h) for h in range(24)],
+                    title="",
                 )
-                fig.update_xaxes(title="")
                 fig.update_yaxes(title="")
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -918,13 +920,14 @@ with chart_cols[0]:
             y1_max = max_val * 1.35
             margin_max = vis_margin.max() if not vis_margin.empty else 100
             y2_range_max = margin_max * 1.6 if margin_max > 0 else 100
+            apply_theme(fig, height=400, margin=dict(l=0, r=40, t=30, b=0))
             fig.update_layout(
-                height=400, margin=dict(l=0, r=40, t=30, b=0),
                 yaxis=dict(title="", range=[0, y1_max]),
-                yaxis2=dict(title="", overlaying="y", side="right",
-                            range=[0, y2_range_max], ticksuffix="%", showgrid=False),
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                yaxis2=dict(
+                    title="", overlaying="y", side="right",
+                    range=[0, y2_range_max], ticksuffix="%", showgrid=False,
+                    color=TEXT_SECONDARY, tickfont=dict(color=TEXT_SECONDARY),
+                ),
                 xaxis=dict(
                     title="", tickmode="array", tickvals=x_pos, ticktext=tick_labels,
                     range=[-0.5, visible_end + 0.5],
@@ -960,7 +963,7 @@ with chart_cols[0]:
                 colorscale="Greens",
                 hoverongaps=False,
             ))
-            fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0))
+            apply_theme(fig, show_legend=False, margin=dict(l=0, r=0, t=10, b=0))
             fig.update_xaxes(title="Hour", dtick=2)
             fig.update_yaxes(title="")
             st.plotly_chart(fig, use_container_width=True)
@@ -1477,15 +1480,16 @@ with geo_right:
                     text=hover_texts,
                     hoverinfo="text",
                 ))
+                apply_theme(
+                    fig, height=350, show_legend=False,
+                    margin=dict(l=0, r=0, t=0, b=0),
+                )
                 fig.update_layout(
                     mapbox=dict(
                         style="carto-darkmatter",
                         center=dict(lat=38, lon=-97),
                         zoom=3,
                     ),
-                    height=350,
-                    margin=dict(l=0, r=0, t=0, b=0),
-                    showlegend=False,
                 )
                 st.plotly_chart(fig, use_container_width=True)
         else:

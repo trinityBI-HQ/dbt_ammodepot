@@ -25,6 +25,7 @@ kb_sources:
   - .claude/kb/cloud/gcp/
   - .claude/kb/ai-ml/llm-platforms/gemini/
   - .claude/kb/ai-ml/observability/langfuse/
+model: sonnet
 color: blue
 ---
 
