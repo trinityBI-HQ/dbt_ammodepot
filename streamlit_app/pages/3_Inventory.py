@@ -24,6 +24,8 @@ st.markdown(
     "<style>"
     "   .block-container {padding-left: 1rem; padding-right: 1rem; max-width: 100%;}"
     "   .stMainBlockContainer {max-width: 100%;}"
+    "   [data-testid='stDataFrame'] {background: #1E1E1E; border-radius: 8px; padding: 4px;}"
+    "   [data-testid='stDataFrame'] [data-testid='glideDataEditor'] {border-radius: 6px;}"
     "</style>",
     unsafe_allow_html=True,
 )
