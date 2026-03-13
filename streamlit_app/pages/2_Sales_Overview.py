@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query, _is_sis
-from utils.chart_theme import apply_theme, ACCENT, secondary_axis_style
+from utils.chart_theme import apply_theme, ACCENT, secondary_axis_style, dark_dataframe
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -1285,11 +1285,10 @@ with geo_left:
             }])
             geo_display = pd.concat([geo_agg, totals], ignore_index=True)
             cols = ["STATE", "NET_SALES", "GP", "ORDERS", "UNITS", "MARGIN"]
-            st.dataframe(
-                geo_display[cols].style.format({
-                    "NET_SALES": "${:,.0f}", "GP": "${:,.0f}", "MARGIN": "{:.2f}%",
-                }).hide(axis="index"),
-                use_container_width=True, height=250,
+            dark_dataframe(
+                geo_display[cols],
+                fmt={"NET_SALES": "${:,.0f}", "GP": "${:,.0f}", "MARGIN": "{:.2f}%"},
+                height=250,
             )
         else:  # Customer
             st.caption(f"Customer Overview / {period_label}")

@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
-from utils.chart_theme import apply_theme, secondary_axis_style
+from utils.chart_theme import apply_theme, secondary_axis_style, dark_dataframe
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -456,19 +456,16 @@ with tab_inv:
                 "DoS", "Daily Average Units Sold",
                 "Cost on Hand", "Net Sales ($)", "% Margin",
             ]
-            st.dataframe(
-                table_df.style.format({
-                    "Qty on Hand": "{:,.0f}",
-                    "Total % on Hand": "{:.2f}%",
-                    "Units Sold in Period": "{:,.0f}",
-                    "DoS": "{:,.0f}",
-                    "Daily Average Units Sold": "{:,.0f}",
-                    "Cost on Hand": "${:,.0f}",
-                    "Net Sales ($)": "${:,.0f}",
-                    "% Margin": "{:.2f}%",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
+            dark_dataframe(table_df, fmt={
+                "Qty on Hand": "{:,.0f}",
+                "Total % on Hand": "{:.2f}%",
+                "Units Sold in Period": "{:,.0f}",
+                "DoS": "{:,.0f}",
+                "Daily Average Units Sold": "{:,.0f}",
+                "Cost on Hand": "${:,.0f}",
+                "Net Sales ($)": "${:,.0f}",
+                "% Margin": "{:.2f}%",
+            })
 
         elif anal_view == "LOW STOCK":
             st.subheader("Lowstock")
@@ -487,17 +484,14 @@ with tab_inv:
                 "Units Sold", "Days of Stock",
                 "Daily Average Units Sold", "Net Sales ($)",
             ]
-            st.dataframe(
-                table_df.style.format({
-                    "Qty On Hand": "{:,.0f}",
-                    "Total %": "{:.2f}%",
-                    "Units Sold": "{:,.0f}",
-                    "Days of Stock": "{:,.0f}",
-                    "Daily Average Units Sold": "{:,.0f}",
-                    "Net Sales ($)": "${:,.0f}",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
+            dark_dataframe(table_df, fmt={
+                "Qty On Hand": "{:,.0f}",
+                "Total %": "{:.2f}%",
+                "Units Sold": "{:,.0f}",
+                "Days of Stock": "{:,.0f}",
+                "Daily Average Units Sold": "{:,.0f}",
+                "Net Sales ($)": "${:,.0f}",
+            })
 
         else:  # OVERSTOCK
             st.subheader("Overstock")
@@ -518,20 +512,17 @@ with tab_inv:
                 "Net Sales ($)", "DOS + On Order",
                 "Qty On Order", "Cost on Hand",
             ]
-            st.dataframe(
-                table_df.style.format({
-                    "Qty On Hand": "{:,.0f}",
-                    "Total%": "{:.2f}%",
-                    "Units Sold": "{:,.0f}",
-                    "DoS": "{:,.0f}",
-                    "Daily Average Units Sold": "{:,.0f}",
-                    "Net Sales ($)": "${:,.0f}",
-                    "DOS + On Order": "{:,.0f}",
-                    "Qty On Order": "{:,.0f}",
-                    "Cost on Hand": "${:,.0f}",
-                }).hide(axis="index"),
-                use_container_width=True,
-            )
+            dark_dataframe(table_df, fmt={
+                "Qty On Hand": "{:,.0f}",
+                "Total%": "{:.2f}%",
+                "Units Sold": "{:,.0f}",
+                "DoS": "{:,.0f}",
+                "Daily Average Units Sold": "{:,.0f}",
+                "Net Sales ($)": "${:,.0f}",
+                "DOS + On Order": "{:,.0f}",
+                "Qty On Order": "{:,.0f}",
+                "Cost on Hand": "${:,.0f}",
+            })
     else:
         st.info("No inventory data.")
 
@@ -806,19 +797,15 @@ with tab_vendor:
                 ]
                 # POID should display as integer (no decimals, no commas)
                 display_po["POID"] = display_po["POID"].astype(int)
-                st.dataframe(
-                    display_po.style.format({
-                        "POID": "{:d}",
-                        "FILLED": "{:,.0f}",
-                        "TOTAL": "{:,.0f}",
-                        "%": "{:.2f}%",
-                        "LT": "{:,.0f}",
-                        "LT Expected": "{:,.0f}",
-                        "Delivers": "{:,.0f}",
-                    }).hide(axis="index"),
-                    use_container_width=True,
-                    height=400,
-                )
+                dark_dataframe(display_po, fmt={
+                    "POID": "{:d}",
+                    "FILLED": "{:,.0f}",
+                    "TOTAL": "{:,.0f}",
+                    "%": "{:.2f}%",
+                    "LT": "{:,.0f}",
+                    "LT Expected": "{:,.0f}",
+                    "Delivers": "{:,.0f}",
+                }, height=400)
             else:
                 st.info("No PO data for the selected period.")
 
@@ -870,47 +857,22 @@ with tab_vendor:
             with table_cols[0]:
                 st.subheader("VENDOR")
                 vt = _build_breakdown(received_df, "VENDOR_NAME", "VENDOR")
-                st.dataframe(
-                    vt.style.format({
-                        "QTY": "{:,.0f}",
-                        "Avg. Cost": "${:,.2f}",
-                        "Delivers": "{:,.0f}",
-                        "LT": "{:,.0f}",
-                        "W. Avg. Cost": "${:,.2f}",
-                        "Total Cost": "${:,.0f}",
-                    }).hide(axis="index"),
-                    use_container_width=True,
-                )
+                _bd_fmt = {
+                    "QTY": "{:,.0f}", "Avg. Cost": "${:,.2f}",
+                    "Delivers": "{:,.0f}", "LT": "{:,.0f}",
+                    "W. Avg. Cost": "${:,.2f}", "Total Cost": "${:,.0f}",
+                }
+                dark_dataframe(vt, fmt=_bd_fmt)
 
             with table_cols[1]:
                 st.subheader("CALIBER")
                 ct = _build_breakdown(received_df, "CALIBER", "CALIBER")
-                st.dataframe(
-                    ct.style.format({
-                        "QTY": "{:,.0f}",
-                        "Avg. Cost": "${:,.2f}",
-                        "Delivers": "{:,.0f}",
-                        "LT": "{:,.0f}",
-                        "W. Avg. Cost": "${:,.2f}",
-                        "Total Cost": "${:,.0f}",
-                    }).hide(axis="index"),
-                    use_container_width=True,
-                )
+                dark_dataframe(ct, fmt=_bd_fmt)
 
             with table_cols[2]:
                 st.subheader("PART SKU")
                 pt = _build_breakdown(received_df, "SKU", "PART SKU")
-                st.dataframe(
-                    pt.style.format({
-                        "QTY": "{:,.0f}",
-                        "Avg. Cost": "${:,.2f}",
-                        "Delivers": "{:,.0f}",
-                        "LT": "{:,.0f}",
-                        "W. Avg. Cost": "${:,.2f}",
-                        "Total Cost": "${:,.0f}",
-                    }).hide(axis="index"),
-                    use_container_width=True,
-                )
+                dark_dataframe(pt, fmt=_bd_fmt)
         else:
             st.info("No receipt data for the selected period.")
     else:
@@ -1078,18 +1040,14 @@ with tab_open_po:
                         "L. Deliver", "QTY", "FILLED", "TOTAL",
                         "LT EXPECTED", "%",
                     ]
-                    st.dataframe(
-                        disp_po.style.format({
-                            "POID": "{:d}",
-                            "QTY": "{:,.0f}",
-                            "FILLED": "{:,.0f}",
-                            "TOTAL": "{:,.0f}",
-                            "LT EXPECTED": "{:,.0f}",
-                            "%": "{:.2f}%",
-                        }).hide(axis="index"),
-                        use_container_width=True,
-                        height=300,
-                    )
+                    dark_dataframe(disp_po, fmt={
+                        "POID": "{:d}",
+                        "QTY": "{:,.0f}",
+                        "FILLED": "{:,.0f}",
+                        "TOTAL": "{:,.0f}",
+                        "LT EXPECTED": "{:,.0f}",
+                        "%": "{:.2f}%",
+                    }, height=300)
                 else:
                     st.info("No POs match the current filters.")
 
@@ -1284,46 +1242,24 @@ with tab_open_po:
                     vt = _build_open_breakdown(
                         filtered_df, "VENDOR_NAME", "VENDOR",
                     )
-                    st.dataframe(
-                        vt.style.format({
-                            "QTY": "{:,.0f}",
-                            "Avg. Cost": "${:,.2f}",
-                            "LT EXPECTED": "{:,.0f}",
-                            "W. Avg. Cost": "${:,.2f}",
-                            "Total Cost": "${:,.0f}",
-                        }).hide(axis="index"),
-                        use_container_width=True,
-                    )
+                    _op_fmt = {
+                        "QTY": "{:,.0f}", "Avg. Cost": "${:,.2f}",
+                        "LT EXPECTED": "{:,.0f}",
+                        "W. Avg. Cost": "${:,.2f}", "Total Cost": "${:,.0f}",
+                    }
+                    dark_dataframe(vt, fmt=_op_fmt)
                 with tbl_cols[1]:
                     st.subheader("CALIBER")
                     ct = _build_open_breakdown(
                         filtered_df, "CALIBER", "CALIBER",
                     )
-                    st.dataframe(
-                        ct.style.format({
-                            "QTY": "{:,.0f}",
-                            "Avg. Cost": "${:,.2f}",
-                            "LT EXPECTED": "{:,.0f}",
-                            "W. Avg. Cost": "${:,.2f}",
-                            "Total Cost": "${:,.0f}",
-                        }).hide(axis="index"),
-                        use_container_width=True,
-                    )
+                    dark_dataframe(ct, fmt=_op_fmt)
                 with tbl_cols[2]:
                     st.subheader("PART SKU")
                     pt = _build_open_breakdown(
                         filtered_df, "SKU", "PART SKU",
                     )
-                    st.dataframe(
-                        pt.style.format({
-                            "QTY": "{:,.0f}",
-                            "Avg. Cost": "${:,.2f}",
-                            "LT EXPECTED": "{:,.0f}",
-                            "W. Avg. Cost": "${:,.2f}",
-                            "Total Cost": "${:,.0f}",
-                        }).hide(axis="index"),
-                        use_container_width=True,
-                    )
+                    dark_dataframe(pt, fmt=_op_fmt)
             else:
                 st.info("No open PO data for the selected filters.")
         else:

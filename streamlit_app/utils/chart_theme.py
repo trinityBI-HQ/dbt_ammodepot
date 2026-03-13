@@ -83,3 +83,45 @@ def apply_theme(
 def secondary_axis_style() -> dict:
     """Return color + tickfont for a secondary y-axis (yaxis2)."""
     return dict(color=TEXT_SECONDARY, tickfont=dict(color=TEXT_SECONDARY))
+
+
+def dark_dataframe(df, fmt=None, height=None, hide_index=True):
+    """Render a DataFrame as a dark-themed HTML table via st.markdown.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    fmt : dict mapping column name → Python format string (e.g. "${:,.0f}")
+    height : optional max height in px (adds scrollbar)
+    hide_index : hide the DataFrame index (default True)
+    """
+    import streamlit as st
+
+    if df.empty:
+        st.info("No data.")
+        return
+
+    styled = df.copy()
+    if fmt:
+        for col, f in fmt.items():
+            if col in styled.columns:
+                styled[col] = styled[col].apply(
+                    lambda v, _f=f: _f.format(v) if v is not None and v == v else ""
+                )
+
+    # Build HTML table
+    hdr = "".join(f"<th>{c}</th>" for c in styled.columns)
+    rows = []
+    for _, row in styled.iterrows():
+        cells = "".join(f"<td>{v}</td>" for v in row)
+        rows.append(f"<tr>{cells}</tr>")
+
+    scroll = f"max-height:{height}px; overflow-y:auto;" if height else ""
+    html = (
+        f'<div style="background:{BG_CHART}; border-radius:8px; padding:8px; {scroll}">'
+        '<table style="width:100%; border-collapse:collapse; font-size:13px;">'
+        f'<thead><tr style="border-bottom:1px solid #333; color:{TEXT_SECONDARY};">{hdr}</tr></thead>'
+        f'<tbody style="color:{TEXT_PRIMARY};">{"".join(rows)}</tbody>'
+        '</table></div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
