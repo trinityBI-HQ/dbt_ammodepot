@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
-from utils.chart_theme import apply_theme, TEXT_SECONDARY
+from utils.chart_theme import apply_theme, secondary_axis_style
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -327,7 +327,7 @@ with tab_inv:
     inv_col = INV_COL_MAP[(inv_unit, inv_stock)]
     is_cost = inv_unit == "COST"
 
-    # Helper: PBI-style horizontal bar chart
+    # Helper: PBI-style horizontal bar chart (theme-adaptive via CSS vars)
     def _render_inv_hbar(labels, values, is_cost_fmt):
         """Render PBI-style horizontal bars with blue color for inventory."""
         if not labels or not values:
@@ -342,8 +342,9 @@ with tab_inv:
             bar_pct = (val / max_val * 100) if max_val else 0
             html_rows.append(
                 f'<div style="margin-bottom:6px;">'
-                f'<div style="font-size:12px; color:#ccc; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-                f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span></div>'
+                f'<div style="font-size:12px; color:var(--text-color, inherit); margin-bottom:2px;'
+                f' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+                f'{lbl}&nbsp;&nbsp;<span style="opacity:0.65;">{val_str} ({pct:.0f}%)</span></div>'
                 f'<div style="background:#5B9BD5; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
                 f'</div>'
             )
@@ -740,7 +741,7 @@ with tab_vendor:
                     yaxis2=dict(
                         title="", side="right",
                         overlaying="y", showgrid=False,
-                        color=TEXT_SECONDARY, tickfont=dict(color=TEXT_SECONDARY),
+                        **secondary_axis_style(),
                     ),
                     xaxis=dict(
                         tickmode="array",
