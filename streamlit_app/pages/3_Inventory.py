@@ -327,9 +327,9 @@ with tab_inv:
     inv_col = INV_COL_MAP[(inv_unit, inv_stock)]
     is_cost = inv_unit == "COST"
 
-    # Helper: PBI-style horizontal bar chart (theme-adaptive via CSS vars)
+    # Helper: PBI-style horizontal bar chart (dark background matching KPI cards)
     def _render_inv_hbar(labels, values, is_cost_fmt):
-        """Render PBI-style horizontal bars with blue color for inventory."""
+        """Render PBI-style horizontal bars with dark background."""
         if not labels or not values:
             st.info("No data.")
             return
@@ -342,14 +342,15 @@ with tab_inv:
             bar_pct = (val / max_val * 100) if max_val else 0
             html_rows.append(
                 f'<div style="margin-bottom:6px;">'
-                f'<div style="font-size:12px; color:var(--text-color, inherit); margin-bottom:2px;'
+                f'<div style="font-size:12px; color:#ccc; margin-bottom:2px;'
                 f' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
-                f'{lbl}&nbsp;&nbsp;<span style="opacity:0.65;">{val_str} ({pct:.0f}%)</span></div>'
+                f'{lbl}&nbsp;&nbsp;<span style="color:#aaa;">{val_str} ({pct:.0f}%)</span></div>'
                 f'<div style="background:#5B9BD5; height:16px; width:{bar_pct:.1f}%; border-radius:2px;"></div>'
                 f'</div>'
             )
         st.markdown(
-            f'<div style="padding:4px 0;">{"".join(html_rows)}</div>',
+            f'<div style="background:#1E1E1E; border-radius:8px; padding:12px 16px;">'
+            f'{"".join(html_rows)}</div>',
             unsafe_allow_html=True,
         )
 

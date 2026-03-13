@@ -1,7 +1,7 @@
-"""Shared Plotly theme for all Streamlit dashboard charts.
+"""Shared Plotly dark theme for all Streamlit dashboard charts.
 
-Adapts to Streamlit's active theme (dark locally, light on SiS).
-All chart backgrounds are transparent so they inherit the page background.
+Forces dark backgrounds on all charts to match KPI cards and tables,
+consistent across both local dev and SiS (light page theme).
 
 Usage:
     from utils.chart_theme import apply_theme
@@ -10,54 +10,37 @@ Usage:
     apply_theme(fig, height=400)         # override height
 """
 
-import streamlit as st
 import plotly.graph_objects as go
 
-
-def _is_dark() -> bool:
-    """Detect whether Streamlit is using a dark theme."""
-    try:
-        base = st.get_option("theme.base")
-        if base:
-            return base == "dark"
-    except Exception:
-        pass
-    # Default: dark for local dev, but SiS typically is light
-    from utils.db import _is_sis
-    return not _is_sis
-
-
-# -- Palette (resolved at call time) --
+# -- Dark palette (always dark, matches KPI cards) --
 ACCENT = "#00d4aa"
 ACCENT_DIM = "rgba(0, 212, 170, 0.20)"
 INVENTORY_BLUE = "#5B9BD5"
 
+BG_CHART = "#1E1E1E"
+BG_HOVER = "#1e1e1e"
+TEXT_PRIMARY = "#e0e0e0"
+TEXT_SECONDARY = "#999999"
+GRID_COLOR = "rgba(255, 255, 255, 0.08)"
 
-def _palette():
-    """Return theme-adaptive colors."""
-    dark = _is_dark()
-    return dict(
-        text_primary="#e0e0e0" if dark else "#1a1a2e",
-        text_secondary="#999999" if dark else "#555555",
-        grid_color="rgba(255,255,255,0.08)" if dark else "rgba(0,0,0,0.08)",
-        hover_bg="#1e1e1e" if dark else "#ffffff",
-        hover_border=ACCENT,
-    )
+# -- Reusable legend defaults --
+_LEGEND = dict(
+    orientation="h",
+    yanchor="bottom",
+    y=1.02,
+    xanchor="left",
+    x=0,
+    font=dict(size=11, color=TEXT_PRIMARY),
+)
 
-
-# -- Reusable legend builder --
-def _legend(pal, overrides=None):
-    d = dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.02,
-        xanchor="left",
-        x=0,
-        font=dict(size=11, color=pal["text_primary"]),
-    )
-    if overrides:
-        d.update(overrides)
-    return d
+# -- Shared axis defaults --
+_AXIS = dict(
+    color=TEXT_SECONDARY,
+    gridcolor=GRID_COLOR,
+    zerolinecolor=GRID_COLOR,
+    title_font=dict(color=TEXT_SECONDARY, size=12),
+    tickfont=dict(color=TEXT_SECONDARY, size=10),
+)
 
 
 def apply_theme(
@@ -68,35 +51,30 @@ def apply_theme(
     margin: dict | None = None,
     legend_overrides: dict | None = None,
 ) -> go.Figure:
-    """Apply the unified theme to a Plotly figure.
+    """Apply the unified dark theme to a Plotly figure.
 
-    Backgrounds are always transparent so charts inherit the Streamlit
-    page theme (dark or light). Text and grid colors adapt automatically.
+    All charts get a dark background (#1E1E1E) matching the KPI cards,
+    with light text and subtle grid lines.
     """
-    pal = _palette()
-    axis = dict(
-        color=pal["text_secondary"],
-        gridcolor=pal["grid_color"],
-        zerolinecolor=pal["grid_color"],
-        title_font=dict(color=pal["text_secondary"], size=12),
-        tickfont=dict(color=pal["text_secondary"], size=10),
-    )
+    legend = {**_LEGEND}
+    if legend_overrides:
+        legend.update(legend_overrides)
 
     fig.update_layout(
         height=height,
         margin=margin or dict(l=0, r=0, t=30, b=0),
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=pal["text_primary"], size=12),
+        plot_bgcolor=BG_CHART,
+        paper_bgcolor=BG_CHART,
+        font=dict(color=TEXT_PRIMARY, size=12),
         showlegend=show_legend,
-        legend=_legend(pal, legend_overrides),
-        xaxis=axis,
-        yaxis=axis,
+        legend=legend,
+        xaxis=_AXIS,
+        yaxis=_AXIS,
         hoverlabel=dict(
-            bgcolor=pal["hover_bg"],
+            bgcolor=BG_HOVER,
             font_size=12,
-            font_color=pal["text_primary"],
-            bordercolor=pal["hover_border"],
+            font_color=TEXT_PRIMARY,
+            bordercolor=ACCENT,
         ),
     )
     return fig
@@ -104,5 +82,4 @@ def apply_theme(
 
 def secondary_axis_style() -> dict:
     """Return color + tickfont for a secondary y-axis (yaxis2)."""
-    pal = _palette()
-    return dict(color=pal["text_secondary"], tickfont=dict(color=pal["text_secondary"]))
+    return dict(color=TEXT_SECONDARY, tickfont=dict(color=TEXT_SECONDARY))
