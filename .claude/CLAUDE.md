@@ -13,14 +13,13 @@ Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
 - **Snowflake** (`ammodepot/`): Operational — 99 models, all passing (3 new Gold models, 1 new intermediate)
 - **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys, Power BI access)
 - **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 6 Airbyte connections)
-- **Power BI migration**: `docs/POWERBI_MIGRATION_PLAN.md` (3-phase plan: source swap → consolidate → retire)
 - **Adapters**: dbt-redshift 1.10.1 (Redshift) + dbt-snowflake 1.11.2 (Snowflake)
 
 ### Snowflake Database Architecture
 
 ```
 AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
-├── AD_FISHBOWL (35 streams)       ├── SILVER (71 views + 7 tables)
+├── AD_FISHBOWL (34 streams)       ├── SILVER (71 views + 7 tables)
 ├── AD_MAGENTO (29 streams)         └── GOLD (13 tables + 8 views)
 └── airbyte_internal                     ↑ Power BI reads here
 ```
@@ -75,15 +74,15 @@ streamlit_app/
 ├── app.py                         # Entry point (local)
 ├── streamlit_app.py               # Entry point (SiS)
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,360 lines
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,502 lines
+│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,382 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,525 lines
 │   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,344 lines
 └── utils/
     ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion (~155 lines)
     └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps
 ```
 
-**Total:** ~4,738 lines across 8 Python files
+**Total:** ~4,783 lines across 8 Python files
 
 ### Cross-Filtering (PBI-style)
 
@@ -169,8 +168,8 @@ ammodepot/
 ├── tests/generic/              # 16 custom generic tests (same as Redshift)
 ├── models/
 │   ├── bronze/                 # Source definitions (reads from AD_AIRBYTE database)
-│   │   ├── fishbowl/           # schema: AD_FISHBOWL (35 source tables)
-│   │   └── magento/            # schema: AD_MAGENTO (30 source tables)
+│   │   ├── fishbowl/           # schema: AD_FISHBOWL (34 source tables)
+│   │   └── magento/            # schema: AD_MAGENTO (25 source tables)
 │   ├── silver/                 # 78 models (71 views + 7 high-fan-out tables)
 │   └── gold/                   # 13 table models + 8 intermediate views
 │       ├── intermediate/       # 8 reusable view models (includes int_sales_cost_fallback)
@@ -183,7 +182,7 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 99 models (34 FB + 23 MG + 21 Inv + 13 Gold + 8 Int), 65 source tables, 16 generic tests, 5 macros (2 root + 3 cross_db)
+**Snowflake Counts:** 99 models (34 FB + 23 MG + 21 Inv + 13 Gold + 8 Int), 59 source tables, 16 generic tests, 5 macros (2 root + 3 cross_db)
 
 ### Streamlit App (BI Dashboard)
 
@@ -196,13 +195,9 @@ streamlit_app/                          # See "Streamlit Dashboard App" section 
 ```
 docs/
 ├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access, temp users
-├── POWERBI_MIGRATION_PLAN.md          # 3-phase Power BI migration: Redshift → Snowflake AD_ANALYTICS.GOLD
 ├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
 ├── AIRBYTE_MAINTENANCE.md             # EC2/Kind maintenance, cleanup scripts, emergency recovery
 └── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
-├── DISCOVERY_POWERBI.md               # Power BI dataflow-to-source mapping
-├── DISCOVERY_SNOWFLAKE.sql            # Snowflake discovery queries
-└── OUR_DELIVERIES.MD                  # Project deliverables summary
 ```
 
 ---
@@ -243,7 +238,7 @@ docs/
 | Bronze | Source YAML only | No SQL models -- Airbyte loads directly |
 | Silver | `view` | Lightweight, real-time freshness; 7 high-fan-out models override to `table` |
 | Gold | `table` | Consumption-ready for BI tools; `+transient: true`, `+query_tag: 'dbt:gold'`; f_sales uses `incremental` (merge, 3-day lookback) |
-| Intermediate | `view` | Reusable pre-computation for Gold tables |
+| Intermediate | `view` | Reusable pre-computation for Gold tables; 3 critical bottlenecks override to `table` (int_fishbowl_order_cost, int_magento_product_eav_lookups, int_sales_cost_fallback) |
 
 ### Schema Routing
 
@@ -255,11 +250,11 @@ docs/
 
 ## Sources
 
-### Fishbowl (34 Redshift / 35 Snowflake tables)
+### Fishbowl (34 tables, both projects)
 Inventory management / ERP system. Key tables: `so`, `soitem`, `product`, `part`, `vendor`, `ship`, `po`, `poitem`, `receipt`, `receiptitem`, `uomconversion`, `kititem`, `objecttoobject`
 - Redshift: `fishbowl` schema | Snowflake: `AD_AIRBYTE.AD_FISHBOWL`
 
-### Magento (25 Redshift / 30 Snowflake source tables, 29 Airbyte streams)
+### Magento (25 tables both projects, 29 Airbyte streams)
 E-commerce platform. Key tables: `sales_order`, `sales_order_item`, `customer_entity`, `catalog_product_entity`, `quote`, `store`, EAV attribute tables (`eav_attribute`, `catalog_product_entity_varchar/int/text/decimal`)
 - Redshift: `magento` schema | Snowflake: `AD_AIRBYTE.AD_MAGENTO`
 
@@ -330,7 +325,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 8. **Generic tests in `tests/generic/`** -- 16 reusable test macros using `{% test %}` wrapper syntax.
 
-9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI). Power BI migration plan in `docs/POWERBI_MIGRATION_PLAN.md`.
+9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI).
 
 10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/PIPELINE_ASSESSMENT.md` for pipeline details.
 
@@ -388,16 +383,16 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ---
 
-## Knowledge Base (537 files in 6 categories)
+## Knowledge Base (604 files in 6 categories)
 
 | Category | Files | Key Technologies |
 |---|---|---|
-| data-engineering | 190 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, elementary |
-| cloud | 117 | S3, IAM, Glue, Athena, CloudWatch, KMS, GCP, EMR, Fargate |
-| devops-sre | 110 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github |
-| ai-ml | 74 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
-| automation | 33 | mermaid, n8n, Streamlit |
-| document-processing | 13 | docling |
+| data-engineering | 213 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, elementary |
+| cloud | 132 | S3, IAM, Glue, Athena, CloudWatch, KMS, GCP, EMR, Fargate |
+| devops-sre | 124 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github |
+| ai-ml | 81 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
+| automation | 38 | mermaid, n8n, Streamlit |
+| document-processing | 15 | docling |
 
 Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.
 
