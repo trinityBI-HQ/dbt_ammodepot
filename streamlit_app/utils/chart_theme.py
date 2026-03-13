@@ -1,86 +1,108 @@
-"""Shared Plotly dark theme for all Streamlit dashboard charts.
+"""Shared Plotly theme for all Streamlit dashboard charts.
+
+Adapts to Streamlit's active theme (dark locally, light on SiS).
+All chart backgrounds are transparent so they inherit the page background.
 
 Usage:
     from utils.chart_theme import apply_theme
     fig = go.Figure(...)
     apply_theme(fig)                     # standard chart
     apply_theme(fig, height=400)         # override height
-    apply_theme(fig, transparent=True)   # fully transparent bg (for hbar)
 """
 
+import streamlit as st
 import plotly.graph_objects as go
 
-# -- Palette --
+
+def _is_dark() -> bool:
+    """Detect whether Streamlit is using a dark theme."""
+    try:
+        base = st.get_option("theme.base")
+        if base:
+            return base == "dark"
+    except Exception:
+        pass
+    # Default: dark for local dev, but SiS typically is light
+    from utils.db import _is_sis
+    return not _is_sis
+
+
+# -- Palette (resolved at call time) --
 ACCENT = "#00d4aa"
 ACCENT_DIM = "rgba(0, 212, 170, 0.20)"
-TEXT_PRIMARY = "#e0e0e0"
-TEXT_SECONDARY = "#999999"
-GRID_COLOR = "rgba(255, 255, 255, 0.08)"
-BG_PLOT = "#0e1117"
-BG_PAPER = "#0e1117"
+INVENTORY_BLUE = "#5B9BD5"
 
-# -- Reusable legend dict --
-LEGEND_DEFAULTS = dict(
-    orientation="h",
-    yanchor="bottom",
-    y=1.02,
-    xanchor="left",
-    x=0,
-    font=dict(size=11, color=TEXT_PRIMARY),
-)
 
-# -- Shared axis defaults --
-_AXIS_DEFAULTS = dict(
-    color=TEXT_SECONDARY,
-    gridcolor=GRID_COLOR,
-    zerolinecolor=GRID_COLOR,
-    title_font=dict(color=TEXT_SECONDARY, size=12),
-    tickfont=dict(color=TEXT_SECONDARY, size=10),
-)
+def _palette():
+    """Return theme-adaptive colors."""
+    dark = _is_dark()
+    return dict(
+        text_primary="#e0e0e0" if dark else "#1a1a2e",
+        text_secondary="#999999" if dark else "#555555",
+        grid_color="rgba(255,255,255,0.08)" if dark else "rgba(0,0,0,0.08)",
+        hover_bg="#1e1e1e" if dark else "#ffffff",
+        hover_border=ACCENT,
+    )
+
+
+# -- Reusable legend builder --
+def _legend(pal, overrides=None):
+    d = dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="left",
+        x=0,
+        font=dict(size=11, color=pal["text_primary"]),
+    )
+    if overrides:
+        d.update(overrides)
+    return d
 
 
 def apply_theme(
     fig: go.Figure,
     *,
     height: int = 300,
-    transparent: bool = False,
     show_legend: bool = True,
     margin: dict | None = None,
     legend_overrides: dict | None = None,
 ) -> go.Figure:
-    """Apply the unified dark theme to a Plotly figure.
+    """Apply the unified theme to a Plotly figure.
 
-    Parameters
-    ----------
-    fig : go.Figure
-    height : chart height in px (default 300)
-    transparent : True → fully transparent backgrounds (useful for hbar overlays)
-    show_legend : whether to show the legend
-    margin : override default margin dict
-    legend_overrides : merge into legend defaults
+    Backgrounds are always transparent so charts inherit the Streamlit
+    page theme (dark or light). Text and grid colors adapt automatically.
     """
-    bg_plot = "rgba(0,0,0,0)" if transparent else BG_PLOT
-    bg_paper = "rgba(0,0,0,0)" if transparent else BG_PAPER
-
-    legend = {**LEGEND_DEFAULTS}
-    if legend_overrides:
-        legend.update(legend_overrides)
+    pal = _palette()
+    axis = dict(
+        color=pal["text_secondary"],
+        gridcolor=pal["grid_color"],
+        zerolinecolor=pal["grid_color"],
+        title_font=dict(color=pal["text_secondary"], size=12),
+        tickfont=dict(color=pal["text_secondary"], size=10),
+    )
 
     fig.update_layout(
         height=height,
         margin=margin or dict(l=0, r=0, t=30, b=0),
-        plot_bgcolor=bg_plot,
-        paper_bgcolor=bg_paper,
-        font=dict(color=TEXT_PRIMARY, size=12),
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=pal["text_primary"], size=12),
         showlegend=show_legend,
-        legend=legend,
-        xaxis=_AXIS_DEFAULTS,
-        yaxis=_AXIS_DEFAULTS,
+        legend=_legend(pal, legend_overrides),
+        xaxis=axis,
+        yaxis=axis,
         hoverlabel=dict(
-            bgcolor="#1e1e1e",
+            bgcolor=pal["hover_bg"],
             font_size=12,
-            font_color=TEXT_PRIMARY,
-            bordercolor=ACCENT,
+            font_color=pal["text_primary"],
+            bordercolor=pal["hover_border"],
         ),
     )
     return fig
+
+
+def secondary_axis_style() -> dict:
+    """Return color + tickfont for a secondary y-axis (yaxis2)."""
+    pal = _palette()
+    return dict(color=pal["text_secondary"], tickfont=dict(color=pal["text_secondary"]))

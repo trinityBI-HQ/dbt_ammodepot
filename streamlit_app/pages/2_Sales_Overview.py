@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query, _is_sis
-from utils.chart_theme import apply_theme, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY
+from utils.chart_theme import apply_theme, ACCENT, secondary_axis_style
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -709,7 +709,6 @@ def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None,
     apply_theme(
         fig,
         height=max(len(labels_r) * 32, 100),
-        transparent=True,
         show_legend=False,
         margin=dict(l=0, r=0, t=0, b=0),
     )
@@ -926,7 +925,7 @@ with chart_cols[0]:
                 yaxis2=dict(
                     title="", overlaying="y", side="right",
                     range=[0, y2_range_max], ticksuffix="%", showgrid=False,
-                    color=TEXT_SECONDARY, tickfont=dict(color=TEXT_SECONDARY),
+                    **secondary_axis_style(),
                 ),
                 xaxis=dict(
                     title="", tickmode="array", tickvals=x_pos, ticktext=tick_labels,
