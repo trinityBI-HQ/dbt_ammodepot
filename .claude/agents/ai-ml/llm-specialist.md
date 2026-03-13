@@ -17,6 +17,8 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Grep, Glob, TodoWrite, WebSearch, mcp__upstash-context-7-mcp__*, mcp__exa__*]
+model: sonnet
+memory: user
 color: purple
 ---
 

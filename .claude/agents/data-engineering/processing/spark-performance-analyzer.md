@@ -17,6 +17,7 @@ description: |
   </example>
 
 tools: [Read, Bash, Grep, Glob, TodoWrite, WebSearch]
+model: sonnet
 color: yellow
 ---
 

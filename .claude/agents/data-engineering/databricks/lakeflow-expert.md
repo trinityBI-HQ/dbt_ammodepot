@@ -18,6 +18,7 @@ description: |
 
 tools: [Read, Write, Edit, Bash, Grep, Glob, TodoWrite, WebSearch, WebFetch, Task, mcp__exa__get_code_context_exa]
 memory: user
+model: sonnet
 color: blue
 ---
 

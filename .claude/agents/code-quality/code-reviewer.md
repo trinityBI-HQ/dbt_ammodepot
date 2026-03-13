@@ -26,6 +26,7 @@ description: |
 
 tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite]
 memory: user
+model: sonnet
 color: orange
 ---
 

@@ -1,8 +1,8 @@
 # Style Guide
 
 > **Purpose**: Official SQL, Jinja, and YAML style conventions from dbt best practices
-> **Source**: https://docs.getdbt.com/best-practices/how-we-style
-> **MCP Validated**: 2026-02-19
+> **Source**: https://docs.getdbt.com/best-practices/how-we-style/2-how-we-style-our-sql
+> **MCP Validated**: 2026-03-13
 
 ## Principles
 
@@ -10,6 +10,13 @@
 - **Consistency**: Unified style across the entire team; use linters to enforce
 
 ## SQL Style
+
+### Column Selection
+
+- **No `SELECT *` in models** — always use explicit column lists
+- Applies to ALL layers (Bronze, Silver, Gold) and ALL CTEs including import CTEs
+- The only acceptable `SELECT *` is `select * from final` as the last statement (where columns are already explicitly listed in the final CTE)
+- Explicit columns prevent silent schema drift, enable column-level lineage, and reduce compute costs
 
 ### Formatting
 
@@ -56,37 +63,46 @@ select
 from source
 ```
 
-### CTE Conventions
+### Fields, Aggregations, and Grouping
+
+- Place fields before aggregates and window functions in SELECT
+- Aggregate early on the smallest dataset before joining to improve performance
+- Prefer `group by 1, 2` (numeric) over column names
+
+### Import CTE Conventions
+
+- Place ALL `ref()` and `source()` statements in CTEs at the top of the file
+- Name import CTEs after the table they reference
+- Select only columns needed downstream (explicit lists, never `SELECT *`)
+- Do NOT select columns that are only used in `WHERE`, `ON`, or `HAVING` — they don't need to be in `SELECT`
+- Filter with `where` clauses in import CTEs to minimize scanned data
 
 ```sql
--- 1. Import CTEs first: all ref/source at top, named after source
+-- region is used in WHERE but not selected (not needed downstream)
 with orders as (
-    select * from {{ ref('stg_ecommerce__orders') }}
-),
-
--- 2. Functional CTEs: one logical task each, descriptive names
-orders_with_payments as (
     select
-        orders.order_id,
-        orders.customer_id,
-        payments.amount
-    from orders
-    inner join payments on orders.order_id = payments.order_id
+        order_id,
+        customer_id,
+        order_total,
+        order_date
+    from {{ ref('stg_ecommerce__orders') }}
+    where region = 'US'
 ),
-
--- 3. Final CTE: select * for easy auditing
-final as (
-    select * from orders_with_payments
-)
-
-select * from final
 ```
+
+### Functional CTE Conventions
+
+- Where performance permits, CTEs should perform a single, logical unit of work
+- CTE names should be as verbose as needed to convey what they do (e.g., `events_joined_to_users`)
+- If a CTE is duplicated across models, extract into a separate intermediate model
+- **The last line of a model should be `select * from final`** — this makes it easy to materialize and audit the output from different steps in the model as you're developing it. You just change the CTE referenced in the select statement to see the output from that step
 
 ### Join Rules
 
 - Always prefix columns with table/CTE name when joining
-- Use descriptive CTE names, not aliases (`customers` not `c`)
+- Use full descriptive CTE names, not aliases (`customers` not `c`)
 - Join conditions: `left_table.id = right_table.id` (left-to-right reading)
+- Explicit join types always (`inner join` not `join`); avoid `right join`
 - Fields before aggregates/window functions in SELECT
 
 ## Jinja Style

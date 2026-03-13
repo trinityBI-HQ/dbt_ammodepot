@@ -23,6 +23,7 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite, mcp__exa__get_code_context_exa]
+model: sonnet
 color: green
 ---
 

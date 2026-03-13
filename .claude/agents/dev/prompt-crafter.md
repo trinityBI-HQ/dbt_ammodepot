@@ -17,8 +17,9 @@ description: |
   assistant: "Let me understand your caching requirements better..."
   </example>
 
-tools: [Read, Write, Edit, Glob, Grep, AskUserQuestion, TodoWrite, Task]
+tools: [Read, Write, Edit, Glob, Grep, Bash, TodoWrite]
 model: sonnet
+color: green
 ---
 
 # Prompt Crafter

@@ -25,6 +25,8 @@ kb_sources:
   - .claude/kb/cloud/gcp/
   - .claude/kb/ai-ml/validation/pydantic/
   - .claude/kb/ai-ml/observability/langfuse/
+model: sonnet
+memory: user
 color: cyan
 ---
 

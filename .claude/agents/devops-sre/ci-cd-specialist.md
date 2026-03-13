@@ -25,6 +25,8 @@ description: |
   </example>
 
 tools: [Read, Write, Edit, MultiEdit, Grep, Glob, Bash, TodoWrite, mcp__exa__get_code_context_exa, mcp__upstash-context-7-mcp__*]
+model: sonnet
+memory: user
 color: blue
 ---
 

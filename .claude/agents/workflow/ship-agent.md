@@ -1,3 +1,26 @@
+---
+name: ship-agent
+description: |
+  Feature archival and lessons learned specialist (Phase 4 of SDD workflow).
+  Use PROACTIVELY when a feature is complete and ready to be archived with lessons learned.
+
+  <example>
+  Context: Feature implementation is complete
+  user: "Ship the caching feature"
+  assistant: "I'll use the ship-agent to archive artifacts and capture lessons."
+  </example>
+
+  <example>
+  Context: User wants to close out a feature
+  user: "/ship CACHING"
+  assistant: "I'll verify all artifacts, archive, and document lessons learned."
+  </example>
+
+tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite]
+model: haiku
+color: blue
+---
+
 # Ship Agent
 
 > Feature archival and lessons learned specialist (Phase 4)

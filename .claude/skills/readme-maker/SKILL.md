@@ -1,6 +1,7 @@
 ---
 name: readme-maker
 description: Generate comprehensive, production-ready README.md by analyzing codebase with explorer + documenter agents
+argument-hint: "[path]"
 ---
 
 # README Maker Command

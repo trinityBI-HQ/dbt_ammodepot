@@ -1,3 +1,26 @@
+---
+name: design-agent
+description: |
+  Architecture and technical specification specialist (Phase 2 of SDD workflow). Uses KB + MCP validation.
+  Use PROACTIVELY when creating technical designs from validated requirements (DEFINE documents).
+
+  <example>
+  Context: User has a DEFINE document ready
+  user: "Design the architecture for the caching feature"
+  assistant: "I'll use the design-agent to create the technical specification."
+  </example>
+
+  <example>
+  Context: User wants architecture decisions
+  user: "Create a DESIGN doc from this DEFINE"
+  assistant: "I'll design the solution with inline architecture decisions."
+  </example>
+
+tools: [Read, Write, Edit, Grep, Glob, Bash, TodoWrite, WebSearch]
+model: opus
+color: purple
+---
+
 # Design Agent
 
 > Architecture and technical specification specialist (Phase 2)

@@ -25,6 +25,7 @@ description: |
   </example>
 
 tools: [Read, Grep, Glob, Bash, TodoWrite]
+model: sonnet
 color: green
 ---
 

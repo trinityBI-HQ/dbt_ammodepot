@@ -1,5 +1,4 @@
 # dbt-core Quick Reference
-
 > Fast lookup tables. For code examples, see linked files.
 > **MCP Validated**: 2026-02-19
 
@@ -15,7 +14,6 @@
 | `dbt snapshot` | Run snapshots | `--select` |
 | `dbt seed` | Load CSV seed files | `--select`, `--full-refresh` |
 | `dbt run --sample` | Time-based sample mode (v1.10+) | `--sample` |
-
 ## Running dbt with uv
 
 When a project uses [uv](https://docs.astral.sh/uv/) as package manager, run from the directory containing `dbt_project.yml`:
@@ -98,10 +96,5 @@ uv run --env-file .env dbt <command>
 | Ignore incremental logic | Test with `--full-refresh` |
 | Pin exact dbt versions | Use Release Tracks (Latest, Compatible, Extended) |
 
-## Related Documentation
 
-| Topic | Path |
-|-------|------|
-| Models & DAG | `concepts/models.md` |
-| Incremental Strategy | `patterns/incremental-models.md` |
-| Full Index | `index.md` |
+**See Also:** [models](concepts/models.md) | [incremental](patterns/incremental-models.md) | [index](index.md)

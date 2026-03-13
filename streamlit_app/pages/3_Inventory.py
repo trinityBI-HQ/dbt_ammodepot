@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from datetime import date, timedelta
 
 from utils.db import run_query
+from utils.chart_theme import apply_theme, TEXT_SECONDARY
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
 _logo_b64 = base64.b64encode(_logo_path.read_bytes()).decode()
@@ -556,12 +557,8 @@ with tab_inv:
             mode="lines",
             line=dict(color="#00d4aa", dash="dot", width=2),
         ))
-        fig.update_layout(
-            height=350,
-            margin=dict(l=40, r=20, t=10, b=40),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-            xaxis=dict(type="category"),
-        )
+        apply_theme(fig, height=350, margin=dict(l=40, r=20, t=10, b=40))
+        fig.update_layout(xaxis=dict(type="category"))
         fig.update_xaxes(title="")
         fig.update_yaxes(title="")
         st.plotly_chart(fig, use_container_width=True)
@@ -737,17 +734,13 @@ with tab_vendor:
                 # Show ~10 most recent months initially, scroll for rest
                 n_months = len(x_pos)
                 visible_end = min(10, n_months) - 1
+                apply_theme(fig, height=400, margin=dict(l=50, r=50, t=10, b=40))
                 fig.update_layout(
-                    height=400,
-                    margin=dict(l=50, r=50, t=10, b=40),
-                    legend=dict(
-                        orientation="h", yanchor="bottom",
-                        y=1.02, xanchor="left", x=0,
-                    ),
                     yaxis=dict(title="", side="left"),
                     yaxis2=dict(
                         title="", side="right",
                         overlaying="y", showgrid=False,
+                        color=TEXT_SECONDARY, tickfont=dict(color=TEXT_SECONDARY),
                     ),
                     xaxis=dict(
                         tickmode="array",
@@ -1195,13 +1188,8 @@ with tab_open_po:
                             font=dict(color="red", size=11),
                         )
 
+                    apply_theme(fig_proj, height=350, margin=dict(l=50, r=30, t=30, b=40))
                     fig_proj.update_layout(
-                        height=350,
-                        margin=dict(l=50, r=30, t=30, b=40),
-                        legend=dict(
-                            orientation="h", yanchor="bottom",
-                            y=1.02, xanchor="left", x=0,
-                        ),
                         yaxis=dict(title="Units"),
                         xaxis=dict(title=""),
                         annotations=list(fig_proj.layout.annotations or ()) + [
