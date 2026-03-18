@@ -11,7 +11,7 @@
 | Airbyte Version | 1.5.1 |
 | Data Path (host) | `/opt/dbt/.airbyte/abctl/data/` |
 | Data Path (container) | `/var/local-path-provisioner/` |
-| Slack Webhook | Configured in Airbyte (notifications on sync failure) |
+| Logs | `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log` |
 
 ### Disk Usage Breakdown
 
@@ -55,110 +55,63 @@ Disk at 99% (595GB / 600GB used). Never pruned in 334 days of operation:
 
 ## Monthly Cleanup Script
 
-### `/opt/scripts/airbyte-cleanup.sh`
+Source: [`scripts/airbyte-cleanup.sh`](../scripts/airbyte-cleanup.sh) — deployed to `/opt/scripts/airbyte-cleanup.sh` on EC2.
 
-```bash
-#!/bin/bash
-# Airbyte monthly cleanup — run on 1st of each month at 3am
-# Retains 30 days of history, sends Slack notification
+**What it does:**
+1. Deletes Minio job logs older than 30 days
+2. Deletes dependent DB rows (`stream_attempt_metadata`, `stream_stats`, `sync_stats`)
+3. Deletes `attempts` and `jobs` rows older than 30 days
+4. Runs `VACUUM` on all cleaned tables (regular, not FULL)
+5. Reports disk usage before/after and sends Slack notification
 
-SLACK_WEBHOOK="$SLACK_WEBHOOK"  # Set in environment or replace with your webhook URL
-DAYS=30
-CONTAINER="airbyte-abctl-control-plane"
-NAMESPACE="airbyte-abctl"
+**Features:**
+- `--dry-run` mode to preview without deleting
+- `RETENTION_DAYS` env var to override 30-day default
+- Pre-flight check (verifies Docker container is running)
+- Row counts logged for each table
 
-# Report disk usage before cleanup
-BEFORE=$(docker exec $CONTAINER df / --output=pcent | tail -1 | tr -dc '0-9')
-
-echo "$(date) — Starting Airbyte cleanup (retaining ${DAYS} days)"
-
-# 1. Clean Minio job logs older than 30 days
-echo "Cleaning Minio job logs..."
-docker exec $CONTAINER find \
-  /var/local-path-provisioner/airbyte-minio-pv/airbyte-storage/job-logging/workspace/ \
-  -mindepth 1 -maxdepth 1 -mtime +${DAYS} -exec rm -rf {} +
-
-# 2. Clean dependent DB tables first (foreign keys reference attempts)
-echo "Cleaning database records..."
-for table in stream_attempt_metadata stream_stats sync_stats; do
-  docker exec $CONTAINER kubectl exec -n $NAMESPACE airbyte-db-0 -- \
-    psql -U airbyte -d db-airbyte -c \
-    "DELETE FROM ${table} WHERE attempt_id IN (SELECT id FROM attempts WHERE created_at < NOW() - INTERVAL '${DAYS} days');"
-done
-
-# 3. Clean attempts table
-docker exec $CONTAINER kubectl exec -n $NAMESPACE airbyte-db-0 -- \
-  psql -U airbyte -d db-airbyte -c \
-  "DELETE FROM attempts WHERE created_at < NOW() - INTERVAL '${DAYS} days';"
-
-# 4. Clean jobs table
-docker exec $CONTAINER kubectl exec -n $NAMESPACE airbyte-db-0 -- \
-  psql -U airbyte -d db-airbyte -c \
-  "DELETE FROM jobs WHERE created_at < NOW() - INTERVAL '${DAYS} days';"
-
-# 5. VACUUM to reclaim space (regular VACUUM, not FULL — less disruptive)
-echo "Running VACUUM..."
-docker exec $CONTAINER kubectl exec -n $NAMESPACE airbyte-db-0 -- \
-  psql -U airbyte -d db-airbyte -c "VACUUM attempts;"
-docker exec $CONTAINER kubectl exec -n $NAMESPACE airbyte-db-0 -- \
-  psql -U airbyte -d db-airbyte -c "VACUUM jobs;"
-
-# Report disk usage after cleanup
-AFTER=$(docker exec $CONTAINER df / --output=pcent | tail -1 | tr -dc '0-9')
-
-echo "$(date) — Cleanup complete. Disk: ${BEFORE}% -> ${AFTER}%"
-
-# Send Slack notification
-curl -s -X POST "$SLACK_WEBHOOK" -H 'Content-type: application/json' \
-  -d "{\"text\":\"Airbyte monthly cleanup complete\nDisk: ${BEFORE}% -> ${AFTER}%\nRetained last ${DAYS} days\"}"
-```
-
-### Cron Setup
-
-```bash
-# Make script executable
-sudo chmod +x /opt/scripts/airbyte-cleanup.sh
-
-# Add monthly cron (1st of month at 3am UTC)
-(crontab -l 2>/dev/null; echo "0 3 1 * * /opt/scripts/airbyte-cleanup.sh >> /var/log/airbyte-cleanup.log 2>&1") | sudo crontab -
-
-# Verify
-crontab -l
-```
+**Cron schedule:** 1st of month at 3:00 AM UTC
 
 ---
 
 ## Disk Alert Script
 
-### `/opt/scripts/disk-alert.sh`
+Source: [`scripts/disk-alert.sh`](../scripts/disk-alert.sh) — deployed to `/opt/scripts/disk-alert.sh` on EC2.
+
+**What it does:**
+- Checks host disk usage against threshold (default 70%)
+- If exceeded, sends Slack alert with top disk consumers and DB table sizes
+- Exits silently when disk is healthy
+
+**Cron schedule:** Every 6 hours
+
+---
+
+## Deployment
+
+Source: [`scripts/deploy.sh`](../scripts/deploy.sh) — run once on the EC2 instance to install everything.
 
 ```bash
-#!/bin/bash
-# Disk usage alert — run every 6 hours
-# Sends Slack alert if disk exceeds 70%
+# 1. Copy scripts to EC2
+scp -r scripts/ ec2-user@<EC2-IP>:/tmp/airbyte-scripts/
 
-SLACK_WEBHOOK="$SLACK_WEBHOOK"  # Set in environment or replace with your webhook URL
-THRESHOLD=70
+# 2. SSH into EC2 and run installer
+ssh ec2-user@<EC2-IP>
+cd /tmp/airbyte-scripts
+sudo ./deploy.sh
 
-DISK_PCT=$(df / --output=pcent | tail -1 | tr -dc '0-9')
+# 3. Verify with dry run
+sudo /opt/scripts/airbyte-cleanup.sh --dry-run
 
-if [ "$DISK_PCT" -ge "$THRESHOLD" ]; then
-  # Get top space consumers for context
-  TOP_USAGE=$(docker exec airbyte-abctl-control-plane du -d 1 -h /var/local-path-provisioner/ 2>/dev/null | sort -rh | head -5)
-
-  curl -s -X POST "$SLACK_WEBHOOK" -H 'Content-type: application/json' \
-    -d "{\"text\":\"Warning: Airbyte EC2 disk at ${DISK_PCT}%\nTop consumers:\n\`\`\`${TOP_USAGE}\`\`\`\nInvestigate before next monthly cleanup.\"}"
-fi
+# 4. (Optional) Run first cleanup immediately
+sudo /opt/scripts/airbyte-cleanup.sh
 ```
 
-### Cron Setup
-
-```bash
-sudo chmod +x /opt/scripts/disk-alert.sh
-
-# Run every 6 hours
-(crontab -l 2>/dev/null; echo "0 */6 * * * /opt/scripts/disk-alert.sh") | sudo crontab -
-```
+The installer:
+- Copies scripts to `/opt/scripts/`
+- Prompts for Slack webhook URL (saves to `/etc/environment`)
+- Sets up both cron jobs (deduplicates if run again)
+- Runs a dry-run test to verify connectivity
 
 ---
 

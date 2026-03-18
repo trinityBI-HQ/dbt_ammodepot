@@ -24,9 +24,9 @@ AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
 └── airbyte_internal                     ↑ Power BI reads here
 ```
 
-- **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI)
-- **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `SVC_POWERBI` (password)
-- **Warehouse**: `ETL_WH` (XSMALL, shared by all three roles)
+- **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI), `POWERBI_READONLY_ROLE` (Gold + Streamlit viewer), `STREAMLIT_ROLE` (app owner), `DASHBOARD_VIEWER_ROLE` (SSO viewers)
+- **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `SVC_POWERBI` (password), `POWERBI_READER` (password, POWERBI_READONLY_ROLE)
+- **Warehouse**: `ETL_WH` (XSMALL, shared by all roles)
 
 ---
 
@@ -62,6 +62,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (local + Streamlit in Snowflake) |
+| EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 
 ---
 
@@ -71,18 +72,20 @@ Replacement for Power BI dashboards, running locally and targeting Streamlit in 
 
 ```
 streamlit_app/
-├── app.py                         # Entry point (local)
-├── streamlit_app.py               # Entry point (SiS)
+├── app.py                         # Entry point (local) (~38 lines)
+├── streamlit_app.py               # Entry point (SiS) (~32 lines)
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,382 lines
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,525 lines
-│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,344 lines
+│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,380 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,529 lines
+│   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,272 lines
 └── utils/
+    ├── __init__.py
+    ├── chart_theme.py             # Unified dark theme for Plotly charts + HTML tables (~127 lines)
     ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion (~155 lines)
-    └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps
+    └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps (~307 lines)
 ```
 
-**Total:** ~4,783 lines across 8 Python files
+**Total:** ~4,840 lines across 9 Python files
 
 ### Cross-Filtering (PBI-style)
 
@@ -95,8 +98,18 @@ Pages 1 and 2 implement PBI-style cross-filtering with selectbox dropdowns + cli
 - **Clickable charts**: Local only — SiS older Streamlit returns `event.selection` as callable, guarded with `_is_sis`
 - **Dropdown options**: Built from pre-filter data (PBI behavior — show all values regardless of active filters)
 
+### Dark Theme Architecture
+
+All visual components force a unified dark background (`#1E1E1E`) via `utils/chart_theme.py`:
+- **`apply_theme(fig)`**: Forces dark `plot_bgcolor`/`paper_bgcolor`, light text, subtle grid on all Plotly `go.Figure` charts
+- **`dark_dataframe(df)`**: Renders DataFrames as dark HTML tables via `st.markdown` — replaces all `st.dataframe` calls (SiS iframe can't be styled with external CSS)
+- **`secondary_axis_style()`**: Returns color + tickfont dict for yaxis2
+- **Inventory HTML bars**: Wrapped in `<div style="background:#1E1E1E">` containers with light text
+- **Constants**: `BG_CHART`, `ACCENT`, `TEXT_PRIMARY`, `TEXT_SECONDARY`, `GRID_COLOR` shared across all pages
+
 ### SiS Compatibility Notes
 
+- **Runtime**: Currently "Run on warehouse" (Streamlit 1.22, limited); migration target is "Run on container" (Streamlit 1.50+, PREVIEW)
 - **Plotly**: Use `go.Bar`/`go.Figure` with `.tolist()` — `px.bar` fails serialization in SiS
 - **Plotly x-axis**: Use numeric positions + `tickvals`/`ticktext` to avoid duplicate category merging
 - **Plotly on_select**: Guard with `if not _is_sis:` — SiS returns `event.selection` as a function, not data object
@@ -104,6 +117,8 @@ Pages 1 and 2 implement PBI-style cross-filtering with selectbox dropdowns + cli
 - **Data types**: All plotly data must be plain Python types (`float()`, `.tolist()`), not numpy/pandas
 - **Dual-mode**: `_is_sis` flag in `utils/db.py` controls local vs SiS rendering paths
 - **st.toggle**: Not available in SiS (Python 3.11) — use `st.checkbox` instead
+- **st.dataframe**: Renders inside iframe that ignores external CSS on SiS — use `dark_dataframe()` instead
+- **Theme detection**: `st.get_option("theme.base")` unreliable on SiS — force dark backgrounds explicitly
 - **Session state pattern**: Initialize defaults in `st.session_state`, render widgets with `key=` only (no `value=`)
 - **Full-width CSS**: All pages inject CSS to remove Streamlit default max-width padding
 - **PBI data filters**: Vendor Analysis + Open POs filter to `Ammunition` category + `QTY != 0` (matches PBI)
@@ -190,11 +205,26 @@ ammodepot/
 streamlit_app/                          # See "Streamlit Dashboard App" section above
 ```
 
+### Airbyte EC2 Maintenance Scripts
+
+```
+scripts/
+├── airbyte-cleanup.sh      # Monthly cleanup: Minio logs + DB pruning + VACUUM (~123 lines)
+├── disk-alert.sh           # 6-hourly disk usage alert to log (~43 lines)
+└── deploy.sh               # One-command installer for EC2 (~76 lines)
+```
+
+- **Deployed to**: `/opt/scripts/` on EC2 instance `ip-10-0-1-105`
+- **Cron**: Monthly cleanup (1st at 3am UTC), disk alert (every 6h)
+- **Logs**: `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log`
+- **Dry run**: `sudo /opt/scripts/airbyte-cleanup.sh --dry-run`
+- **Docs**: `docs/AIRBYTE_MAINTENANCE.md`
+
 ### Shared Documentation
 
 ```
 docs/
-├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access, temp users
+├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access, SiS, SSO
 ├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
 ├── AIRBYTE_MAINTENANCE.md             # EC2/Kind maintenance, cleanup scripts, emergency recovery
 └── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
@@ -414,6 +444,7 @@ Path-scoped instruction files in `.claude/rules/`:
 - **kb-development.md** — KB file conventions and size limits
 - **agent-development.md** — Agent template and MCP validation conventions
 - **git-workflow.md** — Commit message and PR conventions
+- **sql-standards.md** — SQL coding standards for dbt models
 
 ---
 

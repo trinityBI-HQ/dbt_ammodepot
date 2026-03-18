@@ -411,6 +411,8 @@ ACCOUNTADMIN
     │   └── SVC_DBT       → dbt transformation (key-pair auth)
     ├── POWERBI_ROLE      → SELECT on AD_ANALYTICS.GOLD (read-only)
     │   └── SVC_POWERBI   → Power BI dataflows (password auth)
+    ├── POWERBI_READONLY_ROLE → SELECT on AD_ANALYTICS.GOLD + USAGE on Streamlit apps
+    │   └── POWERBI_READER    → Interactive user (password auth)
     ├── STREAMLIT_ROLE    → Owns Streamlit apps, SELECT on AD_ANALYTICS.GOLD
     │   └── (app runs with this role's privileges — owner's rights)
     └── DASHBOARD_VIEWER_ROLE  → USAGE on Streamlit apps (viewer access)
@@ -428,6 +430,7 @@ ACCOUNTADMIN
 | `AIRBYTE_ROLE` | CDC ingestion, owns `AD_AIRBYTE` database |
 | `TRANSFORMER_ROLE` | dbt transformation, owns `AD_ANALYTICS` SILVER/GOLD schemas |
 | `POWERBI_ROLE` | Power BI read-only access, SELECT on `AD_ANALYTICS.GOLD` |
+| `POWERBI_READONLY_ROLE` | Read-only Gold + Streamlit viewer access (interactive users) |
 | `STREAMLIT_ROLE` | Owns Streamlit apps, SELECT on `AD_ANALYTICS.GOLD`, CREATE STREAMLIT |
 | `DASHBOARD_VIEWER_ROLE` | Views Streamlit apps via SSO, USAGE on Streamlit objects only |
 
@@ -961,3 +964,92 @@ GRANT OWNERSHIP ON SCHEMA AD_AIRBYTE.GOLD TO ROLE TRANSFORMER_ROLE COPY CURRENT 
 ```
 
 > **Note on `airbyte_internal`:** This is a lowercase, quoted schema (`"airbyte_internal"`) created by Airbyte for raw staging tables, stages, and the `_airbyte_destination_state` table. It is separate from the user-configured Default Schema.
+
+---
+
+## 15. POWERBI_READER user (read-only Gold + Streamlit access)
+
+`POWERBI_READER` is an interactive user with `POWERBI_READONLY_ROLE` for viewing Gold layer data and Streamlit dashboards. Unlike `SVC_POWERBI` (service account for Power BI dataflows), this is a named user account.
+
+### 15.1 Create role
+
+```sql
+USE ROLE SECURITYADMIN;
+
+CREATE ROLE IF NOT EXISTS POWERBI_READONLY_ROLE
+    COMMENT = 'Views Streamlit dashboards - USAGE on Streamlit objects + SELECT on GOLD';
+
+GRANT ROLE POWERBI_READONLY_ROLE TO ROLE SYSADMIN;
+```
+
+### 15.2 Grant warehouse access
+
+```sql
+USE ROLE SYSADMIN;
+
+GRANT USAGE ON WAREHOUSE ETL_WH TO ROLE POWERBI_READONLY_ROLE;
+```
+
+### 15.3 Grant read-only access to Gold schema
+
+```sql
+USE ROLE SYSADMIN;
+
+-- Database and schema access
+GRANT USAGE ON DATABASE AD_ANALYTICS TO ROLE POWERBI_READONLY_ROLE;
+GRANT USAGE ON SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+
+-- Current objects
+GRANT SELECT ON ALL TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+GRANT SELECT ON ALL VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+
+-- Future objects (auto-grant when dbt creates new Gold models)
+GRANT SELECT ON FUTURE TABLES IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+```
+
+### 15.4 Grant Streamlit app access
+
+```sql
+USE ROLE SYSADMIN;
+
+GRANT USAGE ON ALL STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+GRANT USAGE ON FUTURE STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD TO ROLE POWERBI_READONLY_ROLE;
+```
+
+### 15.5 Configure user
+
+```sql
+USE ROLE SECURITYADMIN;
+
+-- Assign role to existing user
+GRANT ROLE POWERBI_READONLY_ROLE TO USER POWERBI_READER;
+
+-- Set defaults
+ALTER USER POWERBI_READER SET DEFAULT_WAREHOUSE = ETL_WH;
+```
+
+### 15.6 Validate
+
+```sql
+USE ROLE POWERBI_READONLY_ROLE;
+USE WAREHOUSE ETL_WH;
+
+-- Verify Gold tables are visible
+SHOW TABLES IN SCHEMA AD_ANALYTICS.GOLD;
+SHOW VIEWS IN SCHEMA AD_ANALYTICS.GOLD;
+
+-- Verify SELECT works
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.D_STORE;
+SELECT COUNT(*) FROM AD_ANALYTICS.GOLD.F_SALES;
+
+-- Verify Streamlit access
+SHOW STREAMLITS IN SCHEMA AD_ANALYTICS.GOLD;
+
+-- Verify no access to source schemas
+SHOW TABLES IN SCHEMA AD_AIRBYTE.AD_FISHBOWL;
+-- Expected: error (no USAGE on AD_AIRBYTE)
+
+SELECT CURRENT_USER(), CURRENT_ROLE(), CURRENT_WAREHOUSE();
+-- Expected: POWERBI_READER, POWERBI_READONLY_ROLE, ETL_WH
+```
