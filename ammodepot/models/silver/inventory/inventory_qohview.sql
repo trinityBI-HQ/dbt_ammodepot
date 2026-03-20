@@ -19,6 +19,8 @@ select
         serial_number,
         ((1 - quantity_on_tag) * (COUNT(serial_number) - 1) + 1) as calculated_quantity_on_hand
     from    tagserialview_cte
+    where   part_id is not null
+        and tag_number is not null
     group by
         location_group_id,
         location_id,

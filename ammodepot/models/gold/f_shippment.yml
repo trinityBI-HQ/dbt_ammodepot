@@ -85,8 +85,6 @@ models:
           - accepted_values:
               arguments:
                 values: ['Yes', 'No']
-              config:
-                severity: warn
       - name: carrierserviceid
         description: "Carrier service ID aggregated from Fishbowl shipments."
       - name: isfreeauto
@@ -95,7 +93,5 @@ models:
           - accepted_values:
               arguments:
                 values: ['Yes', 'No']
-              config:
-                severity: warn
       - name: carrierservice
         description: "Carrier service name from the Fishbowl lookup."

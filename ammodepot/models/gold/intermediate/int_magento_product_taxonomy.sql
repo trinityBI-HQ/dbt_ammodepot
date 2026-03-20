@@ -26,6 +26,9 @@ parent_sku_data as (
     from {{ ref('magento_catalog_product_super_link') }} as sl
     inner join {{ ref('magento_catalog_product_entity') }} as parent
         on sl.parent_id = parent.product_entity_id
+    qualify row_number() over (
+        partition by sl.product_id order by sl.parent_id desc
+    ) = 1
 )
 
 select

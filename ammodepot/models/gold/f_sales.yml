@@ -75,8 +75,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['GunBroker', 'Website']
-              severity: warn
+              arguments:
+                values: ['GunBroker', 'Website']
       - name: STATUS
         description: "Magento order status."
         tests:

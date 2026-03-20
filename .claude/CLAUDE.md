@@ -26,7 +26,10 @@ AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
 
 - **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI), `POWERBI_READONLY_ROLE` (Gold + Streamlit viewer), `STREAMLIT_ROLE` (app owner), `DASHBOARD_VIEWER_ROLE` (SSO viewers)
 - **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `SVC_POWERBI` (password), `POWERBI_READER` (password, POWERBI_READONLY_ROLE)
-- **Warehouse**: `ETL_WH` (XSMALL, shared by all roles)
+- **Warehouse**: `ETL_WH` (XSMALL, auto-suspend 60s, shared by Airbyte + dbt; BI roles to be migrated to dedicated `BI_WH`)
+- **Legacy warehouses** (to be suspended): `PC_FIVETRAN_WH` ($540/mo), `COMPUTE_WH` ($46/mo)
+- **Query tags**: All users tagged via `QUERY_TAG` for cost attribution
+- **Cost optimization**: See `docs/COST_OPTIMIZATION_PROPOSAL.md` (~$41K/year savings plan)
 
 ---
 
@@ -227,7 +230,8 @@ docs/
 ├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access, SiS, SSO
 ├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
 ├── AIRBYTE_MAINTENANCE.md             # EC2/Kind maintenance, cleanup scripts, emergency recovery
-└── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
+├── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
+└── COST_OPTIMIZATION_PROPOSAL.md      # AWS cost optimization: ~$41K/year savings plan
 ```
 
 ---
@@ -297,8 +301,8 @@ Both sources have freshness configured: warn after 24h, error after 48h, using `
 |---|---|---|---|---|---|
 | 1 | Fishbowl → Redshift | RS | Hourly | 21 | All Incremental+Dedup |
 | 2 | Fishbowl → Redshift (Low Frequency) | RS | Hourly+7min | 16 | All Full Refresh+Overwrite |
-| 3 | Fishbowl → Snowflake | SF | 5 min | 35 | 33 Incremental + 2 FR (`tagserialview`, `upsview_ad_a`) |
-| 4 | Magento → Snowflake | SF | 5 min | 29 | All Incremental+Dedup |
+| 3 | Fishbowl → Snowflake | SF | 10 min | 35 | 33 Incremental + 2 FR (`tagserialview`, `upsview_ad_a`) |
+| 4 | Magento → Snowflake | SF | 10 min | 29 | All Incremental+Dedup |
 | 5 | Magento → Redshift | RS | Hourly | 39 | All Incremental+Dedup |
 | 6 | Snowflake → Redshift | RS | Daily | 1 | FR (`UPS_INVOICE` from UPS_INVOICE_HISTORY) |
 
