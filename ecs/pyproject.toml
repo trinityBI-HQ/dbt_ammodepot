@@ -1,0 +1,8 @@
+[project]
+name = "dbt-ammodepot-ecs"
+version = "0.1.0"
+description = "Minimal dbt-snowflake for ECS Fargate"
+requires-python = ">=3.11"
+dependencies = [
+    "dbt-snowflake>=1.11.2",
+]

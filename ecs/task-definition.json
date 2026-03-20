@@ -1,0 +1,47 @@
+{
+  "family": "ammodepot-dbt-build",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::746669199691:role/ecsTaskExecutionRole-dbt",
+  "taskRoleArn": "arn:aws:iam::746669199691:role/ecsTaskRole-dbt",
+  "containerDefinitions": [
+    {
+      "name": "dbt",
+      "image": "746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt:latest",
+      "essential": true,
+      "entryPoint": ["/app/entrypoint.sh"],
+      "environment": [
+        {"name": "SNOWFLAKE_ACCOUNT", "value": "iwb48385.us-east-1"},
+        {"name": "SNOWFLAKE_DATABASE", "value": "AD_ANALYTICS"},
+        {"name": "SNOWFLAKE_WAREHOUSE", "value": "ETL_WH"},
+        {"name": "SNOWFLAKE_ROLE", "value": "TRANSFORMER_ROLE"},
+        {"name": "SNOWFLAKE_USER", "value": "SVC_DBT"},
+        {"name": "SNOWFLAKE_SCHEMA", "value": "silver"}
+      ],
+      "secrets": [
+        {
+          "name": "SNOWFLAKE_PRIVATE_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:746669199691:secret:ammodepot/dbt/snowflake-rwhWkq:SNOWFLAKE_PRIVATE_KEY::"
+        },
+        {
+          "name": "SNOWFLAKE_PRIVATE_KEY_PASSPHRASE",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:746669199691:secret:ammodepot/dbt/snowflake-rwhWkq:SNOWFLAKE_PRIVATE_KEY_PASSPHRASE::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/ammodepot-dbt",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "dbt"
+        }
+      }
+    }
+  ]
+}

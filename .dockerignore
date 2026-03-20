@@ -1,0 +1,13 @@
+.git
+.venv
+.claude
+.github
+projects/
+streamlit_app/
+docs/
+scripts/
+*.pyc
+__pycache__
+*.log
+.env
+*.p8

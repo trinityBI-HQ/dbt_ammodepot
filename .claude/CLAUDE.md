@@ -60,6 +60,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Transformation | dbt-core 1.11.6 + dbt-redshift 1.10.1 / dbt-snowflake 1.11.2 |
 | Warehouse | Amazon Redshift (production) + Snowflake (migration target) |
 | Ingestion | Airbyte CDC (6 active connections, 141 streams) |
+| Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
 | Packages | dbt_utils, dbt_expectations (metaplane fork) |
 | Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
 | Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
@@ -223,6 +224,33 @@ scripts/
 - **Dry run**: `sudo /opt/scripts/airbyte-cleanup.sh --dry-run`
 - **Docs**: `docs/AIRBYTE_MAINTENANCE.md`
 
+### ECS Fargate (dbt Orchestration)
+
+```
+ecs/
+├── Dockerfile                 # Python 3.11-slim + uv + dbt-snowflake (~40s build)
+├── entrypoint.sh              # Writes RSA key from env, runs dbt build --target prod
+├── pyproject.toml             # Minimal deps: dbt-core + dbt-snowflake
+├── task-definition.json       # 0.5 vCPU, 1 GB, Secrets Manager refs
+├── eventbridge-rule.json      # rate(10 minutes) trigger
+├── iam-policies/              # Least-privilege IAM role policies
+│   ├── task-execution-trust.json
+│   ├── task-execution-role.json
+│   ├── eventbridge-trust.json
+│   └── eventbridge-role.json
+└── README.md                  # Full deployment guide
+```
+
+- **Cluster**: `ammodepot-dbt` (Fargate Spot, us-east-1)
+- **Task**: `ammodepot-dbt-build` (0.5 vCPU, 1 GB, ~3 min/run)
+- **Schedule**: EventBridge `rate(10 minutes)`
+- **Network**: Private subnets in airbyte-project VPC
+- **Secrets**: `ammodepot/dbt/snowflake` (Secrets Manager — RSA key + passphrase)
+- **Logs**: CloudWatch `/ecs/ammodepot-dbt`
+- **Cost**: ~$1-3/month (replaces dbt Cloud at $663/mo)
+- **ECR**: `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt`
+- **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only)
+
 ### Shared Documentation
 
 ```
@@ -379,11 +407,13 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 - **Last local build**: PASS=402, WARN=32, ERROR=0, SKIP=0, TOTAL=434
 - **Audit score**: 8.0/10
 
-### Snowflake (Migration Target)
-- **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
-- **Last build**: PASS=99, WARN=0, ERROR=0 (99 models, 2m 22s — 2026-03-10)
+### Snowflake (Production — ECS Fargate)
+- **dbt-core**: 1.11.7 with dbt-snowflake 1.11.3
+- **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$1-3/mo, replaces dbt Cloud at $663/mo)
+- **Last build**: PASS=429, WARN=10, ERROR=0 (99 models + 340 tests, ~3 min — 2026-03-20)
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
+- **Data quality fixes (2026-03-20)**: d_store admin row, taxonomy dedup, qohview ghost tag filter, test severity promotions
 
 ---
 

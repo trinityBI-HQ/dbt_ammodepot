@@ -2,3 +2,4 @@
 .claude/storage/
 DISCOVERY_POWERBI.md
 POWERBI_MIGRATION_PLAN.md
+ecs/.env
