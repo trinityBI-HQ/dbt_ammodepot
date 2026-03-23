@@ -9,4 +9,24 @@ if [ -n "${SNOWFLAKE_PRIVATE_KEY:-}" ]; then
 fi
 
 cd /app/ammodepot
-exec uv run dbt build --profiles-dir . --target prod
+
+# Track build duration
+START_TIME=$(date +%s)
+uv run dbt build --profiles-dir . --target prod
+EXIT_CODE=$?
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+DURATION_MIN=$(echo "scale=2; $DURATION / 60" | bc)
+
+echo "BUILD_DURATION_SECONDS=${DURATION}"
+echo "BUILD_DURATION_MINUTES=${DURATION_MIN}"
+
+# Publish duration metric to CloudWatch
+aws cloudwatch put-metric-data \
+    --namespace AmmoDepot/dbt \
+    --metric-name BuildDurationMinutes \
+    --value "$DURATION_MIN" \
+    --unit None \
+    --region us-east-1 2>/dev/null || echo "Warning: Could not publish CloudWatch metric"
+
+exit $EXIT_CODE

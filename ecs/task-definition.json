@@ -9,7 +9,7 @@
     "operatingSystemFamily": "LINUX"
   },
   "executionRoleArn": "arn:aws:iam::746669199691:role/ecsTaskExecutionRole-dbt",
-  "taskRoleArn": "arn:aws:iam::746669199691:role/ecsTaskRole-dbt",
+  "taskRoleArn": "arn:aws:iam::746669199691:role/ecs-dbt-task-role",
   "containerDefinitions": [
     {
       "name": "dbt",

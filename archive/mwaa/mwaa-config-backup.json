@@ -1,0 +1,85 @@
+{
+    "Environment": {
+        "Name": "mwaa-airflow-env",
+        "Status": "AVAILABLE",
+        "Arn": "arn:aws:airflow:us-east-1:746669199691:environment/mwaa-airflow-env",
+        "CreatedAt": "2025-04-06T10:10:51-03:00",
+        "WebserverUrl": "81188abc-217f-4c4e-a6a1-cef0c37fe970.c30.us-east-1.airflow.amazonaws.com",
+        "ExecutionRoleArn": "arn:aws:iam::746669199691:role/MWAAExecutionRoleV4",
+        "ServiceRoleArn": "arn:aws:iam::746669199691:role/aws-service-role/airflow.amazonaws.com/AWSServiceRoleForAmazonMWAA",
+        "AirflowVersion": "2.10.3",
+        "SourceBucketArn": "arn:aws:s3:::airflow-dags-bucket-2025",
+        "DagS3Path": "dags",
+        "PluginsS3Path": "plugins/",
+        "PluginsS3ObjectVersion": "null",
+        "RequirementsS3Path": "requirements/requirements.txt",
+        "RequirementsS3ObjectVersion": "2UiN514O2OwEIpkLACmA60Z82yOcGmbO",
+        "StartupScriptS3Path": "startup/startup.sh",
+        "StartupScriptS3ObjectVersion": "yW6Be.3lNwxQDNR6fNHePZKSjJtkVl_l",
+        "AirflowConfigurationOptions": {
+            "secrets.backend": "airflow.providers.amazon.aws.secrets.secrets_manager.SecretsManagerBackend",
+            "secrets.backend_kwargs": "{\"connections_prefix\": \"airflow/connections\", \"variables_prefix\": \"airflow/variables\"}",
+            "smtp.smtp_host": "smtp.gmail.com",
+            "smtp.smtp_mail_from": "paulo@trinitybi.com",
+            "smtp.smtp_password": "REDACTED_SMTP_PASSWORD",
+            "smtp.smtp_port": "587",
+            "smtp.smtp_ssl": "False",
+            "smtp.smtp_starttls": "True",
+            "smtp.smtp_user": "paulo@trinitybi.com",
+            "webserver.warn_deployment_exposure": "false"
+        },
+        "EnvironmentClass": "mw1.large",
+        "MaxWorkers": 10,
+        "NetworkConfiguration": {
+            "SubnetIds": [
+                "subnet-08736cb7c694e256b",
+                "subnet-0dabcd17b0bfebbfd"
+            ],
+            "SecurityGroupIds": [
+                "sg-0dbca64323c5b72f3"
+            ]
+        },
+        "LoggingConfiguration": {
+            "DagProcessingLogs": {
+                "Enabled": true,
+                "LogLevel": "INFO",
+                "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:746669199691:log-group:airflow-mwaa-airflow-env-DAGProcessing"
+            },
+            "SchedulerLogs": {
+                "Enabled": true,
+                "LogLevel": "INFO",
+                "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:746669199691:log-group:airflow-mwaa-airflow-env-Scheduler"
+            },
+            "WebserverLogs": {
+                "Enabled": true,
+                "LogLevel": "INFO",
+                "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:746669199691:log-group:airflow-mwaa-airflow-env-WebServer"
+            },
+            "WorkerLogs": {
+                "Enabled": true,
+                "LogLevel": "INFO",
+                "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:746669199691:log-group:airflow-mwaa-airflow-env-Worker"
+            },
+            "TaskLogs": {
+                "Enabled": true,
+                "LogLevel": "INFO",
+                "CloudWatchLogGroupArn": "arn:aws:logs:us-east-1:746669199691:log-group:airflow-mwaa-airflow-env-Task"
+            }
+        },
+        "LastUpdate": {
+            "Status": "SUCCESS",
+            "CreatedAt": "2025-07-21T11:09:10-03:00",
+            "WorkerReplacementStrategy": "FORCED"
+        },
+        "WeeklyMaintenanceWindowStart": "TUE:20:00",
+        "Tags": {},
+        "WebserverAccessMode": "PUBLIC_ONLY",
+        "MinWorkers": 1,
+        "Schedulers": 2,
+        "DatabaseVpcEndpointService": "com.amazonaws.vpce.us-east-1.vpce-svc-07d740b5ad22579ba",
+        "CeleryExecutorQueue": "arn:aws:sqs:us-east-1:580391752822:airflow-celery-81188abc-217f-4c4e-a6a1-cef0c37fe970",
+        "EndpointManagement": "SERVICE",
+        "MinWebservers": 2,
+        "MaxWebservers": 2
+    }
+}

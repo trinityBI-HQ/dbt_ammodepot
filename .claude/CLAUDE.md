@@ -67,6 +67,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (local + Streamlit in Snowflake) |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
+| Archive | Decommissioned configs (MWAA DAGs, old artifacts) |
 
 ---
 
@@ -212,7 +213,7 @@ streamlit_app/                          # See "Streamlit Dashboard App" section 
 ### Airbyte EC2 Maintenance Scripts
 
 ```
-scripts/
+airbyte-ec2/
 ├── airbyte-cleanup.sh      # Monthly cleanup: Minio logs + DB pruning + VACUUM (~123 lines)
 ├── disk-alert.sh           # 6-hourly disk usage alert to log (~43 lines)
 └── deploy.sh               # One-command installer for EC2 (~76 lines)
@@ -247,7 +248,9 @@ ecs/
 - **Network**: Private subnets in airbyte-project VPC
 - **Secrets**: `ammodepot/dbt/snowflake` (Secrets Manager — RSA key + passphrase)
 - **Logs**: CloudWatch `/ecs/ammodepot-dbt`
-- **Cost**: ~$1-3/month (replaces dbt Cloud at $663/mo)
+- **Monitoring**: CloudWatch dashboard `ammodepot-dbt` (build results, duration, warnings, errors)
+- **Alerts**: `dbt-build-failure` (ERROR in logs), `dbt-task-missing` (no runs in 30 min) → SNS email
+- **Cost**: ~$3.70/month total (replaces dbt Cloud at $663/mo)
 - **ECR**: `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt`
 - **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only)
 
@@ -409,11 +412,12 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ### Snowflake (Production — ECS Fargate)
 - **dbt-core**: 1.11.7 with dbt-snowflake 1.11.3
-- **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$1-3/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=429, WARN=10, ERROR=0 (99 models + 340 tests, ~3 min — 2026-03-20)
+- **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
+- **Last build**: PASS=430, WARN=9, ERROR=0 (99 models + 340 tests, ~3 min — 2026-03-23)
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
-- **Data quality fixes (2026-03-20)**: d_store admin row, taxonomy dedup, qohview ghost tag filter, test severity promotions
+- **Data quality fixes (2026-03-20)**: taxonomy dedup, qohview ghost tag filter, test severity promotions
+- **Reverted (2026-03-20)**: d_store admin row (Magento already includes store_id=0 natively)
 
 ---
 
