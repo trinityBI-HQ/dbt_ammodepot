@@ -6,14 +6,12 @@ dbt project for Ammunition Depot's analytics pipeline. Transforms raw data from 
 
 Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and Gold layers.
 
-### Warehouse Migration (In Progress)
+### Warehouse Migration (Complete)
 
-Migrating from **Amazon Redshift** to **Snowflake**. Two parallel dbt projects:
-- **Redshift** (`projects/ammodepot/`): Production — dbt Cloud scheduled runs, 95 models
-- **Snowflake** (`ammodepot/`): Operational — 99 models, all passing (3 new Gold models, 1 new intermediate)
-- **Setup guide**: `docs/snowflake_access_setup.md` (roles, warehouses, RSA keys, Power BI access)
-- **Pipeline assessment**: `docs/PIPELINE_ASSESSMENT.md` (end-to-end audit, 6 Airbyte connections)
-- **Adapters**: dbt-redshift 1.10.1 (Redshift) + dbt-snowflake 1.11.2 (Snowflake)
+Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
+- **Snowflake** (`ammodepot/`): Production — 99 models, ECS Fargate orchestration every 10 min
+- **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
+- **Adapter**: dbt-snowflake 1.11.3
 
 ### Snowflake Database Architecture
 
@@ -29,7 +27,7 @@ AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
 - **Warehouse**: `ETL_WH` (XSMALL, auto-suspend 60s, shared by Airbyte + dbt; BI roles to be migrated to dedicated `BI_WH`)
 - **Legacy warehouses** (to be suspended): `PC_FIVETRAN_WH` ($540/mo), `COMPUTE_WH` ($46/mo)
 - **Query tags**: All users tagged via `QUERY_TAG` for cost attribution
-- **Cost optimization**: See `docs/COST_OPTIMIZATION_PROPOSAL.md` (~$41K/year savings plan)
+- **Cost optimization**: ~$847/mo confirmed savings (dbt Cloud, EC2 downsize, MWAA); ~$1,433/mo potential with legacy warehouse suspension
 
 ---
 
@@ -134,41 +132,7 @@ All visual components force a unified dark background (`#1E1E1E`) via `utils/cha
 
 ## Project Structure
 
-### Redshift Project (Production)
-
-```
-projects/ammodepot/
-├── dbt_project.yml             # version 1.0
-├── packages.yml
-├── profiles.yml                # Not committed (.gitignore)
-├── .env                        # Not committed (.gitignore)
-├── .env.example                # Snowflake + Redshift connection vars
-├── .sqlfluff                   # dialect: redshift
-├── macros/
-│   └── generate_schema_name.sql
-├── tests/generic/              # 16 custom generic tests
-├── models/
-│   ├── bronze/                 # Source definitions only
-│   │   ├── fishbowl/           # 34 source tables
-│   │   └── magento/            # 25 source tables
-│   ├── silver/                 # 78 view models
-│   │   ├── fishbowl/           # 34 models (ERP data)
-│   │   ├── magento/            # 23 models (e-commerce data)
-│   │   └── inventory/          # 21 models (quantity calculations)
-│   └── gold/                   # 10 table models + 7 intermediate views
-│       ├── intermediate/       # 7 reusable view models
-│       ├── d_customer.sql, d_customer_segmentation.sql, d_product.sql
-│       ├── d_product_bundle.sql, d_store.sql, d_vendor.sql
-│       ├── f_inventoryview.sql, f_pos.sql, f_sales.sql
-│       └── f_shippment.sql
-├── seeds/
-├── snapshots/
-└── analyses/
-```
-
-**Redshift Counts:** 95 models (34 FB + 23 MG + 21 Inv + 10 Gold + 7 Int), 59 source tables, 16 generic tests, 1 macro
-
-### Snowflake Project (Migration Target)
+### Snowflake Project (Production)
 
 ```
 ammodepot/
@@ -254,15 +218,13 @@ ecs/
 - **ECR**: `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt`
 - **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only)
 
-### Shared Documentation
+### Archive (Decommissioned)
 
 ```
-docs/
-├── snowflake_access_setup.md          # Snowflake roles, warehouses, RSA keys, Power BI access, SiS, SSO
-├── PIPELINE_ASSESSMENT.md             # End-to-end pipeline audit (Airbyte, Power BI, dbt)
-├── AIRBYTE_MAINTENANCE.md             # EC2/Kind maintenance, cleanup scripts, emergency recovery
-├── CONSOLIDATION_EXECUTIVE_SUMMARY.md # Project consolidation summary
-└── COST_OPTIMIZATION_PROPOSAL.md      # AWS cost optimization: ~$41K/year savings plan
+archive/
+├── mwaa/                              # MWAA DAGs + config (deleted 2026-03-23, ~$450/mo saved)
+├── projects/ammodepot/                # Redshift dbt project (migrated to Snowflake)
+└── target/                            # Old dbt build artifacts
 ```
 
 ---
@@ -347,20 +309,6 @@ Magento uses Entity-Attribute-Value for product attributes. Product attributes a
 
 ## Common Commands
 
-### Redshift Project (from `projects/ammodepot/`)
-
-```bash
-uv run dbt deps --profiles-dir .           # Install packages
-uv run dbt debug --profiles-dir .          # Test connection
-uv run dbt parse --profiles-dir .          # Validate SQL/YAML (no connection needed)
-uv run dbt build --profiles-dir .          # Run all models + tests
-uv run dbt build --profiles-dir . --select +f_sales   # Run f_sales with upstream deps
-uv run dbt test --profiles-dir . --select gold        # Test gold layer only
-uv run dbt source freshness --profiles-dir .          # Check source freshness
-uv run sqlfluff lint models/               # Lint all models
-uv run sqlfluff fix models/                # Auto-fix (review changes before committing)
-```
-
 ### Snowflake Project (from `ammodepot/`)
 
 ```bash
@@ -392,7 +340,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI).
 
-10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. See `docs/PIPELINE_ASSESSMENT.md` for pipeline details.
+10. **No column removals/renames without Power BI coordination** -- Gold layer tables are consumed directly by Power BI dashboards. Any column removal, rename, or type change requires coordinated BI update. Pipeline details are documented in CLAUDE.md and the archive.
 
 11. **Cross-db dispatch macros** -- All dialect-specific SQL uses `adapter.dispatch` pattern (`macros/cross_db/`). Dispatch search order `[ammodepot, dbt_utils, dbt]` configured in `dbt_project.yml`. Zero raw Snowflake/Redshift-specific calls in models.
 
@@ -404,11 +352,9 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 ## Build & Deployment Status
 
-### Redshift (Production)
-- **dbt-core**: 1.11.6 with dbt-redshift 1.10.1
-- **dbt Cloud**: Scheduled runs, 88 of 95 models selected
-- **Last local build**: PASS=402, WARN=32, ERROR=0, SKIP=0, TOTAL=434
-- **Audit score**: 8.0/10
+### Redshift (Archived)
+- Migrated to Snowflake. Redshift project archived in `archive/projects/ammodepot/`.
+- dbt Cloud and MWAA decommissioned.
 
 ### Snowflake (Production — ECS Fargate)
 - **dbt-core**: 1.11.7 with dbt-snowflake 1.11.3
