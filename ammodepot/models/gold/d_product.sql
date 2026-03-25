@@ -86,31 +86,26 @@ select
     cf.AVGCOST,
     cf.LASTVENDORCOST,
     cf."DD Suggested Use",
+    {# Product use-type classification: matches product attributes against
+       parameterized lists in dbt_project.yml. Priority order:
+       Hunting → Self-Defense → Tactical → Sporting → Collector → caliber fallback #}
     case
         when cf."Categories" ilike '%hunting%'
             or cf."General Purpose" ilike '%hunting%'
             or cf."Product Name" ilike '%hunting%'
-            or cf."Projectile" in ('SP', 'JSP', 'TSX', 'TTSX', 'Partition', 'AccuBond', 'Nosler', 'SST', 'InterLock')
-            or (cf."DD Caliber" in (
-                '.30-06', '.308 Win', '.270 Win', '.243 Win', '7mm Rem Mag', '6.5 Creedmoor',
-                '30-06 Springfield', '308/7.62', '270 Win', '243 Win', '7mm Rem Mag', '6.5 Creedmoor',
-                '300 Win Mag', '7mm-08'
-            ) and cf."Projectile" not in ('FMJ', 'TMJ', 'RN', 'Frangible'))
+            or cf."Projectile" in ({{ var('ammodepot_hunting_projectiles') }})
+            or (cf."DD Caliber" in ({{ var('ammodepot_hunting_calibers') }})
+                and cf."Projectile" not in ({{ var('ammodepot_non_hunting_projectiles') }}))
         then 'Hunting'
 
         when cf."Categories" ilike '%defense%'
             or cf."General Purpose" ilike '%defense%'
             or cf."Product Name" ilike '%defense%'
             or cf."Product Name" ilike '%personal%'
-            or cf."Projectile" in ('JHP', 'XTP', 'Gold Dot', 'HST', 'Critical Defense', 'Critical Duty')
-            or (cf."Projectile" = 'HP' and cf."DD Caliber" in (
-                '9mm', '.45 ACP', '.380 Auto', '.38 Special', '.40 S&W', '.357 Mag',
-                '45 ACP', '380 ACP', '38 Special', '40 S&W', '357 Mag', '10mm', '44 Mag'
-            ))
-            or (cf."DD Caliber" in (
-                '9mm', '.45 ACP', '.380 Auto', '.38 Special', '.40 S&W', '.357 Mag',
-                '45 ACP', '380 ACP', '38 Special', '40 S&W', '357 Mag', '10mm', '44 Mag'
-            ) and cf."Product Name" ilike '%carry%')
+            or cf."Projectile" in ({{ var('ammodepot_defense_projectiles') }})
+            or (cf."Projectile" = 'HP' and cf."DD Caliber" in ({{ var('ammodepot_defense_calibers') }}))
+            or (cf."DD Caliber" in ({{ var('ammodepot_defense_calibers') }})
+                and cf."Product Name" ilike '%carry%')
             or cf."Projectile" = '00 Buck'
             or cf."Projectile" like '%Buck%'
         then 'Self-Defense/Personal Protection'
@@ -121,8 +116,8 @@ select
             or cf."Product Name" ilike '%tactical%'
             or cf."Product Name" ilike '%duty%'
             or cf."Projectile" = 'SS109/Green Tip'
-            or (cf."DD Caliber" in ('5.56 NATO', '223/5.56', '300 Blackout')
-                and cf."Projectile" in ('HP', 'OTM', 'BTHP'))
+            or (cf."DD Caliber" in ({{ var('ammodepot_tactical_calibers') }})
+                and cf."Projectile" in ({{ var('ammodepot_tactical_projectiles') }}))
             or cf."Product Name" ilike '%law enforcement%'
         then 'Tactical/Law Enforcement'
 
@@ -133,9 +128,9 @@ select
             or cf."Product Name" ilike '%target%'
             or cf."Product Name" ilike '%competition%'
             or cf."Product Name" ilike '%match%'
-            or (cf."Projectile" in ('FMJ', 'TMJ', 'FMJBT', 'LRN', 'LFN')
+            or (cf."Projectile" in ({{ var('ammodepot_sporting_projectiles') }})
                 and not (cf."Product Name" ilike '%defense%' or cf."Product Name" ilike '%tactical%'))
-            or cf."Projectile" in ('7.5 Shot', '8 Shot', '9 Shot', 'Clay & Target', 'Game & Target')
+            or cf."Projectile" in ({{ var('ammodepot_sporting_shot_types') }})
             or cf."Product Name" ilike '%practice%'
             or cf."Product Name" ilike '%range%'
             or cf."DD Caliber" = '22 LR'
@@ -147,26 +142,21 @@ select
             or cf."Product Name" ilike '%special edition%'
         then 'Collector/Specialty'
 
+        {# Caliber-based fallback when no keyword/projectile match #}
         else case
-            when cf."DD Caliber" in ('22 LR', '22 Mag/WMR', '17 HMR', '22-250', '6mm Creedmoor')
+            when cf."DD Caliber" in ({{ var('ammodepot_sporting_fallback_calibers') }})
                 then 'Sporting/Target'
-            when cf."DD Caliber" in (
-                '30-06 Springfield', '308/7.62', '270 Win', '243 Win', '300 Win Mag',
-                '7mm Rem Mag', '6.5 Creedmoor', '7mm-08', '25-06', '280 Rem', '35 Rem'
-            )
+            when cf."DD Caliber" in ({{ var('ammodepot_hunting_fallback_calibers') }})
                 then 'Hunting'
-            when cf."DD Caliber" in (
-                '9mm', '45 ACP', '380 ACP', '38 Special', '40 S&W', '357 Mag',
-                '10mm', '44 Mag', '45 LC'
-            )
+            when cf."DD Caliber" in ({{ var('ammodepot_defense_fallback_calibers') }})
                 then 'Self-Defense/Personal Protection'
-            when cf."DD Caliber" in ('223/5.56', '300 Blackout', '308 Win Match', '338 Lapua')
+            when cf."DD Caliber" in ({{ var('ammodepot_tactical_fallback_calibers') }})
                 then 'Tactical/Law Enforcement'
-            when cf."DD Caliber" in ('12 Gauge', '20 Gauge', '410 Bore', '28 Gauge')
+            when cf."DD Caliber" in ({{ var('ammodepot_shotgun_gauges') }})
                 then case
-                    when cf."Projectile" in ('7.5 Shot', '8 Shot', '9 Shot', '7 Shot', '6 Shot', '5 Shot', '4 Shot')
+                    when cf."Projectile" in ({{ var('ammodepot_shotgun_sporting_shot') }})
                         then 'Sporting/Target'
-                    when cf."Projectile" in ('00 Buck', 'Slug', 'OO Buck', '000 Buck', '4 Buck', 'Buckshot', '1 Buck', '2 Buck', '3 Buck')
+                    when cf."Projectile" in ({{ var('ammodepot_shotgun_defense_slug') }})
                         then 'Self-Defense/Personal Protection'
                     else 'Sporting/Target'
                 end

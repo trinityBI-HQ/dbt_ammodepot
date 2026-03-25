@@ -83,6 +83,49 @@ vars:
   # Product description exclusions for cost calculations
   ammodepot_cost_exclude_product_pattern: '%POLLYAMOBAG%'
 
+  # RFM segmentation thresholds (d_customer_segmentation)
+  # Frequency: number of purchases in trailing 12 months
+  ammodepot_rfm_freq_f2: 2
+  ammodepot_rfm_freq_f3: 3
+  ammodepot_rfm_freq_f4: 5
+  # Recency: days since last purchase (label thresholds)
+  ammodepot_rfm_recency_r5: 30
+  ammodepot_rfm_recency_r4: 60
+  ammodepot_rfm_recency_r3: 180
+  ammodepot_rfm_recency_r2: 240
+  ammodepot_rfm_recency_r1: 365
+  # Recency: days since last purchase (score thresholds — different from label)
+  ammodepot_rfm_recency_int_3: 120
+  ammodepot_rfm_recency_int_2: 180
+  # Value: total revenue in trailing 12 months
+  ammodepot_rfm_value_v2: 149
+  ammodepot_rfm_value_v3: 225
+  ammodepot_rfm_value_v4: 300
+  ammodepot_rfm_value_v5: 500
+  # Margin: gross margin ratio
+  ammodepot_rfm_margin_m2: 0.20
+  ammodepot_rfm_margin_m3: 0.24
+  ammodepot_rfm_margin_m4: 0.26
+  ammodepot_rfm_margin_m5: 0.30
+
+  # Product use-type classification lists (d_product)
+  ammodepot_hunting_projectiles: "'SP','JSP','TSX','TTSX','Partition','AccuBond','Nosler','SST','InterLock'"
+  ammodepot_hunting_calibers: "'.30-06','.308 Win','.270 Win','.243 Win','7mm Rem Mag','6.5 Creedmoor','30-06 Springfield','308/7.62','270 Win','243 Win','300 Win Mag','7mm-08'"
+  ammodepot_hunting_fallback_calibers: "'30-06 Springfield','308/7.62','270 Win','243 Win','300 Win Mag','7mm Rem Mag','6.5 Creedmoor','7mm-08','25-06','280 Rem','35 Rem'"
+  ammodepot_non_hunting_projectiles: "'FMJ','TMJ','RN','Frangible'"
+  ammodepot_defense_projectiles: "'JHP','XTP','Gold Dot','HST','Critical Defense','Critical Duty'"
+  ammodepot_defense_calibers: "'9mm','.45 ACP','.380 Auto','.38 Special','.40 S&W','.357 Mag','45 ACP','380 ACP','38 Special','40 S&W','357 Mag','10mm','44 Mag'"
+  ammodepot_defense_fallback_calibers: "'9mm','45 ACP','380 ACP','38 Special','40 S&W','357 Mag','10mm','44 Mag','45 LC'"
+  ammodepot_tactical_calibers: "'5.56 NATO','223/5.56','300 Blackout'"
+  ammodepot_tactical_projectiles: "'HP','OTM','BTHP'"
+  ammodepot_tactical_fallback_calibers: "'223/5.56','300 Blackout','308 Win Match','338 Lapua'"
+  ammodepot_sporting_projectiles: "'FMJ','TMJ','FMJBT','LRN','LFN'"
+  ammodepot_sporting_shot_types: "'7.5 Shot','8 Shot','9 Shot','Clay & Target','Game & Target'"
+  ammodepot_sporting_fallback_calibers: "'22 LR','22 Mag/WMR','17 HMR','22-250','6mm Creedmoor'"
+  ammodepot_shotgun_gauges: "'12 Gauge','20 Gauge','410 Bore','28 Gauge'"
+  ammodepot_shotgun_sporting_shot: "'7.5 Shot','8 Shot','9 Shot','7 Shot','6 Shot','5 Shot','4 Shot'"
+  ammodepot_shotgun_defense_slug: "'00 Buck','Slug','OO Buck','000 Buck','4 Buck','Buckshot','1 Buck','2 Buck','3 Buck'"
+
 tests:
   ammodepot:
     # Default warn severity: Airbyte CDC source data naturally has duplicate

@@ -61,70 +61,70 @@ d_customerupdatesview as (
         tp.total_purchases_all_time,
 
         case
-          when cs.number_of_purchases = 1   then 'F1'
-          when cs.number_of_purchases <= 2  then 'F2'
-          when cs.number_of_purchases <= 3  then 'F3'
-          when cs.number_of_purchases <= 5  then 'F4'
-          when cs.number_of_purchases >= 5  then 'F5'
+          when cs.number_of_purchases = 1                                      then 'F1'
+          when cs.number_of_purchases <= {{ var('ammodepot_rfm_freq_f2') }}    then 'F2'
+          when cs.number_of_purchases <= {{ var('ammodepot_rfm_freq_f3') }}    then 'F3'
+          when cs.number_of_purchases <= {{ var('ammodepot_rfm_freq_f4') }}    then 'F4'
+          when cs.number_of_purchases >= {{ var('ammodepot_rfm_freq_f4') }}    then 'F5'
           else 'F0'
         end                                as frequency,
         case
-          when cs.number_of_purchases = 1   then 1
-          when cs.number_of_purchases <= 2  then 2
-          when cs.number_of_purchases <= 3  then 3
-          when cs.number_of_purchases <= 5  then 4
-          when cs.number_of_purchases >= 5  then 5
+          when cs.number_of_purchases = 1                                      then 1
+          when cs.number_of_purchases <= {{ var('ammodepot_rfm_freq_f2') }}    then 2
+          when cs.number_of_purchases <= {{ var('ammodepot_rfm_freq_f3') }}    then 3
+          when cs.number_of_purchases <= {{ var('ammodepot_rfm_freq_f4') }}    then 4
+          when cs.number_of_purchases >= {{ var('ammodepot_rfm_freq_f4') }}    then 5
           else 0
         end                                as frequency_int,
 
         case
-          when cs.days_since_last_purchase <= 30 then 'R5'
-          when cs.days_since_last_purchase <= 60 then 'R4'
-          when cs.days_since_last_purchase <= 180 then 'R3'
-          when cs.days_since_last_purchase <= 240 then 'R2'
-          when cs.days_since_last_purchase <= 365 then 'R1'
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r5') }} then 'R5'
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r4') }} then 'R4'
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r3') }} then 'R3'
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r2') }} then 'R2'
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r1') }} then 'R1'
           else 'R0'
         end                                as recency,
         case
-          when cs.days_since_last_purchase <= 30 then 5
-          when cs.days_since_last_purchase <= 60 then 4
-          when cs.days_since_last_purchase <= 120 then 3
-          when cs.days_since_last_purchase <= 180 then 2
-          when cs.days_since_last_purchase <= 365 then 1
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r5') }}  then 5
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r4') }}  then 4
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_int_3') }} then 3
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_int_2') }} then 2
+          when cs.days_since_last_purchase <= {{ var('ammodepot_rfm_recency_r1') }}  then 1
           else 0
         end                                as recency_int,
 
         case
-          when cs.total_revenue < 149   then 'V1'
-          when cs.total_revenue <= 225  then 'V2'
-          when cs.total_revenue <= 300  then 'V3'
-          when cs.total_revenue <= 500  then 'V4'
-          when cs.total_revenue > 500   then 'V5'
+          when cs.total_revenue < {{ var('ammodepot_rfm_value_v2') }}   then 'V1'
+          when cs.total_revenue <= {{ var('ammodepot_rfm_value_v3') }}  then 'V2'
+          when cs.total_revenue <= {{ var('ammodepot_rfm_value_v4') }}  then 'V3'
+          when cs.total_revenue <= {{ var('ammodepot_rfm_value_v5') }}  then 'V4'
+          when cs.total_revenue > {{ var('ammodepot_rfm_value_v5') }}   then 'V5'
           else 'V0'
         end                                as value,
         case
-          when cs.total_revenue < 149   then 1
-          when cs.total_revenue <= 225  then 2
-          when cs.total_revenue <= 300  then 3
-          when cs.total_revenue <= 500  then 4
-          when cs.total_revenue > 500   then 5
+          when cs.total_revenue < {{ var('ammodepot_rfm_value_v2') }}   then 1
+          when cs.total_revenue <= {{ var('ammodepot_rfm_value_v3') }}  then 2
+          when cs.total_revenue <= {{ var('ammodepot_rfm_value_v4') }}  then 3
+          when cs.total_revenue <= {{ var('ammodepot_rfm_value_v5') }}  then 4
+          when cs.total_revenue > {{ var('ammodepot_rfm_value_v5') }}   then 5
           else 0
         end                                as value_int,
 
         case
-          when cs.margin < 0.20         then 'M1'
-          when cs.margin < 0.24         then 'M2'
-          when cs.margin < 0.26         then 'M3'
-          when cs.margin < 0.30         then 'M4'
-          when cs.margin >= 0.30        then 'M5'
+          when cs.margin < {{ var('ammodepot_rfm_margin_m2') }}         then 'M1'
+          when cs.margin < {{ var('ammodepot_rfm_margin_m3') }}         then 'M2'
+          when cs.margin < {{ var('ammodepot_rfm_margin_m4') }}         then 'M3'
+          when cs.margin < {{ var('ammodepot_rfm_margin_m5') }}         then 'M4'
+          when cs.margin >= {{ var('ammodepot_rfm_margin_m5') }}        then 'M5'
           else 'M0'
         end                                as margin_classification,
         case
-          when cs.margin < 0.20         then 1
-          when cs.margin < 0.24         then 2
-          when cs.margin < 0.26         then 3
-          when cs.margin < 0.30         then 4
-          when cs.margin >= 0.30        then 5
+          when cs.margin < {{ var('ammodepot_rfm_margin_m2') }}         then 1
+          when cs.margin < {{ var('ammodepot_rfm_margin_m3') }}         then 2
+          when cs.margin < {{ var('ammodepot_rfm_margin_m4') }}         then 3
+          when cs.margin < {{ var('ammodepot_rfm_margin_m5') }}         then 4
+          when cs.margin >= {{ var('ammodepot_rfm_margin_m5') }}        then 5
           else 0
         end                                as margin_int
     from customer_base               as cb
@@ -182,15 +182,10 @@ segmentation as (
 ),
 
 customer_group_cte as (
-    select 4 as customer_group_id, 'Law Enforcement'  as customer_group_code
-    union all
-    select 2,                   'Wholesale'
-    union all
-    select 1,                   'General'
-    union all
-    select 0,                   'NOT LOGGED IN'
-    union all
-    select 3,                   'Retailer'
+    select
+        customer_group_id,
+        customer_group_code
+    from {{ ref('customer_groups') }}
 ),
 
 customer_entity_cte as (
