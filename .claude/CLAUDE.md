@@ -62,6 +62,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Warehouse | Snowflake (production) |
 | Ingestion | Airbyte CDC (2 active Snowflake connections, 64 streams) |
 | Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
+| CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/) |
 | Packages | dbt_utils |
 | Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
 | Linting | SQLFluff (Snowflake dialect) |

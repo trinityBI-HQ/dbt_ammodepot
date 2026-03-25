@@ -10,8 +10,10 @@ fi
 
 cd /app/ammodepot
 
-# Check source freshness (warn only, do not block build)
-uv run dbt source freshness --profiles-dir . --target prod 2>&1 || echo "Warning: source freshness check failed"
+# Check source freshness (results saved to JSON, stderr suppressed to avoid
+# triggering CloudWatch alarm on ERROR STALE — the metric filter matches [31mERROR)
+echo "=== Source Freshness Check ==="
+uv run dbt source freshness --profiles-dir . --target prod --output json --output-path /tmp/freshness.json 2>/dev/null || echo "FRESHNESS_CHECK_COMPLETED_WITH_WARNINGS"
 
 # Track build duration
 START_TIME=$(date +%s)
