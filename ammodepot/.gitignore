@@ -2,6 +2,5 @@ target/
 dbt_packages/
 logs/
 .env
-profiles.yml
 dbt_rsa_key.p8
 *.p8
