@@ -38,6 +38,10 @@ models:
           - accepted_values:
               arguments:
                 values: [0, 1, 2, 3, 4, 5]
+          - assert_numeric_range:
+              arguments:
+                min_value: 0
+                max_value: 5
       - name: RECENCY
         description: "Recency bucket label (R0-R5) based on days_since_last_purchase."
         tests:
@@ -50,6 +54,10 @@ models:
           - accepted_values:
               arguments:
                 values: [0, 1, 2, 3, 4, 5]
+          - assert_numeric_range:
+              arguments:
+                min_value: 0
+                max_value: 5
       - name: VALUE
         description: "Monetary bucket label (V0-V5) based on total_revenue."
         tests:
@@ -58,6 +66,11 @@ models:
                 values: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5']
       - name: VALUE_INT
         description: "Numeric representation of monetary bucket (0-5)."
+        tests:
+          - assert_numeric_range:
+              arguments:
+                min_value: 0
+                max_value: 5
       - name: MARGIN_CLASSIFICATION
         description: "Margin bucket label (M0-M5) based on margin percentage."
         tests:
@@ -66,6 +79,11 @@ models:
                 values: ['M0', 'M1', 'M2', 'M3', 'M4', 'M5']
       - name: MARGIN_INT
         description: "Numeric representation of margin bucket (0-5)."
+        tests:
+          - assert_numeric_range:
+              arguments:
+                min_value: 0
+                max_value: 5
       - name: MONETARY_VALUE
         description: "Combined monetary value bucket (MV0-MV5), the floor of the average of margin_int and value_int."
         tests:

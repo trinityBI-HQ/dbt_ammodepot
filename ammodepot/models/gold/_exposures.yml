@@ -1,0 +1,78 @@
+exposures:
+  - name: power_bi_sales_overview
+    label: "Power BI — Sales Overview"
+    type: dashboard
+    maturity: high
+    description: >
+      Main sales dashboard in Power BI. Displays revenue, cost, margin,
+      freight, and customer metrics. Consumed by leadership daily.
+    depends_on:
+      - ref('f_sales')
+      - ref('d_product')
+      - ref('d_customer')
+      - ref('d_store')
+    owner:
+      name: Victor
+      email: victor@trinitybi.com
+
+  - name: power_bi_inventory
+    label: "Power BI — Inventory"
+    type: dashboard
+    maturity: high
+    description: >
+      Inventory dashboard showing current stock levels, vendor analysis,
+      and open purchase orders. Consumed by operations team.
+    depends_on:
+      - ref('f_inventoryview')
+      - ref('f_pos')
+      - ref('d_vendor')
+      - ref('d_product_bundle')
+    owner:
+      name: Victor
+      email: victor@trinitybi.com
+
+  - name: streamlit_today_yesterday
+    label: "Streamlit — Today/Yesterday"
+    type: dashboard
+    maturity: medium
+    description: >
+      Real-time sales dashboard showing today's and yesterday's orders
+      with cross-filtering by category, manufacturer, vendor, and SKU.
+    depends_on:
+      - ref('f_sales')
+      - ref('f_sales_realtime')
+      - ref('d_product')
+    owner:
+      name: Victor
+      email: victor@trinitybi.com
+
+  - name: streamlit_sales_overview
+    label: "Streamlit — Sales Overview"
+    type: dashboard
+    maturity: medium
+    description: >
+      Historical sales dashboard with category pages and cross-filtering.
+      Replacement for Power BI Sales Overview.
+    depends_on:
+      - ref('f_sales')
+      - ref('d_product')
+      - ref('d_customer')
+      - ref('d_store')
+    owner:
+      name: Victor
+      email: victor@trinitybi.com
+
+  - name: streamlit_inventory
+    label: "Streamlit — Inventory"
+    type: dashboard
+    maturity: medium
+    description: >
+      Inventory dashboard with vendor analysis and open POs.
+      Replacement for Power BI Inventory.
+    depends_on:
+      - ref('f_inventoryview')
+      - ref('f_pos')
+      - ref('d_vendor')
+    owner:
+      name: Victor
+      email: victor@trinitybi.com

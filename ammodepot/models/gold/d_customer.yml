@@ -8,6 +8,7 @@ models:
         description: "Customer email address."
         tests:
           - not_null
+          - assert_valid_email_format
       - name: GENDER
         description: "Customer gender."
       - name: PREFIX
@@ -31,10 +32,14 @@ models:
               severity: error
       - name: FIRSTNAME
         description: "Customer first name."
+        tests:
+          - not_null
       - name: IS_ACTIVE
         description: "Whether the customer account is active."
       - name: CREATED_AT
         description: "Timestamp when the customer account was created."
+        tests:
+          - not_null
       - name: CREATED_IN
         description: "Store view where the customer account was created."
       - name: MIDDLENAME

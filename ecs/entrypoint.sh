@@ -10,6 +10,9 @@ fi
 
 cd /app/ammodepot
 
+# Check source freshness (warn only, do not block build)
+uv run dbt source freshness --profiles-dir . --target prod 2>&1 || echo "Warning: source freshness check failed"
+
 # Track build duration
 START_TIME=$(date +%s)
 uv run dbt build --profiles-dir . --target prod
