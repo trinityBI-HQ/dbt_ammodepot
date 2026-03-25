@@ -18,6 +18,12 @@ with interaction_base as (
           || '@'
           || cast(z.order_id    as varchar)               as chave,
 
+        {# Cost fallback hierarchy (order matters):
+           1. Fishbowl total_cost for unique Magento ID match
+           2. Fishbowl total_cost averaged across duplicate Magento IDs (by product)
+           3. Fishbowl total_cost averaged across all duplicate Magento IDs
+           4-6. Same hierarchy using average weighted cost × qty as fallback
+           Final fallback in outer SELECT: int_sales_cost_fallback → Magento base_cost #}
         coalesce(
           c.cost_unique,
           c.cost_duplicate,

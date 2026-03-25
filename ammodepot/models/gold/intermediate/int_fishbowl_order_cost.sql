@@ -96,7 +96,7 @@ kit_cost_aggregation as (
     left join product_avg_cost          as a on s.product_id = a.id_produto
     left join object_kit                as k on s.so_item_id  = k.recordid1
     where s.item_type_id = {{ var('ammodepot_sale_item_type_id') }}
-      and s.product_description not ilike '%POLLYAMOBAG%'
+      and s.product_description not ilike '{{ var("ammodepot_cost_exclude_product_pattern") }}'
     group by k.recordid2
 ),
 

@@ -7,12 +7,15 @@ models:
         quote: true
         description: "Primary key for the product."
         tests:
-          - unique
-          - not_null
+          - unique:
+              severity: error
+          - not_null:
+              severity: error
       - name: "SKU"
         description: "Stock keeping unit identifier."
         tests:
-          - not_null
+          - not_null:
+              severity: error
       - name: "Product Name"
         description: "Display name of the product."
       - name: "General Purpose"
@@ -85,5 +88,5 @@ models:
         description: "Last vendor cost for the product."
       - name: "DD Suggested Use"
         description: "Detailed data suggested use classification."
-      - name: "use_type_category"
-        description: "Use type category derived from product attributes."
+      - name: USE_TYPE_CATEGORY
+        description: "Use type category derived from product attributes (Hunting, Self-Defense, Tactical, Sporting, Collector, Unclassified)."

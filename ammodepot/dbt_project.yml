@@ -80,6 +80,9 @@ vars:
   # Lead time ranking limit
   ammodepot_lead_time_rank_limit: 3
 
+  # Product description exclusions for cost calculations
+  ammodepot_cost_exclude_product_pattern: '%POLLYAMOBAG%'
+
 tests:
   ammodepot:
     # Default warn severity: Airbyte CDC source data naturally has duplicate

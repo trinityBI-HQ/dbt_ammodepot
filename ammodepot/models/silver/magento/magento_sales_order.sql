@@ -363,10 +363,6 @@ select
     ga_cookie,
     ga_timestamp,
     ga_session_id,
-    _ab_cdc_cursor,
-    _ab_cdc_log_pos,
-    _ab_cdc_log_file,
-    _ab_cdc_updated_at,
 
     -- Relationship IDs
     quote_address_id,

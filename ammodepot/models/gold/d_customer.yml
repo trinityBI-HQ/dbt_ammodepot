@@ -25,8 +25,10 @@ models:
       - name: ENTITY_ID
         description: "Primary key for the customer."
         tests:
-          - unique
-          - not_null
+          - unique:
+              severity: error
+          - not_null:
+              severity: error
       - name: FIRSTNAME
         description: "Customer first name."
       - name: IS_ACTIVE

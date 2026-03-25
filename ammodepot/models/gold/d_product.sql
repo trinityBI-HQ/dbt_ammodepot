@@ -178,6 +178,6 @@ select
                 then 'Hunting'
             else 'Unclassified'
         end
-    end as use_type_category
+    end as USE_TYPE_CATEGORY
 
 from cte_final as cf

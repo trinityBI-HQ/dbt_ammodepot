@@ -66,11 +66,5 @@ select
     datelastmodified as last_modified_at,
     datelastcyclecount as last_cycle_count_date,
 
-    -- Airbyte CDC Metadata (kept as requested, adjust if not needed in final silver)
-    _ab_cdc_cursor,
-    _ab_cdc_log_pos,
-    _ab_cdc_log_file,
-    _ab_cdc_updated_at
-
 from
     source_data

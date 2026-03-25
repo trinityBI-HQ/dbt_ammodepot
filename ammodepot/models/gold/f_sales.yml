@@ -12,7 +12,8 @@ models:
       - name: ID
         description: "Magento order item ID."
         tests:
-          - not_null
+          - not_null:
+              severity: error
       - name: INCREMENT_ID
         description: "Magento order increment identifier."
         tests:
@@ -87,14 +88,20 @@ models:
           - assert_non_negative_values
       - name: COST
         description: "Allocated cost for the item (Magento or Fishbowl fallback)."
+        tests:
+          - assert_non_negative_values
       - name: QTY_ORDERED
         description: "Net quantity ordered."
         tests:
           - assert_non_negative_values
       - name: FREIGHT_REVENUE
         description: "Allocated freight revenue per item."
+        tests:
+          - assert_non_negative_values
       - name: FREIGHT_COST
         description: "Allocated freight cost per item."
+        tests:
+          - assert_non_negative_values
       - name: VENDOR
         description: "Fishbowl vendor identifier."
       - name: CUSTOMER_ID
