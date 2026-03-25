@@ -13,6 +13,8 @@ models:
         description: "Location group identifier for the receipt."
       - name: qty
         description: "Quantity received."
+        tests:
+          - assert_non_negative_values
       - name: datereconciled
         description: "Date when the receipt item was reconciled."
       - name: part_number
@@ -27,8 +29,12 @@ models:
         description: "Date when the record was last modified."
       - name: unit_cost
         description: "Unit cost of the received item."
+        tests:
+          - assert_non_negative_values
       - name: total_cost
         description: "Total cost of the received items."
+        tests:
+          - assert_non_negative_values
       - name: last_fulfillment_date
         description: "Date of the last fulfillment."
       - name: scheduled_fulfillment_date

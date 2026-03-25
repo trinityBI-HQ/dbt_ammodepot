@@ -43,6 +43,12 @@ models:
         description: "Shipping method code from the order."
       - name: store_id
         description: "Store identifier for the order."
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_store')
+                field: 'STORE_ID'
+              severity: warn
       - name: shipping_description
         description: "Text description of the shipping method."
       - name: shipment_status

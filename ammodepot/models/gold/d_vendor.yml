@@ -9,6 +9,8 @@ models:
           - not_null
       - name: vendor_name
         description: "Name of the vendor."
+        tests:
+          - not_null
       - name: vendor_note
         description: "Notes associated with the vendor."
       - name: vendor_url

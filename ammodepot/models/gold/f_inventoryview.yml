@@ -10,11 +10,21 @@ models:
           - not_null
       - name: qty_available
         description: "Quantity currently available in stock."
+        tests:
+          - assert_non_negative_values
       - name: qty_not_available
         description: "Quantity not available (e.g., reserved or held)."
+        tests:
+          - assert_non_negative_values
       - name: qty_on_order
         description: "Quantity currently on order from vendors."
+        tests:
+          - assert_non_negative_values
       - name: part_cost
         description: "Unit cost of the part."
+        tests:
+          - assert_non_negative_values
       - name: extended_cost
         description: "Extended cost (quantity multiplied by unit cost)."
+        tests:
+          - assert_non_negative_values

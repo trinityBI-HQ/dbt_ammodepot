@@ -14,8 +14,12 @@ models:
           - not_null
       - name: NUMBER_OF_PURCHASES
         description: "Count of distinct purchases by the customer in the last 12 months (up to end of prior month)."
+        tests:
+          - assert_non_negative_values
       - name: TOTAL_REVENUE
         description: "Sum of row_total (gross revenue) for the customer in the last 12 months."
+        tests:
+          - assert_non_negative_values
       - name: MARGIN
         description: "Profit margin for the period, calculated as (total_revenue - total cost) / total_revenue."
       - name: DAYS_SINCE_LAST_PURCHASE

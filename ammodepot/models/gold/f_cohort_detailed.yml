@@ -6,8 +6,13 @@ models:
     columns:
       - name: COHORT_MONTH
         description: "Month of the customer's first purchase (cohort assignment)"
+        tests:
+          - not_null
       - name: MONTH_NUMBER
         description: "Number of months since the cohort's first purchase"
+        tests:
+          - not_null
+          - assert_non_negative_values
       - name: '"Manufacturer SKU"'
         description: "Manufacturer SKU from d_product"
         quote: true
@@ -15,7 +20,19 @@ models:
         description: "Customer region from sales order address"
       - name: STORE_ID
         description: "Magento store identifier"
+        tests:
+          - relationships:
+              arguments:
+                to: ref('d_store')
+                field: 'STORE_ID'
+              severity: warn
       - name: PURCHASERS
         description: "Count of distinct customers who purchased in this slice"
+        tests:
+          - not_null
+          - assert_non_negative_values
       - name: COHORT_SIZE
         description: "Count of distinct customers acquired in this cohort_month for this slice"
+        tests:
+          - not_null
+          - assert_non_negative_values

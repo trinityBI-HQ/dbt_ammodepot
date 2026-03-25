@@ -5,8 +5,12 @@ models:
     columns:
       - name: CODE
         description: "Store code identifier."
+        tests:
+          - not_null
       - name: NAME
         description: "Store display name."
+        tests:
+          - not_null
       - name: GROUP_ID
         description: "Store group identifier."
       - name: STORE_ID

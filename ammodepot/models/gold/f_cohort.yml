@@ -6,9 +6,20 @@ models:
     columns:
       - name: COHORT_MONTH
         description: "Month of the customer's first purchase (cohort assignment)"
+        tests:
+          - not_null
       - name: MONTH_NUMBER
         description: "Number of months since the cohort's first purchase (0 = acquisition month)"
+        tests:
+          - not_null
+          - assert_non_negative_values
       - name: PURCHASERS
         description: "Count of distinct customers who made a purchase in this month_number"
+        tests:
+          - not_null
+          - assert_non_negative_values
       - name: COHORT_SIZE
         description: "Count of distinct customers who were acquired in this cohort_month"
+        tests:
+          - not_null
+          - assert_non_negative_values

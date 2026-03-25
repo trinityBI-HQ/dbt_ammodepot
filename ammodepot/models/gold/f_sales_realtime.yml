@@ -9,16 +9,24 @@ models:
     columns:
       - name: CREATED_AT
         description: "Order creation timestamp converted to local timezone"
+        tests:
+          - not_null
       - name: TIMEDATE
         description: "Order creation timestamp (same as CREATED_AT)"
       - name: TRICKAT
         description: "Original UTC timestamp from source"
       - name: PRODUCT_ID
         description: "Magento product entity ID"
+        tests:
+          - not_null
       - name: ORDER_ID
         description: "Magento order entity ID"
+        tests:
+          - not_null
       - name: ROW_TOTAL
         description: "Net line total (row_total - refunded - discount + discount_refunded)"
+        tests:
+          - assert_non_negative_values
       - name: BASE_COST
         description: "Base cost from Magento"
       - name: TESTSKU
