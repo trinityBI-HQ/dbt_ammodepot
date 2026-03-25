@@ -1,12 +1,4 @@
-with customer_cohort as (
-    select
-        rank_id,
-        min(date_trunc('month', created_at)) as cohort_month
-    from {{ ref('f_sales') }}
-    group by rank_id
-),
-
-monthly_orders as (
+with monthly_orders as (
     select
         o.rank_id,
         c.cohort_month,
@@ -16,7 +8,7 @@ monthly_orders as (
         o.REGION,
         o.STORE_ID
     from {{ ref('f_sales') }} as o
-    inner join customer_cohort as c on o.rank_id = c.rank_id
+    inner join {{ ref('int_customer_cohort') }} as c on o.rank_id = c.rank_id
     inner join {{ ref('d_product') }} as p on o.PRODUCT_ID = p."Product ID"
 )
 

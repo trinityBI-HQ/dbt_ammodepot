@@ -71,6 +71,21 @@ models:
                 severity: warn
           - not_null
 
+  - name: int_customer_cohort
+    description: >
+      Customer cohort assignment. Maps each customer (by rank_id) to their first
+      purchase month. Shared base for f_cohort and f_cohort_detailed.
+    columns:
+      - name: rank_id
+        description: "Customer rank identifier from magento_d_customerupdated."
+        tests:
+          - unique
+          - not_null
+      - name: cohort_month
+        description: "Month of the customer's first purchase."
+        tests:
+          - not_null
+
   - name: int_fishbowl_product_enrichment
     description: >
       Fishbowl-sourced product enrichment data including vendor assignment, discontinued

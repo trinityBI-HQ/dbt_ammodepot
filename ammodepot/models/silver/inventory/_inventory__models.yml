@@ -162,22 +162,6 @@ models:
       - name: quantity_dropship
         description: "Total unfulfilled dropship quantity, converted to the part default UOM when applicable."
 
-  - name: inventory_qtycommitted
-    description: "Calculates the committed quantity by part and location group. Sums the committed quantity on tags (quantity_committed_on_tag) from fishbowl_tag joined with fishbowl_location."
-    columns:
-      - name: part_id
-        description: "Part identifier from fishbowl_tag."
-        tests:
-          - not_null:
-              config:
-                severity: warn
-      - name: location_group_id
-        description: "Location group identifier from fishbowl_location."
-        tests:
-          - not_null
-      - name: quantity_committed
-        description: "Total committed quantity from inventory tags."
-
   - name: inventory_qtyinventorytotals
     description: "Provides summarized inventory totals by part and location group. Derives total allocated quantity (sum of PO, SO, transfer order, and MO allocations) and total on-order quantity (sum of PO, SO, transfer order, and MO on-order) from the inventory_qtyinventory model."
     columns:
@@ -215,38 +199,6 @@ models:
           - not_null
       - name: quantity_on_order_to_receive
         description: "Total unfulfilled quantity on order to receive from transfer orders, converted to the part default UOM when applicable."
-
-  - name: inventory_tagserialviewview
-    description: "Joins serial number tracking information with tags and part tracking metadata. Provides a denormalized view of serial numbers, their associated tags, part tracking details, and commitment status."
-    columns:
-      - name: part_tracking_id
-        description: "Part tracking identifier from fishbowl_serialnum."
-        tests:
-          - not_null
-      - name: serial_id
-        description: "Serial identifier from fishbowl_serial."
-        tests:
-          - not_null
-      - name: part_tracking_name
-        description: "Name of the part tracking type."
-      - name: part_tracking_abbreviation
-        description: "Abbreviation for the part tracking type."
-      - name: part_tracking_description
-        description: "Description of the part tracking type."
-      - name: part_tracking_sort_order
-        description: "Sort order for the part tracking type."
-      - name: part_tracking_type_id
-        description: "Type identifier for the part tracking."
-      - name: tag_id
-        description: "Tag identifier from fishbowl_serial."
-      - name: serial_num_record_id
-        description: "Serial number record identifier from fishbowl_serialnum."
-      - name: serial_number_value
-        description: "The actual serial number value."
-      - name: is_committed
-        description: "Whether the serial number is committed."
-      - name: is_part_tracking_active
-        description: "Whether the part tracking type is active."
 
   - name: inventory_qtyallocatedpo
     description: "Calculates the quantity allocated to purchase orders by part and location group. Computes the unfulfilled quantity (quantity_ordered - quantity_fulfilled) for PO items with eligible statuses and item types, applying UOM conversion when necessary."
