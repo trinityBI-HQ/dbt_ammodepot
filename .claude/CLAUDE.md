@@ -9,25 +9,28 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 ### Warehouse Migration (Complete)
 
 Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
-- **Snowflake** (`ammodepot/`): Production — 99 models, ECS Fargate orchestration every 10 min
+- **Snowflake** (`ammodepot/`): Production — 98 models, ECS Fargate orchestration every 10 min
 - **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
-- **Adapter**: dbt-snowflake 1.11.3
+- **Adapter**: dbt-snowflake 1.11.2
 
 ### Snowflake Database Architecture
 
 ```
 AD_AIRBYTE (AIRBYTE_ROLE)          AD_ANALYTICS (TRANSFORMER_ROLE)
-├── AD_FISHBOWL (34 streams)       ├── SILVER (71 views + 7 tables)
-├── AD_MAGENTO (29 streams)         └── GOLD (13 tables + 8 views)
+├── AD_FISHBOWL (34 streams)       ├── SILVER (69 views + 7 tables)
+├── AD_MAGENTO (29 streams)         └── GOLD (13 tables + 10 views)
 └── airbyte_internal                     ↑ Power BI reads here
 ```
 
 - **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI), `POWERBI_READONLY_ROLE` (Gold + Streamlit viewer), `STREAMLIT_ROLE` (app owner), `DASHBOARD_VIEWER_ROLE` (SSO viewers)
 - **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `SVC_POWERBI` (password), `POWERBI_READER` (password, POWERBI_READONLY_ROLE)
-- **Warehouse**: `ETL_WH` (XSMALL, auto-suspend 60s, shared by Airbyte + dbt; BI roles to be migrated to dedicated `BI_WH`)
-- **Legacy warehouses** (to be suspended): `PC_FIVETRAN_WH` ($540/mo), `COMPUTE_WH` ($46/mo)
+- **Warehouses**: `ETL_WH` (XSMALL, auto-suspend 60s, Airbyte + dbt), `COMPUTE_WH` (XSMALL, BI — used by Power BI, do NOT rename/drop/suspend)
+- **Legacy warehouse**: `PC_FIVETRAN_WH` (suspended, auto-resume OFF — was $540/mo)
 - **Query tags**: All users tagged via `QUERY_TAG` for cost attribution
-- **Cost optimization**: ~$847/mo confirmed savings (dbt Cloud, EC2 downsize, MWAA); ~$1,433/mo potential with legacy warehouse suspension
+- **Cost monitoring**: Snowsight dashboard "Snowflake Cost & Usage Monitor" (8 tiles, see `docs/SNOWFLAKE_COST_DASHBOARD.md`)
+- **Monthly credits (30d)**: ETL_WH ~2,053 ($6,159), COMPUTE_WH ~62 ($186), total ~2,464 credits ($7,392)
+- **Cost by user**: SVC_AIRBYTE 678 (74%), SVC_DBT 137 (15%), POWERBI_READER 103 (11%)
+- **Cost optimization**: ~$847/mo confirmed savings (dbt Cloud, EC2 downsize, MWAA); S3+DuckDB lakehouse POC planned for ~$2,600/mo additional savings
 
 ---
 
@@ -55,17 +58,18 @@ Airbyte CDC (Fishbowl, Magento)
 
 | Component | Technology |
 |---|---|
-| Transformation | dbt-core 1.11.6 + dbt-redshift 1.10.1 / dbt-snowflake 1.11.2 |
-| Warehouse | Amazon Redshift (production) + Snowflake (migration target) |
-| Ingestion | Airbyte CDC (6 active connections, 141 streams) |
+| Transformation | dbt-core 1.11.6 + dbt-snowflake 1.11.2 |
+| Warehouse | Snowflake (production) |
+| Ingestion | Airbyte CDC (2 active Snowflake connections, 64 streams) |
 | Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
-| Packages | dbt_utils, dbt_expectations (metaplane fork) |
+| Packages | dbt_utils |
 | Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
-| Linting | SQLFluff (Redshift dialect / Snowflake dialect) |
+| Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
-| BI Dashboard | Streamlit (local + Streamlit in Snowflake) |
+| BI Dashboard | Streamlit (local + Streamlit in Snowflake) + Snowsight dashboards |
+| Cost Monitoring | Snowsight dashboard (8 tiles: credits, utilization, anomalies, storage) |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
-| Archive | Decommissioned configs (MWAA DAGs, old artifacts) |
+| Archive | Decommissioned Redshift project + old artifacts |
 
 ---
 
@@ -149,24 +153,25 @@ ammodepot/
 │       ├── convert_tz.sql
 │       ├── string_agg.sql
 │       └── format_timestamp.sql
-├── tests/generic/              # 16 custom generic tests (same as Redshift)
+├── tests/generic/              # 8 custom generic tests
 ├── models/
 │   ├── bronze/                 # Source definitions (reads from AD_AIRBYTE database)
 │   │   ├── fishbowl/           # schema: AD_FISHBOWL (34 source tables)
 │   │   └── magento/            # schema: AD_MAGENTO (25 source tables)
-│   ├── silver/                 # 78 models (71 views + 7 high-fan-out tables)
-│   └── gold/                   # 13 table models + 8 intermediate views
-│       ├── intermediate/       # 8 reusable view models (includes int_sales_cost_fallback)
-│       ├── (all Redshift gold models)
-│       ├── f_cohort.sql        # NEW: Customer cohort analysis
-│       ├── f_cohort_detailed.sql  # NEW: Detailed cohort metrics
-│       └── f_sales_realtime.sql   # NEW: Real-time sales view
+│   ├── silver/                 # 76 models (69 views + 7 high-fan-out tables)
+│   └── gold/                   # 13 table models + 10 views (including intermediates)
+│       ├── intermediate/       # 9 reusable view models (3 materialized as tables)
+│       ├── _exposures.yml      # BI dashboard dependency documentation
+│       ├── f_cohort.sql        # Customer cohort analysis
+│       ├── f_cohort_detailed.sql  # Detailed cohort metrics
+│       └── f_sales_realtime.sql   # Real-time sales (filtered view of f_sales)
 ├── seeds/
+│   └── customer_groups.csv     # Customer group lookup (Law Enforcement, Wholesale, etc.)
 ├── snapshots/
 └── analyses/
 ```
 
-**Snowflake Counts:** 99 models (34 FB + 23 MG + 21 Inv + 13 Gold + 8 Int), 59 source tables, 16 generic tests, 5 macros (2 root + 3 cross_db)
+**Snowflake Counts:** 98 models (34 FB + 23 MG + 19 Inv + 13 Gold + 9 Int), 1 seed, 59 source tables, 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
 
 ### Streamlit App (BI Dashboard)
 
@@ -187,14 +192,14 @@ airbyte-ec2/
 - **Cron**: Monthly cleanup (1st at 3am UTC), disk alert (every 6h)
 - **Logs**: `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log`
 - **Dry run**: `sudo /opt/scripts/airbyte-cleanup.sh --dry-run`
-- **Docs**: `docs/AIRBYTE_MAINTENANCE.md`
+- **Docs**: see `docs/` folder
 
 ### ECS Fargate (dbt Orchestration)
 
 ```
 ecs/
 ├── Dockerfile                 # Python 3.11-slim + uv + dbt-snowflake (~40s build)
-├── entrypoint.sh              # Writes RSA key from env, runs dbt build --target prod
+├── entrypoint.sh              # Writes RSA key from env, runs source freshness + dbt build --target prod
 ├── pyproject.toml             # Minimal deps: dbt-core + dbt-snowflake
 ├── task-definition.json       # 0.5 vCPU, 1 GB, Secrets Manager refs
 ├── eventbridge-rule.json      # rate(10 minutes) trigger
@@ -216,16 +221,17 @@ ecs/
 - **Alerts**: `dbt-build-failure` (ERROR in logs), `dbt-task-missing` (no runs in 30 min) → SNS email
 - **Cost**: ~$3.70/month total (replaces dbt Cloud at $663/mo)
 - **ECR**: `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt`
-- **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only)
+- **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only, `--profile ammodepot`)
 
 ### Archive (Decommissioned)
 
 ```
 archive/
-├── mwaa/                              # MWAA DAGs + config (deleted 2026-03-23, ~$450/mo saved)
 ├── projects/ammodepot/                # Redshift dbt project (migrated to Snowflake)
 └── target/                            # Old dbt build artifacts
 ```
+
+- **MWAA**: Deleted 2026-03-23 (~$450/mo saved). Archive files removed from repo 2026-03-25 (contained leaked credentials).
 
 ---
 
@@ -288,19 +294,19 @@ E-commerce platform. Key tables: `sales_order`, `sales_order_item`, `customer_en
 ### Source Freshness
 Both sources have freshness configured: warn after 24h, error after 48h, using `_airbyte_extracted_at` as the loaded_at_field.
 
-### Airbyte Connections (6 active, updated 2026-03-07)
+### Airbyte Connections (2 active Snowflake, updated 2026-03-23)
 
-| # | Connection | Dest | Frequency | Streams | Sync Mode |
-|---|---|---|---|---|---|
-| 1 | Fishbowl → Redshift | RS | Hourly | 21 | All Incremental+Dedup |
-| 2 | Fishbowl → Redshift (Low Frequency) | RS | Hourly+7min | 16 | All Full Refresh+Overwrite |
-| 3 | Fishbowl → Snowflake | SF | 10 min | 35 | 33 Incremental + 2 FR (`tagserialview`, `upsview_ad_a`) |
-| 4 | Magento → Snowflake | SF | 10 min | 29 | All Incremental+Dedup |
-| 5 | Magento → Redshift | RS | Hourly | 39 | All Incremental+Dedup |
-| 6 | Snowflake → Redshift | RS | Daily | 1 | FR (`UPS_INVOICE` from UPS_INVOICE_HISTORY) |
+| # | Connection | Dest | Frequency | Streams | Sync Mode | Status |
+|---|---|---|---|---|---|---|
+| 1 | Fishbowl → Snowflake | SF | 10 min | 35 | 33 Incremental + 2 FR (`tagserialview`, `upsview_ad_a`) | **Active** |
+| 2 | Magento → Snowflake | SF | 10 min | 29 | All Incremental+Dedup | **Active** |
+| 3 | Fishbowl → Redshift | RS | Hourly | 21 | All Incremental+Dedup | Archived |
+| 4 | Fishbowl → Redshift (Low Freq) | RS | Hourly+7min | 16 | All Full Refresh+Overwrite | Archived |
+| 5 | Magento → Redshift | RS | Hourly | 39 | All Incremental+Dedup | Archived |
+| 6 | Snowflake → Redshift | RS | Daily | 1 | FR (`UPS_INVOICE`) | Archived |
 
+- **Cost impact**: SVC_AIRBYTE consumes 678 credits/mo (74% of total compute)
 - **Full audit**: `Connections Audit - Ammo Depot.xlsx` (per-stream detail)
-- **Deleted**: FB→RS (so+soitem), MGT→RS (SALES), MGT→RS (CATALOG) — merged into main connections
 
 ### EAV Pattern
 Magento uses Entity-Attribute-Value for product attributes. Product attributes are resolved in `int_magento_product_eav_lookups.sql` and `int_magento_product_attributes.sql`, then consumed by `d_product.sql`. Attribute IDs are configured as dbt variables with prefix `ammodepot_magento_attr_id_*`.
@@ -318,6 +324,14 @@ set -a && source .env && set +a && uv run dbt parse --profiles-dir .
 set -a && source .env && set +a && uv run dbt test --profiles-dir . --target prod --select gold
 ```
 
+### AWS CLI (use `--profile ammodepot` for all commands)
+
+```bash
+aws ecs list-tasks --cluster ammodepot-dbt --profile ammodepot
+aws logs tail /ecs/ammodepot-dbt --since 1h --profile ammodepot
+aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
+```
+
 ---
 
 ## Key Design Decisions
@@ -328,7 +342,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 3. **Silver views, Gold tables** -- Silver is lightweight (views) for real-time freshness, with 7 high-fan-out models overridden to tables (fishbowl_soitem, fishbowl_product, fishbowl_uomconversion, fishbowl_part, magento_sales_order_item, magento_sales_order, inventory_qtyinventorytotals). Gold materializes as tables for BI query performance.
 
-4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 8 reusable intermediate views, materialized in the `gold` schema. Includes `int_sales_cost_fallback` (cost fallback logic extracted from f_sales) and `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution).
+4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 9 reusable intermediate views, materialized in the `gold` schema. Includes `int_sales_cost_fallback` (cost fallback logic extracted from f_sales), `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution), and `int_customer_cohort` (shared cohort base for f_cohort/f_cohort_detailed).
 
 5. **UPPER_CASE gold columns** -- Gold layer output uses UPPER_CASE aliases for backward compatibility with existing Power BI consumers.
 
@@ -336,7 +350,7 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 
 7. **All config centralized** -- Model materialization and schema routing defined in `dbt_project.yml`, not in per-model config blocks.
 
-8. **Generic tests in `tests/generic/`** -- 16 reusable test macros using `{% test %}` wrapper syntax.
+8. **Generic tests in `tests/generic/`** -- 8 reusable test macros using `{% test %}` wrapper syntax (reduced from 16 after dead code cleanup).
 
 9. **Snowflake migration** -- Separate Snowflake dbt project (`ammodepot/`) with 3 new Gold models (f_cohort, f_cohort_detailed, f_sales_realtime). `AD_AIRBYTE` database for sources (AD_FISHBOWL/AD_MAGENTO schemas), `AD_ANALYTICS` database for Silver/Gold output. Three roles: `TRANSFORMER_ROLE` (dbt), `AIRBYTE_ROLE` (ingestion), `POWERBI_ROLE` (read-only BI).
 
@@ -357,13 +371,49 @@ set -a && source .env && set +a && uv run dbt test --profiles-dir . --target pro
 - dbt Cloud and MWAA decommissioned.
 
 ### Snowflake (Production — ECS Fargate)
-- **dbt-core**: 1.11.7 with dbt-snowflake 1.11.3
+- **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=430, WARN=9, ERROR=0 (99 models + 340 tests, ~3 min — 2026-03-23)
+- **Last build**: PASS=430, WARN=9, ERROR=0 (98 models + 382 tests, ~3 min — 2026-03-25)
+- **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
 - **Data quality fixes (2026-03-20)**: taxonomy dedup, qohview ghost tag filter, test severity promotions
 - **Reverted (2026-03-20)**: d_store admin row (Magento already includes store_id=0 natively)
+- **Storage (2026-03-23)**: AD_AIRBYTE 56.8 GB active + 247 GB failsafe = 304 GB; AD_ANALYTICS 98.3 GB; PC_FIVETRAN_DB 8.8 GB (candidate for drop)
+
+### Snowflake Cost Dashboard (Snowsight)
+
+Built 2026-03-23 — "Snowflake Cost & Usage Monitor" with 8 tiles:
+1. Daily Credit Trend (line, by warehouse)
+2. Total Credits This Month (scorecard)
+3. Credits by Warehouse (bar)
+4. Credits by User/Role (bar, proportional allocation)
+5. Warehouse Utilization (table)
+6. Top Expensive Queries (table)
+7. Storage by Database (bar)
+8. Cost Anomaly Detection (table)
+
+### S3 + DuckDB + Iceberg Lakehouse (POC Planned)
+
+Target architecture to reduce Snowflake compute by ~93%:
+```
+Airbyte → S3 (Parquet) → DuckDB+dbt (Fargate) → S3 Gold → COPY INTO Snowflake → Power BI
+```
+- **Motivation**: SVC_AIRBYTE burns 678 credits/mo (74% of total)
+- **Savings**: ~$2,600/mo (~$31K/year)
+- **POC**: Single stream (`fishbowl.so`), 3 days effort
+- **Docs**: `docs/POC_S3_DUCKDB_LAKEHOUSE.md`
+
+---
+
+## Documentation
+
+| Document | Path | Description |
+|---|---|---|
+| Optimization Plan | `docs/OPTIMIZATION_PLAN.md` | 4-phase plan: test severity, contracts, incremental, refactoring |
+| Cost Dashboard | `docs/SNOWFLAKE_COST_DASHBOARD.md` | Snowflake cost monitoring queries, tags, alerts, best practices |
+| Lakehouse POC | `docs/POC_S3_DUCKDB_LAKEHOUSE.md` | S3+DuckDB+Iceberg migration plan with step-by-step POC |
+| Snowflake Access | `docs/snowflake_access_setup.md` | Role/user/warehouse setup documentation |
 
 ---
 
