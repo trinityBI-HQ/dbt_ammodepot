@@ -143,7 +143,7 @@ All visual components force a unified dark background (`#1E1E1E`) via `utils/cha
 ammodepot/
 ├── dbt_project.yml             # version 2.0
 ├── packages.yml
-├── profiles.yml                # Not committed (.gitignore)
+├── profiles.yml                # Committed (env_var() only, no secrets)
 ├── .env                        # Not committed (.gitignore)
 ├── .env.example                # Snowflake-only connection vars
 ├── .sqlfluff                   # dialect: snowflake
@@ -200,7 +200,8 @@ airbyte-ec2/
 ```
 ecs/
 ├── Dockerfile                 # Python 3.11-slim + uv + dbt-snowflake (~40s build)
-├── entrypoint.sh              # Writes RSA key from env, runs source freshness + dbt build --target prod
+├── entrypoint.sh              # Writes RSA key, source freshness (JSON), dbt build --target prod
+├── deploy.sh                  # Manual deploy fallback (build + push to ECR)
 ├── pyproject.toml             # Minimal deps: dbt-core + dbt-snowflake
 ├── task-definition.json       # 0.5 vCPU, 1 GB, Secrets Manager refs
 ├── eventbridge-rule.json      # rate(10 minutes) trigger
@@ -212,17 +213,19 @@ ecs/
 └── README.md                  # Full deployment guide
 ```
 
+- **CI/CD**: GitHub Actions (`deploy-ecs.yml`) auto-builds + pushes to ECR on push to main (path-filtered: ammodepot/, ecs/)
 - **Cluster**: `ammodepot-dbt` (Fargate Spot, us-east-1)
 - **Task**: `ammodepot-dbt-build` (0.5 vCPU, 1 GB, ~3 min/run)
-- **Schedule**: EventBridge `rate(10 minutes)`
+- **Schedule**: EventBridge `rate(10 minutes)` — picks up new `:latest` image automatically
 - **Network**: Private subnets in airbyte-project VPC
 - **Secrets**: `ammodepot/dbt/snowflake` (Secrets Manager — RSA key + passphrase)
 - **Logs**: CloudWatch `/ecs/ammodepot-dbt`
 - **Monitoring**: CloudWatch dashboard `ammodepot-dbt` (build results, duration, warnings, errors)
-- **Alerts**: `dbt-build-failure` (ERROR in logs), `dbt-task-missing` (no runs in 30 min) → SNS email
+- **Alerts**: `dbt-build-failure` (matches `[31mERROR` in build output, freshness stderr suppressed), `dbt-task-missing` (no runs in 30 min) → SNS email
 - **Cost**: ~$3.70/month total (replaces dbt Cloud at $663/mo)
 - **ECR**: `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt`
-- **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only, `--profile ammodepot`)
+- **AWS CLI user**: `svc_iac` (ADBIadmin group, CLI-only, `--profile ammodepot`; also used for GitHub Actions via secrets)
+- **Manual deploy**: `./ecs/deploy.sh` from repo root (fallback when CI is unavailable)
 
 ### Archive (Decommissioned)
 
@@ -480,6 +483,7 @@ Path-scoped instruction files in `.claude/rules/`:
 - **agent-development.md** — Agent template and MCP validation conventions
 - **git-workflow.md** — Commit message and PR conventions
 - **sql-standards.md** — SQL coding standards for dbt models
+- **ecs-deploy.md** — Auto-deploy to ECS after dbt model changes (scoped to ammodepot/, ecs/)
 
 ---
 
