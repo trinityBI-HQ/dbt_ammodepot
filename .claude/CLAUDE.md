@@ -60,7 +60,7 @@ Airbyte CDC (Fishbowl, Magento)
 |---|---|
 | Transformation | dbt-core 1.11.6 + dbt-snowflake 1.11.2 |
 | Warehouse | Snowflake (production) |
-| Ingestion | Airbyte CDC on EC2 m7i.xlarge (2 active Snowflake connections, 64 streams) |
+| Ingestion | Airbyte CDC on EC2 c6a.2xlarge (2 active Snowflake connections, 64 streams) |
 | Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
 | CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/) |
 | Packages | dbt_utils |
@@ -189,8 +189,8 @@ airbyte-ec2/
 └── deploy.sh               # One-command installer for EC2 (~76 lines)
 ```
 
-- **Deployed to**: `/opt/scripts/` on EC2 instance `ip-10-0-1-105` (m7i.xlarge, 4 vCPU, 16 GB)
-- **Airbyte**: v1.5.1, abctl (kind/k8s), JOB_MAIN_CONTAINER_CPU_LIMIT=1 (reduced from 3 for m7i.xlarge fit)
+- **Deployed to**: `/opt/scripts/` on EC2 instance `ip-10-0-1-105` (c6a.2xlarge, 8 vCPU, 16 GB, ~$223/mo)
+- **Airbyte**: v1.5.1, abctl (kind/k8s), default resource limits (CPU=3, requires 8+ vCPU instance)
 - **Cron**: Monthly cleanup (1st at 3am UTC), disk alert (every 6h)
 - **Logs**: `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log`
 - **Dry run**: `sudo /opt/scripts/airbyte-cleanup.sh --dry-run`
