@@ -157,12 +157,12 @@ agents:
   python-developer:
     keywords: [python, code, parser, dataclass, type hints]
     role: "Python code architect"
-  extraction-specialist:
-    keywords: [extraction, llm, pydantic, gemini, prompt]
-    role: "LLM extraction expert"
-  function-developer:
-    keywords: [cloud run, serverless, pub/sub, handler]
-    role: "Cloud Run function developer"
+  dbt-expert:
+    keywords: [dbt, model, macro, schema, transformation, sql]
+    role: "dbt transformation expert"
+  snowflake-expert:
+    keywords: [snowflake, warehouse, rbac, query, optimization]
+    role: "Snowflake architecture expert"
   test-generator:
     keywords: [test, pytest, fixture, coverage]
     role: "Test automation expert"
@@ -177,10 +177,10 @@ For each file in the manifest:
 
 | Match Criteria | Weight | Example |
 |----------------|--------|---------|
-| File type (.py, .yaml, .tf) | High | `.tf` → ci-cd-specialist |
-| Purpose keywords | High | "extraction" → extraction-specialist |
-| Path patterns | Medium | `functions/` → function-developer |
-| KB domains from DEFINE | Medium | gemini KB → extraction-specialist |
+| File type (.py, .sql, .yml) | High | `.sql` → dbt-expert |
+| Purpose keywords | High | "model" → dbt-expert, "warehouse" → snowflake-expert |
+| Path patterns | Medium | `models/` → dbt-expert, `macros/` → dbt-expert |
+| KB domains from DEFINE | Medium | snowflake KB → snowflake-expert |
 | Fallback | Low | Any .py → python-developer |
 
 **Step 4: Assign with Rationale**
@@ -189,10 +189,10 @@ Update File Manifest to include Agent column:
 
 | # | File | Action | Purpose | Agent | Rationale |
 |---|------|--------|---------|-------|-----------|
-| 1 | `main.py` | Create | Handler | @function-developer | Cloud Run pattern |
-| 2 | `schema.py` | Create | Pydantic | @extraction-specialist | LLM output validation |
-| 3 | `config.yaml` | Create | Config | @infra-deployer | IaC patterns |
-| 4 | `test_main.py` | Create | Tests | @test-generator | pytest specialist |
+| 1 | `silver_sales__orders.sql` | Create | dbt model | @dbt-expert | Medallion Silver pattern |
+| 2 | `_sales__models.yml` | Create | Schema YAML | @dbt-expert | Testing + documentation |
+| 3 | `generate_schema_name.sql` | Create | Macro | @dbt-expert | Schema routing |
+| 4 | `test_row_counts.py` | Create | Tests | @test-generator | pytest specialist |
 
 **Step 5: Handle No Match**
 

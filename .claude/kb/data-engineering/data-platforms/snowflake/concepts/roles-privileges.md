@@ -106,3 +106,6 @@ ALTER TABLE customers MODIFY COLUMN ssn SET TAG pii = 'ssn';
 
 - [databases-schemas](../concepts/databases-schemas.md)
 - [tables-views](../concepts/tables-views.md)
+- [rbac-service-accounts](../patterns/rbac-service-accounts.md) — Production service account patterns (dbt, Fivetran, Dagster)
+- [rbac-multi-tenant](../patterns/rbac-multi-tenant.md) — Multi-client RBAC isolation patterns
+- `.claude/docs/06_SNOWFLAKE_RBAC_STANDARDS.md` — Full RBAC delivery standards

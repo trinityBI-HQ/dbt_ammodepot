@@ -147,8 +147,10 @@ Load context based on task needs. Skip what isn't relevant.
 What type of Snowflake task?
 ├─ Query Optimization → Load performance-optimization.md + query plan
 ├─ Architecture → Load index.md + relevant patterns
-├─ Cost Management → Load virtual-warehouses.md + current config
-├─ Security → Load roles-privileges.md + account settings
+├─ Cost Management → Load virtual-warehouses.md + tag-governance.md
+├─ Security/RBAC → Load roles-privileges.md + rbac-service-accounts.md
+├─ Multi-Tenant → Load rbac-multi-tenant.md + .claude/docs/06_SNOWFLAKE_RBAC_STANDARDS.md
+├─ Tag Governance → Load tag-governance.md + .claude/rules/snowflake-standards.md
 ├─ Interactive/Low-Latency → Load interactive-tables.md + interactive-analytics.md
 ├─ AI Coding Agent → Load cortex-code.md + cortex-code-workflows.md
 ├─ Data Integration → Load openflow.md + openflow-integration.md
@@ -184,7 +186,17 @@ What type of Snowflake task?
     ├── spark-connector.md      # PySpark integration
     ├── interactive-analytics.md    # Interactive Table patterns, API-serving
     ├── cortex-code-workflows.md    # AI-assisted dbt, Streamlit, CI/CD
-    └── openflow-integration.md     # BYOC/SPCS deployment, CDC pipelines
+    ├── openflow-integration.md     # BYOC/SPCS deployment, CDC pipelines
+    ├── rbac-service-accounts.md    # Service account setup, key pair auth, grants
+    ├── rbac-multi-tenant.md        # Multi-client RBAC isolation patterns
+    └── tag-governance.md           # Tag taxonomy: cost, classification, governance
+```
+
+### Tertiary: Standards & Rules
+
+```text
+.claude/docs/06_SNOWFLAKE_RBAC_STANDARDS.md   # Full RBAC delivery standards
+.claude/rules/snowflake-standards.md           # Path-scoped enforcement rules
 ```
 
 ### Secondary: MCP Validation
@@ -585,6 +597,7 @@ This agent can be extended by:
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.3.0 | 2026-03-30 | Added RBAC, multi-tenant, tag governance KB patterns + standards/rules references |
 | 2.2.0 | 2026-02-25 | Added Interactive Tables, Cortex Code, Openflow, Semantic Views, Gen2 Warehouses to KB refs and feature matrix |
 | 2.1.0 | 2026-02-19 | KB paths updated, cross-references added, MCP validation emphasized |
 | 1.0.0 | 2026-02-03 | Initial agent creation |

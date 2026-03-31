@@ -32,6 +32,9 @@
 | [patterns/interactive-analytics.md](patterns/interactive-analytics.md) | Low-latency dashboards and API serving (GA Dec 2025) |
 | [patterns/cortex-code-workflows.md](patterns/cortex-code-workflows.md) | AI-assisted data development workflows (GA Feb 2026) |
 | [patterns/openflow-integration.md](patterns/openflow-integration.md) | Any-to-any data integration with Openflow (GA May 2025) |
+| [patterns/rbac-service-accounts.md](patterns/rbac-service-accounts.md) | Service account setup, key pair auth, grant templates |
+| [patterns/rbac-multi-tenant.md](patterns/rbac-multi-tenant.md) | Multi-client RBAC isolation and onboarding patterns |
+| [patterns/tag-governance.md](patterns/tag-governance.md) | Tag taxonomy for cost attribution, classification, and governance |
 
 ---
 

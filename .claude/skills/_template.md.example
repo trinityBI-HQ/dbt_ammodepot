@@ -1,0 +1,102 @@
+---
+name: {skill-name}
+description: {One-line description of what this skill does}
+argument-hint: "{usage pattern with [optional] and <required> args}"
+---
+
+# {Skill Title}
+
+{One-sentence description of purpose and when to use.}
+
+## Usage
+
+```bash
+/{skill-name}                        # Default behavior
+/{skill-name} <required-arg>         # With required argument
+/{skill-name} --flag                  # With optional flag
+```
+
+---
+
+## What It Does
+
+{2-3 bullet points explaining the skill's behavior at a high level.}
+
+1. **{Step verb}** — {what happens}
+2. **{Step verb}** — {what happens}
+3. **{Step verb}** — {what happens}
+
+---
+
+## Execution Steps
+
+### Step 1: {Validate / Gather Input}
+
+{Describe what the skill checks or asks before starting.}
+
+```text
+# Example tool calls
+Read("{file}")
+Glob("{pattern}")
+```
+
+{If interactive, describe AskUserQuestion usage here.}
+
+### Step 2: {Core Logic}
+
+{Describe the main processing step. Include tool call examples.}
+
+```text
+# Example tool calls
+Grep("{pattern}")
+Edit("{file}", old_string=..., new_string=...)
+```
+
+### Step 3: {Output / Verify}
+
+{Describe what the skill produces and how it verifies success.}
+
+```text
+# Example output format
+{SKILL-NAME} RESULTS
+━━━━━━━━━━━━━━━━━━━━
+
+{Summary of what was done}
+
+━━━━━━━━━━━━━━━━━━━━
+```
+
+---
+
+## Flags
+
+| Flag | Description |
+|------|-------------|
+| `--dry-run` | Preview changes without writing |
+| `{--flag}` | {Description} |
+
+---
+
+## Examples
+
+```bash
+# Example 1: {description}
+/{skill-name} {args}
+
+# Example 2: {description}
+/{skill-name} {args}
+```
+
+---
+
+## Notes
+
+- {Important constraint or behavior to document}
+- {Edge case or prerequisite}
+- {Relationship to other skills if applicable}
+
+---
+
+## See Also
+
+- {Related skill, agent, rule, or doc}

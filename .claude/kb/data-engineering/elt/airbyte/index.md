@@ -72,7 +72,7 @@
 | data-engineer | patterns/terraform-orchestration.md, patterns/incremental-dedup-pattern.md | Production ELT pipelines |
 | devops-engineer | concepts/cloud-vs-oss.md, patterns/multi-environment-setup.md | Deploy and manage Airbyte |
 | python-developer | concepts/python-cdk.md, patterns/custom-python-connector.md | Build custom connectors |
-| pipeline-architect | patterns/api-triggered-syncs.md, patterns/monitoring-observability.md | Orchestrate data workflows |
+| dagster-expert | patterns/api-triggered-syncs.md, patterns/monitoring-observability.md | Orchestrate data workflows |
 
 ---
 

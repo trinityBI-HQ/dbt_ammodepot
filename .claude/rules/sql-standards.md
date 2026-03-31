@@ -145,3 +145,8 @@ joined as (
 
 select * from joined
 ```
+
+## See Also
+
+- `.claude/docs/05_DBT_DATA_PRACTICE_STANDARDS.md` — dbt conventions, testing, architecture, and anti-patterns beyond SQL formatting
+- `.claude/rules/dbt-conventions.md` — path-scoped dbt model rules (naming, layers, config)

@@ -70,8 +70,7 @@ Catalog (REST/Hive/Glue/Nessie)
 
 | Agent | Primary Files | Use Case |
 |-------|---------------|----------|
-| spark-specialist | patterns/spark-integration.md | Read/write Iceberg with Spark |
-| spark-performance-analyzer | patterns/performance-tuning.md | Optimize Iceberg query performance |
+| spark-specialist | patterns/spark-integration.md, patterns/performance-tuning.md | Read/write and optimize Iceberg with Spark |
 | medallion-architect | patterns/migration-from-hive.md | Design lakehouse with Iceberg |
 | lakeflow-architect | patterns/table-maintenance.md | DLT pipelines with Iceberg |
 

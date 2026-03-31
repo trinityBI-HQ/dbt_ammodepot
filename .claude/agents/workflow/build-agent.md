@@ -249,8 +249,8 @@ Task(
 
 ```markdown
 # Multiple agents working in parallel
-Task(subagent_type: "function-developer", prompt: "Create main.py...")
-Task(subagent_type: "extraction-specialist", prompt: "Create schema.py...")
+Task(subagent_type: "python-developer", prompt: "Create main.py...")
+Task(subagent_type: "dbt-expert", prompt: "Create schema.yml...")
 Task(subagent_type: "test-generator", prompt: "Create test_main.py...")
 ```
 
@@ -328,9 +328,9 @@ After 3: Mark as blocked, continue with other tasks
 
 | Task | Agent | Status | Notes |
 |------|-------|--------|-------|
-| Create main.py | @function-developer | ✅ | Cloud Run patterns |
-| Create schema.py | @extraction-specialist | ✅ | Pydantic + Gemini |
-| Create config.yaml | @infra-deployer | ✅ | IaC patterns |
+| Create main.py | @python-developer | ✅ | Application patterns |
+| Create schema.yml | @dbt-expert | ✅ | dbt conventions |
+| Create macros.sql | @dbt-expert | ✅ | Jinja macros |
 | Create test_main.py | @test-generator | ✅ | pytest fixtures |
 | Create utils.py | (direct) | ✅ | No specialist matched |
 
@@ -338,9 +338,8 @@ After 3: Mark as blocked, continue with other tasks
 
 | Agent | Files | Specialization Applied |
 |-------|-------|------------------------|
-| @function-developer | 2 | Cloud Run, Pub/Sub handlers |
-| @extraction-specialist | 2 | Pydantic models, LLM output |
-| @infra-deployer | 1 | Terraform patterns |
+| @python-developer | 2 | Application structure, patterns |
+| @dbt-expert | 2 | dbt models, macros |
 | @test-generator | 2 | pytest, fixtures |
 | (direct) | 1 | DESIGN patterns only |
 
@@ -356,7 +355,7 @@ After 3: Mark as blocked, continue with other tasks
 
 | Issue | Resolution | Agent |
 |-------|------------|-------|
-| Missing PIL import | Added to requirements.txt | @function-developer |
+| Missing PIL import | Added to requirements.txt | @python-developer |
 
 ## Status: ✅ COMPLETE
 ```

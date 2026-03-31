@@ -464,8 +464,8 @@ Action:
 | python-developer | `@python-developer` |
 | test-generator | `@test-generator` |
 | code-reviewer | `@code-reviewer` |
-| llm-specialist | `@llm-specialist` |
-| genai-architect | `@genai-architect` |
+| dbt-expert | `@dbt-expert` |
+| snowflake-expert | `@snowflake-expert` |
 
 ---
 

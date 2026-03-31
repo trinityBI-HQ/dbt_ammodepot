@@ -81,12 +81,9 @@ color: {blue|green|orange|purple|red|yellow}
 Agents are created in: `.claude/agents/{agent-name}.md`
 
 For categorized agents, use subdirectories matching the hierarchy:
-- `.claude/agents/ai-ml/` — LLM, extraction, monitoring agents
-- `.claude/agents/cloud/aws/` — AWS Lambda, deployment agents
-- `.claude/agents/cloud/gcp/` — GCP Cloud Run, pipeline agents
 - `.claude/agents/code-quality/` — Review, testing, documentation agents
 - `.claude/agents/communication/` — Explanation, analysis, planning agents
-- `.claude/agents/data-engineering/{subcategory}/` — Spark, Databricks, dbt, Dagster agents
+- `.claude/agents/data-engineering/{subcategory}/` — Spark, Databricks, dbt, Dagster, Snowflake agents
 - `.claude/agents/devops-sre/` — CI/CD, infrastructure agents
 - `.claude/agents/dev/` — Dev loop agents
 - `.claude/agents/exploration/` — Codebase analysis agents

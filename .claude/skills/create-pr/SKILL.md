@@ -306,10 +306,15 @@ BRANCH
 | `ci` | CI/CD | `ci: add github actions workflow` |
 | `build` | Build system | `build: update dockerfile` |
 
-**Scopes for this project:**
+**Scopes:**
 
 | Scope | Applies To |
 |-------|------------|
+| `sensor` | Dagster sensors |
+| `sources` | dbt source definitions |
+| `ci` | GitHub Actions workflows (`.github/**`) |
+| `deps` | Dependency updates |
+| `migrations` | Schema or data migrations |
 | `agents` | `.claude/agents/**` |
 | `kb` | `.claude/kb/**` |
 | `sdd` | `.claude/sdd/**` |
@@ -318,7 +323,6 @@ BRANCH
 | `pipeline` | `src/pipelines/**` |
 | `api` | `src/api/**` |
 | `infra` | `terraform/**`, `infrastructure/**` |
-| `ci` | `.github/**` |
 
 ---
 
@@ -397,7 +401,7 @@ BRANCH
 ## Related
 
 - Review Command: `.claude/skills/review/SKILL.md`
-- Dual Reviewer Agent: `.claude/agents/code-quality/dual-reviewer.md`
+- Code Reviewer Agent: `.claude/agents/code-quality/code-reviewer.md`
 - CodeRabbit Config: `.coderabbit.yaml`
 - Template: `.github/PULL_REQUEST_TEMPLATE.md`
 - Workflow: `.claude/sdd/_index.md`

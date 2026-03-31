@@ -27,6 +27,8 @@
 | [patterns/snapshots.md](patterns/snapshots.md) | SCD Type 2 implementation with snapshots |
 | [patterns/testing-strategy.md](patterns/testing-strategy.md) | Comprehensive testing approach |
 | [patterns/custom-macros.md](patterns/custom-macros.md) | Building reusable macro libraries |
+| [patterns/data-contracts.md](patterns/data-contracts.md) | Schema enforcement with model contracts (v1.9+) |
+| [patterns/multi-tenancy.md](patterns/multi-tenancy.md) | Multi-client isolation strategies (database vs schema) |
 
 ---
 

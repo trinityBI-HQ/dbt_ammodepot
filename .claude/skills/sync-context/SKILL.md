@@ -1,346 +1,235 @@
 ---
 name: sync-context
-description: Sync project context to CLAUDE.md by analyzing codebase patterns and conventions
-argument-hint: "[--section <name>]"
+description: Sync project context to CLAUDE.md by scanning .claude/ structure and codebase patterns
+argument-hint: "[--section <name>] [--dry-run]"
 ---
 
-# Sync Context Command
+# Sync Context
 
-Analyzes codebase and intelligently updates `.claude/CLAUDE.md` with current project context.
+Scans the current project's `.claude/` structure and codebase, then updates `CLAUDE.md` with accurate counts, tables, and references. Works in any project that has a `.claude/` folder.
 
 ## Usage
 
 ```bash
-/sync-context                    # Full analysis and update
-/sync-context --section agents   # Update specific section
+/sync-context                    # Full scan and update
+/sync-context --section agents   # Update specific section only
 /sync-context --dry-run          # Preview changes without saving
 ```
 
 ---
 
-## What It Does
+## What It Scans
 
-1. **Analyzes** current codebase structure
-2. **Extracts** patterns, conventions, and architecture
-3. **Merges** with existing CLAUDE.md content
-4. **Preserves** manual customizations
-5. **Updates** sections that need refresh
+The skill auto-detects which components exist and only generates sections for what's present.
+
+| Component | How Detected | CLAUDE.md Section Generated |
+|-----------|-------------|----------------------------|
+| `agents/` | `Glob(".claude/agents/**/*.md")` excluding `_*` | Agents table (category, count, names) |
+| `kb/` | `Glob(".claude/kb/**/index.md")` | Knowledge Base table (category, count, technologies) |
+| `rules/` | `Glob(".claude/rules/*.md")` | Rules list (name, path scope, purpose) |
+| `docs/` | `Glob(".claude/docs/*.md")` | Delivery Standards table (doc, scope) |
+| `skills/` | `Glob(".claude/skills/*/SKILL.md")` | Skills list (grouped by function) |
+| `dev/`, `sdd/` | Directory existence check | Mentioned in layout if present |
+| Project code | `Glob("**/*.py")`, `Glob("**/*.sql")`, `Glob("**/dbt_project.yml")` | Project-specific context (tech stack, structure) |
 
 ---
 
-## Analysis Process
+## Execution Steps
 
-### Step 1: Scan Codebase Structure
+### Step 1: Read Existing CLAUDE.md
 
 ```text
-# Discover project structure
-Glob("**/*.py")              # Python files
-Glob("**/*.ts")              # TypeScript files
-Glob("**/package.json")      # Node projects
-Glob("**/pyproject.toml")    # Python projects
-Glob("**/Dockerfile")        # Container configs
-Glob("**/*.tf")              # Terraform
+Read(".claude/CLAUDE.md")
 ```
 
-### Step 2: Extract Patterns
+Parse into sections by `##` headers. Identify which sections exist and their content.
+
+### Step 2: Scan .claude/ Components
+
+Run these scans in parallel:
 
 ```text
-# Code patterns
-Grep("@dataclass")           # Dataclass usage
-Grep("class.*Parser")        # Parser patterns
-Grep("def test_")            # Test patterns
-Grep("async def")            # Async patterns
-
-# Architecture patterns
-Grep("from src")             # Import structure
-Grep("@router")              # API patterns
-Grep("@lambda_handler")      # Lambda patterns
-```
-
-### Step 3: Analyze Agents
-
-```text
-# List available agents
+# Agents: count and categorize by parent folder
 Glob(".claude/agents/**/*.md")
+→ Group by directory (code-quality/, data-engineering/, workflow/, etc.)
+→ Extract name from frontmatter
 
-# Categorize by folder
-- workflow/      → SDD pipeline agents
-- code-quality/  → Review, clean, test
-- data-engineering/ → Spark, Lakeflow
-- aws/           → Lambda, deployer
-- ai-ml/         → LLM, prompts
-- domain/        → Project-specific
+# KB: count technologies by category
+Glob(".claude/kb/**/index.md")
+→ Group by top-level category (data-engineering/, ai-ml/, cloud/, etc.)
+→ Extract technology name from parent folder
+
+# Rules: list with path scope
+Glob(".claude/rules/*.md")
+→ Read first 5 lines of each for paths: frontmatter
+→ Extract rule name and scope
+
+# Docs: list delivery standards
+Glob(".claude/docs/*.md")
+→ Extract title from first # heading
+
+# Skills: list slash commands
+Glob(".claude/skills/*/SKILL.md")
+→ Extract name and description from frontmatter
 ```
 
-### Step 4: Merge Updates
+### Step 3: Scan Project Code (if present)
+
+Only runs if the project has source code (not a pure KB repo):
 
 ```text
-# Sections to update
-- Project Structure (from scan)
-- Coding Standards (from patterns)
-- Agent Usage (from agent analysis)
-- Commands (from commands/)
-- Environment (from config files)
-
-# Sections to preserve
-- Project Context (manual)
-- Core Mission (manual)
-- Important Dates (manual)
-- Getting Help (manual)
+# Detect tech stack
+Glob("**/dbt_project.yml")      → dbt project (extract name, profile)
+Glob("**/pyproject.toml")       → Python project (extract deps)
+Glob("**/dagster_orchestration") → Dagster orchestration
+Glob("**/*.sql")                → SQL models (count by layer)
+Glob(".github/workflows/*.yml") → CI/CD workflows
 ```
 
----
+### Step 4: Generate Updated Sections
 
-## CLAUDE.md Template
+Build each section from scan results. Use these templates:
 
-Generated CLAUDE.md follows this structure:
-
+**Directory Layout:**
 ```markdown
-# {Project Name}
+## Directory Layout
 
-## Project Context
+\```
+.claude/
+├── agents/       # {agent_count} specialized domain experts ({category_count} categories)
+├── skills/       # {skill_count} slash commands
+├── rules/        # {rule_count} path-scoped instruction files
+├── kb/           # {kb_count} technology knowledge bases ({kb_category_count} categories)
+├── docs/         # {doc_count} delivery standards documents
+{├── dev/          # Dev loop system (only if exists)}
+{├── sdd/          # SDD workflow artifacts (only if exists)}
+└── CLAUDE.md     # This file (global context)
+\```
+```
 
-{Manual: What this project does and why}
+**Agents table:**
+```markdown
+## Agents ({agent_count} across {category_count} categories)
 
----
+| Category | Count | Key Agents |
+|----------|-------|------------|
+| {category} | {count} | {agent_names comma-separated} |
+```
 
-## Architecture Overview
+**KB table:**
+```markdown
+## Knowledge Base ({kb_count} technologies in {kb_category_count} categories)
 
-{Auto-generated from codebase scan}
+| Category | Count | Key Technologies |
+|----------|-------|------------------|
+| {category} | {count} | {technology_names comma-separated} |
+```
 
+**Delivery Standards table** (only if `.claude/docs/` exists):
+```markdown
+## Delivery Standards ({doc_count} documents in `.claude/docs/`)
+
+| Doc | Scope |
+|-----|-------|
+| `{filename}` | {first_heading_or_description} |
+```
+
+**Rules list:**
+```markdown
+## Rules ({rule_count} path-scoped files)
+
+| Rule | Path Scope | Purpose |
+|------|-----------|---------|
+| `{filename}` | `{paths_from_frontmatter}` | {first_heading} |
+```
+
+**Skills list:**
+```markdown
+## Skills ({skill_count} slash commands)
+
+**Core:** {skills_grouped_by_function}
+**Development:** ...
+**Workflow (SDD):** ...
+```
+
+### Step 5: Apply Update Rules
+
+| Section | Update Mode | Behavior |
+|---------|------------|----------|
+| Project Overview | **Preserve** | Never auto-modify (manual context) |
+| Directory Layout | **Replace** | Regenerate from scan |
+| Agents | **Replace** | Regenerate from scan |
+| Knowledge Base | **Replace** | Regenerate from scan |
+| Delivery Standards | **Replace** | Regenerate from scan |
+| Rules | **Replace** | Regenerate from scan |
+| Skills | **Replace** | Regenerate from scan |
+| Key Patterns | **Preserve** | Manual (confidence scoring, git workflow, MCP) |
+| Quick Reference | **Preserve** | Manual (curated task→agent mapping) |
+| Any project-specific sections | **Preserve** | Never touch sections not in the template |
+
+**Rule:** If a section exists in CLAUDE.md but wasn't generated by the scan (e.g., "Architecture Overview" in a dbt project), preserve it untouched.
+
+### Step 6: Write or Preview
+
+If `--dry-run`:
 ```text
-{Data flow diagram}
+SYNC-CONTEXT DRY RUN
+━━━━━━━━━━━━━━━━━━━━
+
+Scanned:
+  Agents:  {count} across {categories} categories
+  KB:      {count} technologies in {categories} categories
+  Rules:   {count} path-scoped files
+  Docs:    {count} delivery standards
+  Skills:  {count} slash commands
+
+Sections to update:
+  • Directory Layout: UPDATE (agents count changed: {old} → {new})
+  • Agents: UPDATE (removed 3, structure changed)
+  • Knowledge Base: NO CHANGE
+  • Delivery Standards: UPDATE (1 new doc added)
+  • Skills: NO CHANGE
+
+Sections preserved:
+  • Project Overview
+  • Key Patterns
+  • Quick Reference
+
+━━━━━━━━━━━━━━━━━━━━
+Run without --dry-run to apply changes.
 ```
 
-| Stage | Technology | Purpose |
-| ----- | ---------- | ------- |
-| {stage} | {tech} | {purpose} |
-
----
-
-## Project Structure
-
-{Auto-generated from Glob scans}
-
+If writing:
 ```text
-{project}/
-├── src/
-│   ├── {folders discovered}
-├── tests/
-├── .claude/
-│   ├── agents/
-│   ├── commands/
-│   ├── sdd/
-│   ├── kb/
-│   └── memories/
+Edit(".claude/CLAUDE.md", old_string=..., new_string=...)
 ```
 
----
-
-## Agent Usage Guidelines
-
-{Auto-generated from agents/ folder}
-
-### Available Agents by Category
-
-| Category | Agents | Use When |
-| -------- | ------ | -------- |
-| Workflow | prd-agent, clarify-agent, ... | Building features with SDD |
-| Code Quality | code-reviewer, test-generator, ... | Improving code |
-| {category} | {agents} | {trigger} |
-
----
-
-## Coding Standards
-
-{Auto-generated from detected patterns}
-
-### Language: {Python/TypeScript/etc}
-
-- **Version:** {detected from config}
-- **Style:** {detected patterns}
-- **Testing:** {detected framework}
-
-### Detected Patterns
-
-| Pattern | Usage | Example File |
-| ------- | ----- | ------------ |
-| {pattern} | {where used} | {file path} |
-
----
-
-## Commands
-
-{Auto-generated from commands/ folder}
-
-| Command | Purpose |
-| ------- | ------- |
-| /build-feature | Full SDD pipeline |
-| /memory | Save session insights |
-| {command} | {purpose} |
-
----
-
-## Environment Variables
-
-{Auto-generated from .env.example, config files}
-
-| Variable | Purpose |
-| -------- | ------- |
-| {var} | {purpose} |
-
----
-
-## MCP Tools Available
-
-{Auto-generated from settings}
-
-| MCP Server | Purpose |
-| ---------- | ------- |
-| context7-mcp | Library documentation |
-| exa | Code context search |
-| {mcp} | {purpose} |
-
----
-
-## Important Dates
-
-{Manual: Project-specific dates}
-
----
-
-## Getting Help
-
-{Auto-generated from structure}
-
-- **Documentation**: Start with relevant docs
-- **Agents**: Review .claude/agents/
-- **Commands**: Use /help for available commands
-```
-
----
-
-## Section Update Rules
-
-| Section | Source | Update Mode |
-| ------- | ------ | ----------- |
-| Project Context | Manual | Preserve |
-| Architecture | Codebase scan | Replace |
-| Project Structure | Glob patterns | Replace |
-| Agent Usage | agents/ folder | Replace |
-| Coding Standards | Pattern detection | Merge |
-| Commands | commands/ folder | Replace |
-| Environment | Config files | Merge |
-| MCP Tools | settings.json | Replace |
-| Important Dates | Manual | Preserve |
-| Getting Help | Structure | Replace |
-
-**Replace**: Fully regenerate from source
-**Merge**: Add new, preserve custom
-**Preserve**: Never auto-modify
-
----
-
-## Execution Flow
-
-```text
-1. Read existing CLAUDE.md
-   │
-   ▼
-2. Parse into sections
-   │
-   ▼
-3. Analyze codebase (parallel)
-   ├── Glob for structure
-   ├── Grep for patterns
-   ├── Read config files
-   └── List agents/commands
-   │
-   ▼
-4. Generate new sections
-   │
-   ▼
-5. Apply update rules
-   ├── Replace auto sections
-   ├── Merge semi-auto sections
-   └── Preserve manual sections
-   │
-   ▼
-6. Validate (dry-run or save)
-   │
-   ▼
-7. Write updated CLAUDE.md
-```
-
----
-
-## Example Output
-
-```text
-UPDATE CLAUDE.MD
-━━━━━━━━━━━━━━━━
-
-Analyzing codebase...
-✓ Found 47 Python files
-✓ Found 12 test files
-✓ Found 28 agents
-✓ Found 8 commands
-
-Detected patterns:
-✓ Dataclass pattern (15 usages)
-✓ Parser pattern (4 files)
-✓ Generator pattern (8 usages)
-
-Section updates:
-• Architecture: UPDATED (new components detected)
-• Project Structure: UPDATED (3 new folders)
-• Agent Usage: UPDATED (2 new agents)
-• Coding Standards: MERGED (1 new pattern)
-• Commands: UPDATED (1 new command)
-• Project Context: PRESERVED (manual content)
-
-━━━━━━━━━━━━━━━━
-CLAUDE.md updated successfully
-```
+Use targeted Edit calls per section — never rewrite the entire file.
 
 ---
 
 ## Flags
 
 | Flag | Description |
-| ---- | ----------- |
+|------|-------------|
 | `--dry-run` | Preview changes without saving |
-| `--section {name}` | Update only specific section |
-| `--force` | Replace all sections (ignores preserve rules) |
-| `--verbose` | Show detailed analysis |
+| `--section {name}` | Update only: `agents`, `kb`, `rules`, `docs`, `skills`, `layout` |
+| `--verbose` | Show detailed scan results |
 
 ---
 
-## Best Practices
+## When to Run
 
-### When to Run
+- After adding/removing agents or KB entries
+- After creating new rules or docs files
+- After adding new skills
+- Before `/sync-repos` (ensures CLAUDE.md is current before pushing)
+- After any session that modifies `.claude/` structure
 
-- After adding new agents or commands
-- After significant architecture changes
-- After adding new file types
-- When onboarding new team members
+---
 
-### What to Customize
+## Notes
 
-After running, manually update:
-
-1. **Project Context** - Add business context
-2. **Important Dates** - Add milestone dates
-3. **Architecture** - Add business-specific details
-4. **Coding Standards** - Add team conventions
-
-### Version Control
-
-```bash
-# Review changes before committing
-git diff .claude/CLAUDE.md
-
-# Commit with context
-git add .claude/CLAUDE.md
-git commit -m "chore: update CLAUDE.md with latest project structure"
-```
+- **Lab vs downstream**: In claude-code-lab this scans the full KB/agent roster. In downstream projects (after `/sync-repos`), it scans whatever subset was synced.
+- **Project-specific sections**: Any `##` section in CLAUDE.md that the skill doesn't recognize is preserved. This protects project-specific context (Architecture, Snowflake Objects, Deployment, etc.).
+- **No code analysis for pure KB repos**: If no `*.py`, `*.sql`, or project config files exist, Step 3 is skipped entirely.
