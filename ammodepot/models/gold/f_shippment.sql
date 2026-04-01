@@ -64,28 +64,20 @@ shiptransformation as (
     group by s.shipment_id, sales_order_id
 ),
 
-conversion as (
-    select
-        p.record_id              as order_fishbowl,
-        p.channel_id             as order_magento
-    from {{ ref('fishbowl_plugininfo') }} as p
-    where p.related_table_name = 'SO'
-),
-
 freightinfo as (
     select
-        c.order_magento         as order_magento,
+        om.magento_order_id     as order_magento,
         avg(st.freightamount)   as freightamount,
         avg(st.freightweight)   as freightweight,
         avg(st.carrierserviceid) as carrierserviceid,
         avg(st.net_amount)      as net_amount,
         avg(st.packagenumb)     as packagenumb
     from {{ ref('fishbowl_so') }} as so
+    inner join {{ ref('int_fishbowl_magento_order_map') }} as om
+      on so.sales_order_id = om.fishbowl_so_id
     left join shiptransformation as st
-    on cast(so.sales_order_id as varchar) = cast(st.sales_order_id as varchar)
-    left join conversion        as c
-      on cast(so.sales_order_id   as varchar) = cast(c.order_fishbowl   as varchar)
-    group by c.order_magento
+      on cast(so.sales_order_id as varchar) = cast(st.sales_order_id as varchar)
+    group by om.magento_order_id
 ),
 
 service as (

@@ -1,5 +1,21 @@
 
 models:
+  - name: int_fishbowl_magento_order_map
+    description: >
+      Maps Fishbowl sales orders to Magento orders using the order number.
+      Fishbowl SO.NUM base (before the dash suffix) matches Magento INCREMENT_ID.
+      Replaces the plugininfo-based mapping which stopped receiving new SO records
+      after 2026-01-05.
+    columns:
+      - name: fishbowl_so_id
+        description: "Fishbowl sales order identifier."
+        tests:
+          - not_null
+      - name: magento_order_id
+        description: "Magento order identifier (entity_id)."
+        tests:
+          - not_null
+
   - name: int_fishbowl_order_cost
     description: >
       Fishbowl-to-Magento cost resolution per order item. Contains all cost-related CTEs

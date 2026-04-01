@@ -1,12 +1,4 @@
-with conversion_so as (
-    select
-        f.record_id  as produtofish,
-        f.channel_id as produto_magento
-    from {{ ref('fishbowl_plugininfo') }} as f
-    where f.related_table_name = 'SO'
-),
-
-ups_shipment_cost as (
+with ups_shipment_cost as (
     select
         tracking_number,
         sum(net_amount)          as net_amount
@@ -32,14 +24,15 @@ fishbowl_shipment_costs as (
 
 magento_freight_info as (
     select
-        pc.produto_magento        as order_magento,
+        om.magento_order_id       as order_magento,
         avg(fb2.freight_amount)   as freight_amount,
         avg(fb2.freight_weight)   as freight_weight,
         avg(fb2.carrier_service_id) as carrier_service_id
     from {{ ref('fishbowl_so') }}            as fb
+    inner join {{ ref('int_fishbowl_magento_order_map') }} as om
+      on fb.sales_order_id = om.fishbowl_so_id
     left join fishbowl_shipment_costs       as fb2 on fb.sales_order_id = fb2.soid
-    left join conversion_so                  as pc  on fb.sales_order_id = pc.produtofish
-    group by pc.produto_magento
+    group by om.magento_order_id
 ),
 
 magento_order_items_for_freight as (

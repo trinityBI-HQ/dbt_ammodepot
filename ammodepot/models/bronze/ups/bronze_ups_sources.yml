@@ -1,0 +1,19 @@
+sources:
+  - name: ups
+    description: >
+      UPS invoice data manually uploaded weekly from UPS Billing Center CSV exports.
+      Loaded into PC_FIVETRAN_DB by operations team every Monday.
+      No freshness check — manual upload cadence varies.
+    database: PC_FIVETRAN_DB
+    schema: UPS_INVOICE_HISTORY
+    tables:
+      - name: ups_invoice
+        description: >
+          UPS shipping invoice line items with tracking numbers and net amounts.
+          Multiple rows per tracking number (freight, surcharges, fuel).
+          Primary join key to Fishbowl shipcarton is TRACKING_NUMBER.
+        columns:
+          - name: tracking_number
+            description: "UPS tracking number — joins to fishbowl_shipcarton.tracking_number"
+          - name: net_amount
+            description: "Net charge amount in USD for this line item"
