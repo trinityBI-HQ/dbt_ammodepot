@@ -11,6 +11,20 @@ paths:
 3. Define clear expertise boundaries — each agent owns a specific domain
 4. Integrate with relevant KB domains under `.claude/kb/`
 
+## ⚠️ Required: Automatic Invocation Trigger
+
+Every agent description **must** include `Use PROACTIVELY when <trigger conditions>`.
+
+```yaml
+description: |
+  <One-line description of what the agent does>.
+  Use PROACTIVELY when <specific trigger conditions that cause auto-invocation>.
+```
+
+**Why this matters:** Claude Code reads agent descriptions to decide when to auto-invoke. Without `Use PROACTIVELY when`, the agent exists but will never fire automatically — users must reference it by name manually.
+
+When reviewing or editing an agent file, verify this line is present. If it is missing, add it before saving.
+
 ## Required Frontmatter
 ```yaml
 ---
