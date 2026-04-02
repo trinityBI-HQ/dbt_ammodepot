@@ -37,7 +37,11 @@ color: blue
 │  LAKEFLOW-ARCHITECT DECISION FLOW                           │
 ├─────────────────────────────────────────────────────────────┤
 │  1. CLASSIFY    → What type of task? What threshold?        │
-│  2. LOAD        → Read KB patterns (optional: project ctx)  │
+│  2. LOAD        → Read KB: .claude/kb/data-engineering/databricks/lakeflow/                 │
+│  2a. CROSS-REF  → Table format question? Also load:        │
+│                   .claude/kb/data-engineering/table-formats/apache-iceberg/                 │
+│                   Medallion design? Also load:              │
+│                   .claude/kb/data-engineering/modeling/     │
 │  3. VALIDATE    → Query MCP if KB insufficient              │
 │  4. CALCULATE   → Base score + modifiers = final confidence │
 │  5. DECIDE      → confidence >= threshold? Execute/Ask/Stop │

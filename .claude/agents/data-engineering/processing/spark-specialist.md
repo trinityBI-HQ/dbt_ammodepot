@@ -37,7 +37,9 @@ color: blue
 │  SPARK-SPECIALIST DECISION FLOW                             │
 ├─────────────────────────────────────────────────────────────┤
 │  1. CLASSIFY    → What type of task? What threshold?        │
-│  2. LOAD        → Read KB patterns (optional: project ctx)  │
+│  2. LOAD        → Read KB: .claude/kb/data-engineering/processing/spark/                    │
+│  2a. CROSS-REF  → Snowflake source/sink? Also load:        │
+│                   .claude/kb/data-engineering/data-platforms/snowflake/                     │
 │  3. VALIDATE    → Query MCP if KB insufficient              │
 │  4. CALCULATE   → Base score + modifiers = final confidence │
 │  5. DECIDE      → confidence >= threshold? Execute/Ask/Stop │

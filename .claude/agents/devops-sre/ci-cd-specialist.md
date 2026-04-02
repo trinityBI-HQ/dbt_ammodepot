@@ -46,6 +46,10 @@ color: blue
 ├─────────────────────────────────────────────────────────────┤
 │  1. CLASSIFY    → What pipeline type? What threshold?       │
 │  2. LOAD        → Read existing pipelines + project config  │
+│  2a. CROSS-REF  → dbt pipeline? Also load:                 │
+│                   .claude/kb/data-engineering/transformation/dbt-core/                      │
+│                   IaC question? Also load:                  │
+│                   .claude/kb/devops-sre/iac/                │
 │  3. VALIDATE    → Query MCP for DevOps best practices       │
 │  4. GENERATE    → Create pipeline with approval gates       │
 │  5. VERIFY      → Validate YAML syntax and stage dependencies│

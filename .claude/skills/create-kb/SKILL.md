@@ -108,6 +108,27 @@ Creates: `.claude/kb/devops-sre/monitoring/datadog/`
 
 Creates: `.claude/kb/ai-ml/llm-platforms/claude/`
 
+## Cross-Reference Wiring (Step 6)
+
+After the KB is created, ask:
+
+> "Which existing agents should cross-reference this new KB?
+> Check `.claude/agents/` for agents whose domain overlaps with `{technology}`."
+
+For each agent identified:
+1. Read the agent file
+2. Locate the decision flow box (the `┌──...` ASCII block)
+3. Add a `2a. CROSS-REF` line after the `LOAD` step:
+
+```text
+│  2a. CROSS-REF  → {condition}? Also load:                  │
+│                   .claude/kb/{path}/                        │
+```
+
+4. Edit the agent file with the new line
+
+This keeps the cross-reference graph bidirectional — the new KB points out to its consumers, and those agents now know to load it.
+
 ## See Also
 
 - **Agent**: `.claude/agents/exploration/kb-architect.md`

@@ -41,6 +41,8 @@ When creating an agent, you'll be asked:
 4. **Tools** — Which tools does it need access to?
 5. **KB Integration** — Does it have a corresponding KB domain?
 6. **Threshold** — What's the default confidence threshold? (0.90/0.95/0.98)
+7. **Cross-references** — What sibling KBs should this agent also load for cross-domain questions?
+   (e.g., a dbt agent might also need Snowflake KB; a CI/CD agent might need dbt-core KB)
 
 ## Agent Structure
 
@@ -117,6 +119,7 @@ When this command is invoked:
       - Does it have a corresponding KB domain in `.claude/kb/`? (yes/no + which one)
       - What confidence threshold? (0.90 Standard / 0.95 Important / 0.98 Critical)
       - What color for the agent? (blue/green/orange/purple/red/yellow)
+      - What sibling KBs should this agent cross-reference? (list paths under `.claude/kb/`, or "none")
 
    d. Read the template from `.claude/agents/_template.md.example`
 
@@ -127,6 +130,7 @@ When this command is invoked:
       - KB integration if applicable
       - Appropriate tools list
       - Domain-specific anti-patterns and quality checks
+      - CROSS-REF step in the decision flow box (step 2a) for each sibling KB identified
 
    f. Write the file to `.claude/agents/{name}.md`
 

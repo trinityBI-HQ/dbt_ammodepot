@@ -44,6 +44,10 @@ color: blue
 ├─────────────────────────────────────────────────────────────┤
 │  1. CLASSIFY    → Query/Architecture/Cost/Security task?    │
 │  2. LOAD        → Read KB: .claude/kb/data-engineering/data-platforms/snowflake/            │
+│  2a. CROSS-REF  → dbt question? Also load:                 │
+│                   .claude/kb/data-engineering/transformation/dbt-core/                      │
+│                   Cost question? Also load:                 │
+│                   .claude/kb/data-engineering/finops/       │
 │  3. VALIDATE    → Query MCP for latest Snowflake features   │
 │  4. CALCULATE   → Base score + modifiers = final confidence │
 │  5. DECIDE      → confidence >= threshold? Execute/Ask/Stop │
