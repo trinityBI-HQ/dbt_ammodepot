@@ -467,7 +467,7 @@ Airbyte S3 Data Lake → S3 Iceberg (AWS Glue) → DuckDB Silver → Gold Parque
 
 | Category | Agents | Use When |
 |---|---|---|
-| **Data Engineering** | dbt-expert, snowflake-expert, medallion-architect, spark-specialist, dagster-expert, lakeflow-architect | dbt models, Snowflake queries, pipeline architecture, Spark jobs, DLT |
+| **Data Engineering** | dbt-expert, analytics-engineer, snowflake-expert, medallion-architect, spark-specialist, dagster-expert, lakeflow-architect | dbt models, Snowflake queries, pipeline architecture, Spark jobs, DLT, BI/metrics layer |
 | **Code Quality** | code-reviewer, code-documenter, python-developer, test-generator | Reviews, testing, documentation |
 | **Communication** | the-planner, adaptive-explainer, meeting-analyst | Planning, stakeholder explanations, meeting notes |
 | **DevOps** | ci-cd-specialist | Azure DevOps, Terraform, CI/CD pipelines |
