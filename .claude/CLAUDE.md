@@ -1,5 +1,13 @@
 # ammodepot
 
+## Institutional Memory
+
+**Lookup policy:** For any technology question, check `.claude/kb/` before invoking an agent or using Exa web search. See the KB routing table in the institutional CLAUDE.md for technology-to-path mapping.
+
+**Model guidance:** `.claude/docs/07_MODEL_SELECTION_POLICY.md` — Haiku for lookups/summaries, Sonnet for implementation, Opus for architecture decisions.
+
+---
+
 ## Project Context
 
 dbt project for Ammunition Depot's analytics pipeline. Transforms raw data from Fishbowl (inventory/ERP) and Magento (e-commerce) into structured, tested datasets using Medallion Architecture.
@@ -9,7 +17,7 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 ### Warehouse Migration (Complete)
 
 Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
-- **Snowflake** (`ammodepot/`): Production — 98 models, ECS Fargate orchestration every 10 min
+- **Snowflake** (`ammodepot/`): Production — 99 models, ECS Fargate orchestration every 10 min
 - **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
 - **Adapter**: dbt-snowflake 1.11.2
 
@@ -60,7 +68,8 @@ Airbyte CDC (Fishbowl, Magento)
 |---|---|
 | Transformation | dbt-core 1.11.6 + dbt-snowflake 1.11.2 |
 | Warehouse | Snowflake (production) |
-| Ingestion | Airbyte CDC on EC2 c6a.2xlarge (2 active Snowflake connections, 64 streams) |
+| Ingestion | Airbyte CDC on EC2 c6a.2xlarge (2 Snowflake + 2 S3 Data Lake Iceberg connections) |
+| Lakehouse | dbt-duckdb 1.10.1 + S3 Iceberg (AWS Glue catalog) — `ammodepot_lakehouse/` |
 | Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
 | CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/) |
 | Packages | dbt_utils |
@@ -156,12 +165,13 @@ ammodepot/
 │       └── format_timestamp.sql
 ├── tests/generic/              # 8 custom generic tests
 ├── models/
-│   ├── bronze/                 # Source definitions (reads from AD_AIRBYTE database)
+│   ├── bronze/                 # Source definitions (reads from AD_AIRBYTE + PC_FIVETRAN_DB)
 │   │   ├── fishbowl/           # schema: AD_FISHBOWL (34 source tables)
-│   │   └── magento/            # schema: AD_MAGENTO (25 source tables)
+│   │   ├── magento/            # schema: AD_MAGENTO (25 source tables)
+│   │   └── ups/                # schema: UPS_INVOICE_HISTORY in PC_FIVETRAN_DB (1 source table)
 │   ├── silver/                 # 76 models (69 views + 7 high-fan-out tables)
 │   └── gold/                   # 13 table models + 10 views (including intermediates)
-│       ├── intermediate/       # 9 reusable view models (3 materialized as tables)
+│       ├── intermediate/       # 10 reusable view models (3 materialized as tables)
 │       ├── _exposures.yml      # BI dashboard dependency documentation
 │       ├── f_cohort.sql        # Customer cohort analysis
 │       ├── f_cohort_detailed.sql  # Detailed cohort metrics
@@ -172,7 +182,28 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 98 models (34 FB + 23 MG + 19 Inv + 13 Gold + 9 Int), 1 seed, 59 source tables, 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
+**Snowflake Counts:** 99 models (34 FB + 23 MG + 19 Inv + 13 Gold + 10 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
+
+### Lakehouse Project (dbt-duckdb, In Progress)
+
+```
+ammodepot_lakehouse/
+├── dbt_project.yml             # profile: ammodepot_lakehouse, dbt-duckdb adapter
+├── packages.yml                # dbt_utils
+├── profiles.yml                # DuckDB in-memory, S3 via httpfs
+├── models/
+│   ├── bronze/                 # Source definitions (S3 Iceberg via Glue catalog)
+│   │   ├── fishbowl/           # 34 tables from production2018 Glue DB
+│   │   └── magento/            # 21 tables from ammuni_prod Glue DB
+│   ├── silver/                 # 76 models (copied from ammodepot/, adapted for DuckDB)
+│   │   ├── fishbowl/           # 34 models
+│   │   ├── magento/            # 23 models
+│   │   └── inventory/          # 19 models
+│   └── gold/                   # Pending — will export to S3 staging → Snowflake COPY INTO
+└── .gitignore                  # target/, dbt_packages/, logs/, .env, *.p8
+```
+
+**Dialect fixes applied:** `coalesce(_ab_cdc_updated_at, _airbyte_extracted_at)` → `try_cast()` wrapper (54 files). All other SQL compatible with DuckDB.
 
 ### Streamlit App (BI Dashboard)
 
@@ -296,8 +327,13 @@ Inventory management / ERP system. Key tables: `so`, `soitem`, `product`, `part`
 E-commerce platform. Key tables: `sales_order`, `sales_order_item`, `customer_entity`, `catalog_product_entity`, `quote`, `store`, EAV attribute tables (`eav_attribute`, `catalog_product_entity_varchar/int/text/decimal`)
 - Redshift: `magento` schema | Snowflake: `AD_AIRBYTE.AD_MAGENTO`
 
+### UPS (1 table, Snowflake only)
+Shipping invoice data manually uploaded weekly from UPS Billing Center CSV exports. Loaded into `PC_FIVETRAN_DB.UPS_INVOICE_HISTORY` by operations team.
+- Key table: `ups_invoice` (tracking_number, net_amount)
+- Joins to Fishbowl shipcarton via tracking_number for freight cost allocation
+
 ### Source Freshness
-Both sources have freshness configured: warn after 24h, error after 48h, using `_airbyte_extracted_at` as the loaded_at_field.
+Fishbowl and Magento sources have freshness configured: warn after 24h, error after 48h, using `_airbyte_extracted_at` as the loaded_at_field. UPS source has no freshness check (manual upload cadence).
 
 ### Airbyte Connections (2 active Snowflake, updated 2026-03-23)
 
@@ -347,7 +383,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 
 3. **Silver views, Gold tables** -- Silver is lightweight (views) for real-time freshness, with 7 high-fan-out models overridden to tables (fishbowl_soitem, fishbowl_product, fishbowl_uomconversion, fishbowl_part, magento_sales_order_item, magento_sales_order, inventory_qtyinventorytotals). Gold materializes as tables for BI query performance.
 
-4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 9 reusable intermediate views, materialized in the `gold` schema. Includes `int_sales_cost_fallback` (cost fallback logic extracted from f_sales), `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution), and `int_customer_cohort` (shared cohort base for f_cohort/f_cohort_detailed).
+4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 10 reusable intermediate views, materialized in the `gold` schema. Includes `int_fishbowl_magento_order_map` (NUM-based SO-to-order mapping), `int_sales_cost_fallback` (cost fallback logic extracted from f_sales), `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution), and `int_customer_cohort` (shared cohort base for f_cohort/f_cohort_detailed).
 
 5. **UPPER_CASE gold columns** -- Gold layer output uses UPPER_CASE aliases for backward compatibility with existing Power BI consumers.
 
@@ -378,7 +414,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 ### Snowflake (Production — ECS Fargate)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=430, WARN=9, ERROR=0 (98 models + 382 tests, ~3 min — 2026-03-25)
+- **Last build**: PASS=430, WARN=9, ERROR=0 (99 models + 382 tests, ~3 min — 2026-04-01)
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
@@ -398,16 +434,19 @@ Built 2026-03-23 — "Snowflake Cost & Usage Monitor" with 8 tiles:
 7. Storage by Database (bar)
 8. Cost Anomaly Detection (table)
 
-### S3 + DuckDB + Iceberg Lakehouse (POC Planned)
+### S3 + DuckDB + Iceberg Lakehouse (In Progress)
 
-Target architecture to reduce Snowflake compute by ~93%:
+Architecture to reduce Snowflake compute by ~93%:
 ```
-Airbyte → S3 (Parquet) → DuckDB+dbt (Fargate) → S3 Gold → COPY INTO Snowflake → Power BI
+Airbyte S3 Data Lake → S3 Iceberg (AWS Glue) → DuckDB Silver → Gold Parquet → Snowflake COPY INTO → Power BI
 ```
 - **Motivation**: SVC_AIRBYTE burns 678 credits/mo (74% of total)
 - **Savings**: ~$2,600/mo (~$31K/year)
-- **POC**: Single stream (`fishbowl.so`), 3 days effort
-- **Docs**: `docs/POC_S3_DUCKDB_LAKEHOUSE.md`
+- **Status**: Fishbowl 34 Iceberg tables in Glue, Magento 21 pending. dbt-duckdb Silver 75/76 PASS.
+- **S3 Bucket**: `ammodepot-lakehouse` (us-east-1, lifecycle rules, Iceberg at `iceberg/` prefix)
+- **Glue Databases**: `production2018` (Fishbowl), `ammuni_prod` (Magento pending)
+- **IAM**: `svc_airbyte-s3` (S3 + Glue access), `ecs-dbt-lakehouse-task-role`, `snowflake-lakehouse-role`
+- **Docs**: `docs/POC_S3_DUCKDB_LAKEHOUSE.md`, `docs/AIRBYTE_RESOURCE_OPTIMIZATION.md`
 
 ---
 
@@ -415,25 +454,21 @@ Airbyte → S3 (Parquet) → DuckDB+dbt (Fargate) → S3 Gold → COPY INTO Snow
 
 | Document | Path | Description |
 |---|---|---|
-| Optimization Plan | `docs/OPTIMIZATION_PLAN.md` | 4-phase plan: test severity, contracts, incremental, refactoring |
 | Cost Dashboard | `docs/SNOWFLAKE_COST_DASHBOARD.md` | Snowflake cost monitoring queries, tags, alerts, best practices |
 | Lakehouse POC | `docs/POC_S3_DUCKDB_LAKEHOUSE.md` | S3+DuckDB+Iceberg migration plan with step-by-step POC |
 | Snowflake Access | `docs/snowflake_access_setup.md` | Role/user/warehouse setup documentation |
+| Airbyte Resources | `docs/AIRBYTE_RESOURCE_OPTIMIZATION.md` | Airbyte EC2 resource optimization analysis |
 
 ---
 
 ## Agent Usage Guidelines
 
-44 specialized agents organized by category in `.claude/agents/`:
+25 specialized agents in 8 categories (`.claude/agents/`):
 
 | Category | Agents | Use When |
 |---|---|---|
-| **Data Engineering** | dbt-expert, snowflake-expert, medallion-architect, spark-specialist, spark-performance-analyzer, spark-troubleshooter, spark-streaming-architect, dagster-expert | dbt models, Snowflake queries, pipeline architecture, Spark jobs |
-| **Databricks** | lakeflow-expert, lakeflow-architect, lakeflow-pipeline-builder | DLT pipelines, Lakeflow CDC, DABs deployment |
-| **AI/ML** | extraction-specialist, genai-architect, dataops-builder, ai-data-engineer, ai-prompt-specialist, llm-specialist | LLM prompts, extraction, multi-agent systems |
-| **Cloud - AWS** | lambda-builder, aws-deployer, aws-lambda-architect | Lambda functions, SAM templates, S3 triggers |
-| **Cloud - GCP** | function-developer, pipeline-architect, infra-deployer | Cloud Run, Pub/Sub, Terraform/Terragrunt |
-| **Code Quality** | code-reviewer, code-cleaner, code-documenter, dual-reviewer, python-developer, test-generator | Reviews, refactoring, testing, documentation |
+| **Data Engineering** | dbt-expert, snowflake-expert, medallion-architect, spark-specialist, dagster-expert, lakeflow-architect | dbt models, Snowflake queries, pipeline architecture, Spark jobs, DLT |
+| **Code Quality** | code-reviewer, code-documenter, python-developer, test-generator | Reviews, testing, documentation |
 | **Communication** | the-planner, adaptive-explainer, meeting-analyst | Planning, stakeholder explanations, meeting notes |
 | **DevOps** | ci-cd-specialist | Azure DevOps, Terraform, CI/CD pipelines |
 | **Automation** | streamlit-expert | Streamlit apps, SiS deployment, dashboard optimization |
@@ -452,11 +487,11 @@ Airbyte → S3 (Parquet) → DuckDB+dbt (Fargate) → S3 Gold → COPY INTO Snow
 
 ---
 
-## Knowledge Base (604 files in 6 categories)
+## Knowledge Base (609 files in 6 categories)
 
 | Category | Files | Key Technologies |
 |---|---|---|
-| data-engineering | 213 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, elementary |
+| data-engineering | 218 | dbt-core, dbt-cloud, dagster, snowflake, iceberg, great-expectations, DuckDB, elementary, airbyte |
 | cloud | 132 | S3, IAM, Glue, Athena, CloudWatch, KMS, GCP, EMR, Fargate |
 | devops-sre | 124 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github |
 | ai-ml | 81 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
@@ -467,23 +502,26 @@ Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code,
 
 ---
 
-## Skills (14 slash commands)
+## Skills (16 slash commands)
 
 Located in `.claude/skills/<name>/SKILL.md`:
 
-**Core:** `/memory`, `/readme-maker`, `/sync-context`
-**Development:** `/dev`, `/review`, `/create-agent`, `/create-kb`
+**Core:** `/memory`, `/readme-maker`, `/sync-context`, `/audit`
+**Development:** `/dev`, `/review`, `/create-agent`, `/create-kb`, `/create-skill`
 **Workflow (SDD):** `/brainstorm` → `/define` → `/design` → `/build` → `/iterate` → `/ship`, `/create-pr`
 
 ---
 
 ## Rules
 
-Path-scoped instruction files in `.claude/rules/`:
+Path-scoped instruction files in `.claude/rules/` (8 files):
 - **kb-development.md** — KB file conventions and size limits
 - **agent-development.md** — Agent template and MCP validation conventions
 - **git-workflow.md** — Commit message and PR conventions
 - **sql-standards.md** — SQL coding standards for dbt models
+- **dbt-conventions.md** — dbt project conventions and patterns
+- **snowflake-standards.md** — Snowflake SQL and architecture standards
+- **skill-development.md** — Skill template and creation conventions
 - **ecs-deploy.md** — Auto-deploy to ECS after dbt model changes (scoped to ammodepot/, ecs/)
 
 ---

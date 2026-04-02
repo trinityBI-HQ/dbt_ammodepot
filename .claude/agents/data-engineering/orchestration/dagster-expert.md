@@ -38,6 +38,10 @@ color: purple
 ├─────────────────────────────────────────────────────────────┤
 │  1. CLASSIFY    → Asset design? Job? Resource? Deployment?  │
 │  2. LOAD        → Read KB: .claude/kb/data-engineering/orchestration/dagster/              │
+│  2a. CROSS-REF  → dbt question? Also load:                 │
+│                   .claude/kb/data-engineering/transformation/dbt-core/                      │
+│                   Snowflake question? Also load:            │
+│                   .claude/kb/data-engineering/data-platforms/snowflake/                     │
 │  3. VALIDATE    → Query MCP for latest Dagster patterns     │
 │  4. CALCULATE   → Base score + modifiers = final confidence │
 │  5. DECIDE      → confidence >= 0.95? Execute/Ask/Stop      │
