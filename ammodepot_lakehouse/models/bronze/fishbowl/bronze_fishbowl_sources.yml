@@ -1,0 +1,42 @@
+sources:
+  - name: fishbowl
+    description: >
+      Fishbowl inventory management data from Glue Iceberg catalog (Airbyte CDC).
+      Deduplication handled in Silver layer.
+    database: glue
+    schema: production2018
+    tables:
+      - name: so
+      - name: soitem
+      - name: product
+      - name: part
+      - name: customer
+      - name: vendor
+      - name: ship
+      - name: uomconversion
+      - name: kititem
+      - name: objecttoobject
+      - name: po
+      - name: poitem
+      - name: receipt
+      - name: receiptitem
+      - name: inventorylog
+      - name: serial
+      - name: serialnum
+      - name: parttracking
+      - name: parttotracking
+      - name: partcost
+      - name: location
+      - name: carrierservice
+      - name: shipcarton
+      - name: tag
+      - name: tagserialview
+      - name: post
+      - name: postpo
+      - name: postpoitem
+      - name: wo
+      - name: woitem
+      - name: xo
+      - name: xoitem
+      - name: plugininfo
+      - name: vendorparts
