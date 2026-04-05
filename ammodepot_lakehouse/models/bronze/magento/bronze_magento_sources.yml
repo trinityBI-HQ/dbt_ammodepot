@@ -1,10 +1,9 @@
 sources:
   - name: magento
     description: >
-      Magento e-commerce data from Glue Iceberg catalog (Airbyte CDC).
-      Deduplication handled in Silver layer.
+      Magento e-commerce data — deduped Bronze Iceberg (Glue catalog).
     database: glue
-    schema: ammuni_prod
+    schema: ammodepot_bronze
     tables:
       - name: sales_order
       - name: sales_order_item

@@ -86,21 +86,15 @@ vars:
   ammodepot_shotgun_sporting_shot: "'7.5 Shot','8 Shot','9 Shot','7 Shot','6 Shot','5 Shot','4 Shot'"
   ammodepot_shotgun_defense_slug: "'00 Buck','Slug','OO Buck','000 Buck','4 Buck','Buckshot','1 Buck','2 Buck','3 Buck'"
 
-  # S3 bucket for lakehouse Bronze data
+  # S3 bucket for lakehouse data
   s3_bucket: 'ammodepot-lakehouse'
-  s3_bronze_path: 's3://ammodepot-lakehouse/bronze'
+  s3_iceberg_prefix: 's3://ammodepot-lakehouse/iceberg'
 
 models:
   ammodepot_lakehouse:
     silver:
       +materialized: view
     gold:
-      +materialized: table
+      +materialized: view
       intermediate:
         +materialized: view
-        int_fishbowl_order_cost:
-          +materialized: table
-        int_magento_product_eav_lookups:
-          +materialized: table
-        int_sales_cost_fallback:
-          +materialized: table

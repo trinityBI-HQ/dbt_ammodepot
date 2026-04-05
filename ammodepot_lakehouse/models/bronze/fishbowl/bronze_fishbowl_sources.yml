@@ -1,10 +1,9 @@
 sources:
   - name: fishbowl
     description: >
-      Fishbowl inventory management data from Glue Iceberg catalog (Airbyte CDC).
-      Deduplication handled in Silver layer.
+      Fishbowl inventory management data — deduped Bronze Iceberg (Glue catalog).
     database: glue
-    schema: production2018
+    schema: ammodepot_bronze
     tables:
       - name: so
       - name: soitem
