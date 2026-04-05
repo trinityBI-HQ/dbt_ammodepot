@@ -19,11 +19,6 @@ with source_data as (
     from
         {{ source('fishbowl', 'tagserialview') }}
     -- No WHERE clause for _ab_cdc_deleted_at as this is a Full Refresh stream
-    qualify
-        row_number() over (
-            partition by tagid
-            order by _airbyte_extracted_at desc nulls last
-        ) = 1
 )
 
 select
