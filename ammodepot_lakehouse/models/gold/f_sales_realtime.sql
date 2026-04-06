@@ -14,7 +14,7 @@ with today_sales as (
         PRODUCT_TYPE
     from {{ ref('f_sales') }}
     where cast(CREATED_AT as date) = cast(
-        {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_timestamp()') }} as date
+        {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_timestamp') }} as date
     )
 ),
 

@@ -122,14 +122,14 @@ dd_suggested_use_exploded as (
     select
         rt.entity_id,
         case
-            when regexp_like(trim(split_part(rt.raw_value, ',', c.n)), '^[0-9]+$')
+            when regexp_matches(trim(split_part(rt.raw_value, ',', c.n)), '^[0-9]+$')
             then cast(trim(split_part(rt.raw_value, ',', c.n)) as int)
             else null
         end as option_id
     from dd_suggested_use_raw as rt
     inner join counter as c on c.n <= 10
     where split_part(rt.raw_value, ',', c.n) is not null
-      and regexp_like(trim(split_part(rt.raw_value, ',', c.n)), '^[0-9]+$')
+      and regexp_matches(trim(split_part(rt.raw_value, ',', c.n)), '^[0-9]+$')
 ),
 
 dd_suggested_use_data as (

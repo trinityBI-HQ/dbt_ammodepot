@@ -35,7 +35,7 @@ receipt_item_base as (
         ob.scheduled_fulfillment_date,
         ob.quantity_fulfilled as qtyfulfilled,
         ob.quantity_ordered as qtytofulfill,
-        ob.vendor_id,
+        cast(ob.vendor_id as bigint) as vendor_id,
         ob.po_created_at as datecreated,
         ob.po_confirmed_at as dateconfirmed,
         ob.po_issued_at as dateissued,
