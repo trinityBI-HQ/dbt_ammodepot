@@ -25,7 +25,7 @@ with source_data as (
     qualify
         row_number() over (
             partition by rate_id
-            order by coalesce(_ab_cdc_updated_at, _airbyte_extracted_at) desc nulls last
+            order by coalesce(try_to_timestamp(_ab_cdc_updated_at), to_timestamp(_airbyte_extracted_at, 3)) desc nulls last
         ) = 1
 )
 
