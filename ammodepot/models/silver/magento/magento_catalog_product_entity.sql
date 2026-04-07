@@ -12,6 +12,13 @@ with source_data as (
         {{ source('magento', 'catalog_product_entity') }}
     where
         _ab_cdc_deleted_at is null
+        {# Drop rows with NULL primary key. The Iceberg append-only landing
+           preserves malformed CDC events (seen as an 11-row burst on
+           2026-04-01 20:46 UTC) that the legacy Snowflake MERGE destination
+           was silently filtering out. Without this guard, ROW_NUMBER
+           collapses all NULL-PK rows into one row which propagates to
+           d_product and fails not_null tests. #}
+        and entity_id is not null
     qualify
         row_number() over (
             partition by entity_id
