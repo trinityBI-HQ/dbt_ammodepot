@@ -19,10 +19,8 @@ dispatch:
   - macro_namespace: ammodepot
     search_order: [ammodepot, dbt_utils, dbt]
 
-# Refresh UNMANAGED Iceberg tables in LAKEHOUSE_LANDING before each build so
-# Bronze sources see the latest Airbyte writes. See macros/refresh_lakehouse_landing.sql.
-on-run-start:
-  - "{{ refresh_lakehouse_landing() }}"
+# Iceberg landing refresh is now handled by ecs/refresh_iceberg.py before
+# dbt starts (parallelized, 4-6x faster than the dbt on-run-start hook).
 
 vars:
   # Timezone for all convert_timezone() calls

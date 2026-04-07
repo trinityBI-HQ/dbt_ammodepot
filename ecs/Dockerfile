@@ -14,6 +14,7 @@ COPY ammodepot/ ./ammodepot/
 WORKDIR /app/ammodepot
 RUN uv run dbt deps --profiles-dir .
 
+COPY ecs/refresh_iceberg.py /app/refresh_iceberg.py
 COPY ecs/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

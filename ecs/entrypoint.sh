@@ -10,6 +10,20 @@ fi
 
 cd /app/ammodepot
 
+# Refresh UNMANAGED Iceberg tables in LAKEHOUSE_LANDING in parallel BEFORE dbt
+# starts. This used to be a dbt on-run-start hook but dbt runs hooks serially
+# via the master connection, costing 45-90s warm and 3-5min cold. The Python
+# script uses 8 worker threads and is 4-6x faster. See ecs/refresh_iceberg.py
+# for the rationale.
+#
+# Fail fast: if Iceberg refresh errors out, dbt would silently build from a
+# stale catalog and ship wrong numbers. Better to fail the build and page.
+echo "=== Iceberg Refresh ==="
+ICEBERG_START=$(date +%s)
+uv run python /app/refresh_iceberg.py
+ICEBERG_DURATION=$(($(date +%s) - ICEBERG_START))
+echo "ICEBERG_REFRESH_SECONDS=${ICEBERG_DURATION}"
+
 # Check source freshness (results saved to JSON, stderr suppressed to avoid
 # triggering CloudWatch alarm on ERROR STALE — the metric filter matches [31mERROR)
 echo "=== Source Freshness Check ==="
