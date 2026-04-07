@@ -1,14 +1,23 @@
 with interaction_base as (
     select
-        {# Use the 2-arg convert_timezone form: target_tz + tz-aware source.
-           After the Bronze swap to Iceberg, item_created_at is TIMESTAMP_LTZ.
-           The 3-arg form silently casts LTZ -> NTZ using the session timezone
-           (currently America/Los_Angeles for SVC_DBT), which produces a wrong
-           wall-clock value before the convert_timezone runs. The 2-arg form
-           consumes the LTZ instant directly and returns the correct target_tz
-           wall clock. #}
-        convert_timezone('{{ var("ammodepot_timezone") }}', z.item_created_at)
-                                                            as created_at,
+        {# Convert LTZ -> target wall clock and strip the offset back to NTZ.
+
+           After the Bronze swap to Iceberg, item_created_at is TIMESTAMP_LTZ
+           (was TIMESTAMP_TZ on the legacy AD_AIRBYTE path). The 2-arg form
+           convert_timezone(target_tz, ltz_value) returns a TIMESTAMP_TZ. We
+           then cast it to TIMESTAMP_NTZ to preserve the legacy schema:
+           Power BI's cached dataset schema expects 'datetime' (NTZ) here,
+           and rendering a TIMESTAMP_TZ via PBI's cached column metadata
+           produces a UTC wall clock instead of the intended EDT one.
+
+           The triple-step is intentional:
+             1. convert_timezone strips the LTZ instant to the target wall clock
+             2. cast to NTZ removes the offset so PBI sees 'datetime'
+             3. Downstream skubase columns inherit NTZ for free #}
+        cast(
+            convert_timezone('{{ var("ammodepot_timezone") }}', z.item_created_at)
+            as timestamp_ntz
+        )                                                   as created_at,
 
         z.product_id,
         z.order_id,

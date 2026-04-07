@@ -99,11 +99,12 @@ f_ship as (
         so.order_increment_id                       as ID,
         so.order_id                                 as ORDER_ID,
         so.customer_email                           as CUSTOMER_EMAIL,
-        {# 2-arg convert_timezone form for LTZ source. See comment in f_sales.sql.
-           magento_sales_order.created_at is TIMESTAMP_LTZ from the Iceberg
-           Bronze and would be double-shifted by the 3-arg form. #}
-        convert_timezone('{{ var("ammodepot_timezone") }}', so.created_at)
-                                                    as CREATED_AT,
+        {# Convert LTZ -> target wall clock as NTZ. See f_sales.sql for the
+           rationale: PBI's cached schema expects datetime (NTZ) here. #}
+        cast(
+            convert_timezone('{{ var("ammodepot_timezone") }}', so.created_at)
+            as timestamp_ntz
+        )                                           as CREATED_AT,
         so.customer_firstname
         || ' '
         || so.customer_lastname                     as CUSTOMER_NAME,

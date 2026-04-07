@@ -6,11 +6,14 @@
 -- to ensure cost fallback values match the inline logic.
 with interaction_base as (
     select
-        {# 2-arg convert_timezone form for LTZ source. See comment in f_sales.sql
-           for details. After the Bronze swap to Iceberg, item_created_at is
-           TIMESTAMP_LTZ and the 3-arg form would double-shift via session TZ. #}
-        convert_timezone('{{ var("ammodepot_timezone") }}', z.item_created_at)
-                                                            as created_at,
+        {# Convert LTZ -> target wall clock as NTZ. See f_sales.sql for the
+           rationale: PBI's cached schema expects datetime (NTZ); leaving the
+           result as TIMESTAMP_TZ would render as UTC wall clock instead of
+           EDT in Power BI. #}
+        cast(
+            convert_timezone('{{ var("ammodepot_timezone") }}', z.item_created_at)
+            as timestamp_ntz
+        )                                                   as created_at,
         z.product_id,
         z.order_id,
         z.quantity_ordered,
