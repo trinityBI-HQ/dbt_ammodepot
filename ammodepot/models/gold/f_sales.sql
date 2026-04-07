@@ -1,6 +1,13 @@
 with interaction_base as (
     select
-        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(z.item_created_at as timestamp)') }}
+        {# Use the 2-arg convert_timezone form: target_tz + tz-aware source.
+           After the Bronze swap to Iceberg, item_created_at is TIMESTAMP_LTZ.
+           The 3-arg form silently casts LTZ -> NTZ using the session timezone
+           (currently America/Los_Angeles for SVC_DBT), which produces a wrong
+           wall-clock value before the convert_timezone runs. The 2-arg form
+           consumes the LTZ instant directly and returns the correct target_tz
+           wall clock. #}
+        convert_timezone('{{ var("ammodepot_timezone") }}', z.item_created_at)
                                                             as created_at,
 
         z.product_id,

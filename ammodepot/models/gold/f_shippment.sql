@@ -99,7 +99,10 @@ f_ship as (
         so.order_increment_id                       as ID,
         so.order_id                                 as ORDER_ID,
         so.customer_email                           as CUSTOMER_EMAIL,
-        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(so.created_at as timestamp)') }}
+        {# 2-arg convert_timezone form for LTZ source. See comment in f_sales.sql.
+           magento_sales_order.created_at is TIMESTAMP_LTZ from the Iceberg
+           Bronze and would be double-shifted by the 3-arg form. #}
+        convert_timezone('{{ var("ammodepot_timezone") }}', so.created_at)
                                                     as CREATED_AT,
         so.customer_firstname
         || ' '

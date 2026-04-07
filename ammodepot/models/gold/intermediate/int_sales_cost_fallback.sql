@@ -6,7 +6,10 @@
 -- to ensure cost fallback values match the inline logic.
 with interaction_base as (
     select
-        {{ convert_tz('UTC', var("ammodepot_timezone"), 'cast(z.item_created_at as timestamp)') }}
+        {# 2-arg convert_timezone form for LTZ source. See comment in f_sales.sql
+           for details. After the Bronze swap to Iceberg, item_created_at is
+           TIMESTAMP_LTZ and the 3-arg form would double-shift via session TZ. #}
+        convert_timezone('{{ var("ammodepot_timezone") }}', z.item_created_at)
                                                             as created_at,
         z.product_id,
         z.order_id,
