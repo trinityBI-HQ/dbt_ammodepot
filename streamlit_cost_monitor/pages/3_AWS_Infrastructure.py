@@ -1,4 +1,4 @@
-"""Page 4 — AWS infrastructure cost via Cost Explorer."""
+"""Page 3 — AWS infrastructure cost via Cost Explorer."""
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -6,9 +6,11 @@ import streamlit as st
 from utils.aws_costs import (
     cost_by_service_mtd,
     daily_cost_by_service,
+    monthly_cost_by_service,
     mtd_summary_aws,
 )
 from utils.chart_theme import ACCENT, WARNING, apply_theme, dark_dataframe, kpi_card
+from utils.config import AWS_MONTHLY_HISTORY_MONTHS
 
 st.set_page_config(page_title="AWS Infrastructure", layout="wide")
 st.title("AWS Infrastructure")
@@ -90,7 +92,7 @@ else:
         fig.update_yaxes(autorange="reversed")
         fig.update_xaxes(tickprefix="$", tickformat=",.2f")
         apply_theme(fig, height=max(280, 28 * len(filtered)), show_legend=False)
-        st.plotly_chart(fig, use_container_width=True, theme=None)
+        st.plotly_chart(fig, width="stretch", theme=None)
 
 st.divider()
 
@@ -128,7 +130,74 @@ else:
         )
     fig.update_yaxes(tickprefix="$", tickformat=",.2f")
     apply_theme(fig, height=380)
-    st.plotly_chart(fig, use_container_width=True, theme=None)
+    st.plotly_chart(fig, width="stretch", theme=None)
+
+st.divider()
+
+# --------------------------------------------------------------------------- #
+# Monthly trend (last 6 months, stacked by service)
+# --------------------------------------------------------------------------- #
+
+st.subheader(f"Monthly Cost ({AWS_MONTHLY_HISTORY_MONTHS}M)")
+st.caption(
+    "Calendar-month totals. The current month is partial — compare it to "
+    "prior full months with that in mind."
+)
+
+monthly = monthly_cost_by_service()
+if monthly.empty:
+    st.info("No monthly cost data.")
+else:
+    show_all_monthly = st.checkbox(
+        "Show all services (not just pipeline-relevant)",
+        value=False,
+        key="aws_monthly_show_all",
+        help="Toggle to include services outside AWS_RELEVANT_SERVICES.",
+    )
+    monthly["bucket"] = monthly.apply(
+        lambda r: r["service"] if (show_all_monthly or r["relevant"]) else "Other",
+        axis=1,
+    )
+    if not show_all_monthly:
+        # When filtered, drop "Other" so the chart reflects only relevant services.
+        monthly = monthly[monthly["bucket"] != "Other"]
+
+    if monthly.empty:
+        st.info("No relevant services billed in this window.")
+    else:
+        pivot = (
+            monthly.groupby(["month", "bucket"])["dollars"]
+            .sum()
+            .unstack(fill_value=0)
+            .sort_index()
+        )
+        month_labels = [m.strftime("%b %Y") for m in pivot.index]
+        fig = go.Figure()
+        for col in pivot.columns:
+            fig.add_trace(
+                go.Bar(
+                    x=month_labels,
+                    y=pivot[col].astype(float).tolist(),
+                    name=col,
+                    hovertemplate="%{x}<br>" + col + ": $%{y:,.2f}<extra></extra>",
+                )
+            )
+        fig.update_layout(barmode="stack")
+        fig.update_yaxes(tickprefix="$", tickformat=",.0f")
+        apply_theme(fig, height=380)
+        st.plotly_chart(fig, width="stretch", theme=None)
+
+        # Total per month as a small sanity-check table
+        totals = pivot.sum(axis=1).round(2)
+        totals.index = month_labels
+        totals_df = totals.reset_index()
+        totals_df.columns = ["Month", "Total $"]
+        # Mark current (partial) month
+        current_label = pivot.index[-1].strftime("%b %Y")
+        totals_df["Month"] = totals_df["Month"].apply(
+            lambda m: f"{m} (partial)" if m == current_label else m
+        )
+        dark_dataframe(totals_df, fmt={"Total $": "${:,.2f}"})
 
 st.caption(
     "*Cost Explorer API charges $0.01 per request — results are cached for 6 hours.*"

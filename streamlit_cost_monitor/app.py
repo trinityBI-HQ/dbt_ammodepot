@@ -29,11 +29,10 @@ st.markdown(
     """
 ### Pages
 
-- **Snowflake Compute** — Daily/MTD spend, warehouse + user + query-tag breakdown, anomalies
+- **Snowflake Compute** — Daily/MTD spend, warehouse + user + query-tag breakdown, daily anomalies
 - **Snowflake Storage** — Storage growth by database (active + failsafe)
-- **Top Queries** — Most expensive queries across all warehouses (last 7 days)
-- **AWS Infrastructure** — ECS Fargate, EC2, S3 Iceberg, CloudWatch, Secrets Manager
-- **Combined** — Total pipeline cost (Snowflake + AWS) with month-over-month trend
+- **AWS Infrastructure** — ECS Fargate, EC2, S3 Iceberg, CloudWatch, Secrets Manager (MTD, daily 90d, monthly 6M)
+- **Combined** — Total pipeline cost (Snowflake + AWS) with an explicit allow-list of what counts as AWS infrastructure
 """
 )
 

@@ -24,7 +24,11 @@ from dataclasses import dataclass
 import pandas as pd
 import streamlit as st
 
-from .config import AWS_RELEVANT_SERVICES, AWS_SECRET_NAME
+from .config import (
+    AWS_MONTHLY_HISTORY_MONTHS,
+    AWS_RELEVANT_SERVICES,
+    AWS_SECRET_NAME,
+)
 from .db import is_sis
 
 
@@ -145,6 +149,49 @@ def mtd_summary_aws() -> dict:
         "delta_pct": round(((mtd - prior) / prior * 100.0), 1) if prior else None,
         "days_elapsed": (today - month_start).days + 1,
     }
+
+
+@st.cache_data(ttl=_CACHE_TTL, show_spinner=False)
+def monthly_cost_by_service(months: int = AWS_MONTHLY_HISTORY_MONTHS) -> pd.DataFrame:
+    """Monthly unblended cost per service for the last N months (default 6).
+
+    Cost Explorer's MONTHLY granularity aligns to calendar months; the
+    current month is partial. The caller can decide whether to include it.
+    """
+    client = get_ce_client()
+    today = dt.date.today()
+    # Walk back `months` calendar months from the first of the current month.
+    start = today.replace(day=1)
+    for _ in range(months - 1):
+        start = (start - dt.timedelta(days=1)).replace(day=1)
+    end = today + dt.timedelta(days=1)  # CE end is exclusive
+
+    resp = client.get_cost_and_usage(
+        TimePeriod={"Start": start.isoformat(), "End": end.isoformat()},
+        Granularity="MONTHLY",
+        Metrics=["UnblendedCost"],
+        GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+    )
+    rows: list[dict] = []
+    for period in resp.get("ResultsByTime", []):
+        month_start = period["TimePeriod"]["Start"]
+        for group in period.get("Groups", []):
+            amount = float(group["Metrics"]["UnblendedCost"]["Amount"])
+            if amount == 0:
+                continue
+            rows.append(
+                {
+                    "month": month_start,
+                    "service": group["Keys"][0],
+                    "dollars": round(amount, 2),
+                }
+            )
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return df
+    df["month"] = pd.to_datetime(df["month"])
+    df["relevant"] = df["service"].isin(AWS_RELEVANT_SERVICES)
+    return df
 
 
 @st.cache_data(ttl=_CACHE_TTL, show_spinner=False)

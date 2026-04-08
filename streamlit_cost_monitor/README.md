@@ -17,11 +17,10 @@ streamlit_cost_monitor/
 ├── requirements.txt          # pip deps for container runtime
 ├── .streamlit/config.toml    # dark theme
 ├── pages/
-│   ├── 1_Snowflake_Compute.py
+│   ├── 1_Snowflake_Compute.py   # KPIs + 90d trend + breakdowns + anomaly detector
 │   ├── 2_Snowflake_Storage.py
-│   ├── 3_Top_Queries.py
-│   ├── 4_AWS_Infrastructure.py
-│   └── 5_Combined.py
+│   ├── 3_AWS_Infrastructure.py  # MTD, daily 90d, monthly 6M
+│   └── 4_Combined.py            # SF + AWS + explicit allow-list
 ├── utils/
 │   ├── config.py             # CREDIT_PRICE_USD, relevant AWS services, TTLs
 │   ├── db.py                 # Snowpark session (dual-mode)

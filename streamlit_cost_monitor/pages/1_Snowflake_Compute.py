@@ -7,9 +7,11 @@ import streamlit as st
 from utils.chart_theme import ACCENT, WARNING, apply_theme, dark_dataframe, kpi_card
 from utils.db import run_query
 from utils.snowflake_queries import (
+    cost_anomalies,
     cost_by_query_tag_mtd,
     cost_by_user_mtd,
     cost_by_warehouse_mtd,
+    daily_cost_by_user,
     daily_cost_by_warehouse,
     mtd_summary,
 )
@@ -78,7 +80,49 @@ else:
         )
     fig.update_yaxes(tickprefix="$", tickformat=",.0f")
     apply_theme(fig, height=360)
-    st.plotly_chart(fig, use_container_width=True, theme=None)
+    st.plotly_chart(fig, width="stretch", theme=None)
+
+st.divider()
+
+# --------------------------------------------------------------------------- #
+# Daily spend by user (top-5 + Other), stacked
+# --------------------------------------------------------------------------- #
+
+st.subheader("Daily Spend by User (90d)")
+st.caption(
+    "Hourly credits allocated to users by execution_time share. Top-5 users "
+    "by total window spend get their own line; everyone else rolls into *Other*."
+)
+
+user_daily = run_query(daily_cost_by_user())
+if user_daily.empty:
+    st.info("No user query activity in the last 90 days.")
+else:
+    pivot_u = user_daily.pivot_table(
+        index="USAGE_DATE", columns="BUCKET", values="DOLLARS", aggfunc="sum"
+    ).fillna(0)
+    # Legend order: biggest spenders first, Other last.
+    cols = sorted(
+        [c for c in pivot_u.columns if c != "Other"],
+        key=lambda c: pivot_u[c].sum(),
+        reverse=True,
+    ) + (["Other"] if "Other" in pivot_u.columns else [])
+    pivot_u = pivot_u[cols]
+
+    fig = go.Figure()
+    for col in pivot_u.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=pivot_u.index.tolist(),
+                y=pivot_u[col].tolist(),
+                mode="lines",
+                name=col,
+                hovertemplate="%{x|%Y-%m-%d}<br>" + col + ": $%{y:,.2f}<extra></extra>",
+            )
+        )
+    fig.update_yaxes(tickprefix="$", tickformat=",.0f")
+    apply_theme(fig, height=360)
+    st.plotly_chart(fig, width="stretch", theme=None)
 
 st.divider()
 
@@ -110,7 +154,7 @@ with col_wh:
         fig.update_yaxes(autorange="reversed")
         fig.update_xaxes(tickprefix="$", tickformat=",.0f")
         apply_theme(fig, height=320, show_legend=False)
-        st.plotly_chart(fig, use_container_width=True, theme=None)
+        st.plotly_chart(fig, width="stretch", theme=None)
 
 with col_user:
     st.markdown("**By User**")
@@ -133,7 +177,7 @@ with col_user:
         fig.update_yaxes(autorange="reversed")
         fig.update_xaxes(tickprefix="$", tickformat=",.0f")
         apply_theme(fig, height=320, show_legend=False)
-        st.plotly_chart(fig, use_container_width=True, theme=None)
+        st.plotly_chart(fig, width="stretch", theme=None)
 
 st.markdown("**By Query Tag**")
 st.caption(
@@ -158,4 +202,44 @@ else:
     fig.update_yaxes(autorange="reversed")
     fig.update_xaxes(tickprefix="$", tickformat=",.0f")
     apply_theme(fig, height=max(240, 28 * len(tags)), show_legend=False)
-    st.plotly_chart(fig, use_container_width=True, theme=None)
+    st.plotly_chart(fig, width="stretch", theme=None)
+
+st.divider()
+
+# --------------------------------------------------------------------------- #
+# Daily anomaly detector
+# --------------------------------------------------------------------------- #
+
+st.subheader("Daily Cost Anomalies (30d)")
+st.caption(
+    "Flagged when daily spend exceeds 2.5× the 28-day rolling mean. "
+    "Tune the multiplier in `utils/config.py`."
+)
+
+anomalies = run_query(cost_anomalies())
+if anomalies.empty:
+    st.info("No anomaly history yet (needs at least 7 days of data).")
+else:
+    flagged = anomalies[anomalies["STATUS"] == "ANOMALY"]
+    if len(flagged) == 0:
+        st.success("No anomalies in the last 30 days.")
+    else:
+        st.error(f"{len(flagged)} anomalous day(s) detected.")
+    display = anomalies.rename(
+        columns={
+            "USAGE_DATE": "Date",
+            "CREDITS": "Credits",
+            "DOLLARS": "Dollars",
+            "BASELINE_28D_CREDITS": "Baseline 28d (credits)",
+            "STATUS": "Status",
+        }
+    )
+    dark_dataframe(
+        display,
+        fmt={
+            "Credits": "{:,.2f}",
+            "Dollars": "${:,.2f}",
+            "Baseline 28d (credits)": "{:,.2f}",
+        },
+        height=320,
+    )

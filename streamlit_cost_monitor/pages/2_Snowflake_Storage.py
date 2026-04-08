@@ -76,7 +76,7 @@ for col in pivot.columns:
     )
 fig.update_yaxes(ticksuffix=" GB", tickformat=",.0f")
 apply_theme(fig, height=360)
-st.plotly_chart(fig, use_container_width=True, theme=None)
+st.plotly_chart(fig, width="stretch", theme=None)
 
 st.caption(
     "*Active only. Failsafe (Snowflake's 7-day disaster-recovery retention) "

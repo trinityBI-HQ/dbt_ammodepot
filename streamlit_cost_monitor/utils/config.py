@@ -8,26 +8,30 @@ CREDIT_PRICE_USD: float = 3.00
 
 # Default lookback windows (days)
 DAILY_LOOKBACK_DAYS: int = 90
-TOP_QUERIES_LOOKBACK_DAYS: int = 7
 STORAGE_HISTORY_DAYS: int = 30
+
+# AWS monthly trend — months of history to plot
+AWS_MONTHLY_HISTORY_MONTHS: int = 6
 
 # Anomaly detection: flag daily spend > N × 28-day rolling median
 ANOMALY_MULTIPLIER: float = 2.5
 
 # AWS Cost Explorer — services relevant to the pipeline. Filter applied
 # client-side since CE doesn't support OR across service filters.
+# Verified against real CE output 2026-04-08 — add new services as the
+# infra evolves.
 AWS_RELEVANT_SERVICES: tuple[str, ...] = (
-    "Amazon Elastic Container Service",
-    "Amazon EC2 Container Registry (ECR)",
-    "Amazon Elastic Compute Cloud - Compute",
-    "EC2 - Other",
-    "Amazon Simple Storage Service",
-    "AWS Glue",
-    "Amazon CloudWatch",
-    "AWS Secrets Manager",
-    "Amazon Virtual Private Cloud",
-    "AWS Key Management Service",
-    "AmazonCloudWatch",
+    "Amazon Elastic Container Service",          # dbt ECS Fargate
+    "Amazon EC2 Container Registry (ECR)",       # dbt image registry
+    "Amazon Elastic Compute Cloud - Compute",    # Airbyte EC2
+    "EC2 - Other",                               # NAT, EBS, EIP
+    "Amazon Simple Storage Service",             # S3 Iceberg lakehouse
+    "AWS Glue",                                  # Iceberg catalog
+    "Amazon CloudWatch",                         # dbt logs + alarms
+    "AWS Secrets Manager",                       # SVC_DBT private key
+    "Amazon Virtual Private Cloud",              # subnets + NAT
+    "AWS Key Management Service",                # encryption keys
+    "Amazon Redshift",                           # SHOULD be $0 post-archive — surface it
 )
 
 # Snowflake secret name for AWS Cost Explorer creds. Must match bootstrap SQL.
