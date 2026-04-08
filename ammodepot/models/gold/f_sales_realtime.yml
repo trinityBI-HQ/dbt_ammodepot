@@ -4,10 +4,15 @@ models:
       materialized: view
     description: >
       Real-time sales view. Mirrors the full f_sales column set filtered to
-      today's orders (in the configured business timezone) and adds two order
-      count metrics. Keeping the schema aligned with f_sales prevents Power BI
-      "column does not exist" errors when dashboards reference any field that
-      f_sales already exposes. Materialized as a view for real-time freshness.
+      the LAST 4 DAYS of orders (in the configured business timezone) and
+      adds two per-day order count metrics. The 4-day window matches the
+      legacy AD_AIRBYTE.AD_REALTIME.F_SALES_REALTIME_LASTDAYS view and is
+      required for Power BI's TODAY/Yesterday filters, which apply a date
+      slicer in DAX against the materialized view (so the view must contain
+      both today AND yesterday at minimum). Order-count metrics are
+      partitioned by sale_date so each row reports its own day's count
+      rather than a cross-day total. Materialized as a view for real-time
+      freshness.
     columns:
       - name: CREATED_AT
         description: "Order creation timestamp converted to local timezone"
@@ -102,6 +107,12 @@ models:
       - name: TESTFC
         description: "Debug column passthrough from f_sales (configurable parent freight_cost)"
       - name: DISTINCT_ORDER_ID_COUNT
-        description: "Total distinct orders for today (cross-joined metric)"
+        description: >
+          Distinct order_id count for the row's sale_date (cast(CREATED_AT
+          as date)). Each row reports its own day's total, so PBI's date
+          slicer can filter to any day in the 4-day window without skewing
+          the metric.
       - name: DISTINCT_ORDER_ID_BY_TESTSKU
-        description: "Distinct orders per SKU for today"
+        description: >
+          Distinct order_id count per (sale_date, testsku) — i.e., how many
+          orders contained this SKU on the row's day.

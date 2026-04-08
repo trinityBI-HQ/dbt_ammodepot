@@ -1,10 +1,12 @@
 {# Real-time sales view built on f_sales instead of duplicating its CTE chain.
-   Mirrors the full f_sales column set filtered to today's orders, then adds
-   per-SKU and total order count metrics. Keeping the schema aligned with
-   f_sales avoids Power BI "column does not exist" errors whenever a dashboard
-   references a field that f_sales already exposes. #}
+   Mirrors the full f_sales column set filtered to the last 4 days of orders
+   (matching the legacy AD_AIRBYTE.AD_REALTIME.F_SALES_REALTIME_LASTDAYS window),
+   then adds per-day order count metrics. Power BI's TODAY/Yesterday filters
+   apply a date slicer in DAX, so the view must contain BOTH today and
+   yesterday at minimum. The order-count aggregates are partitioned by
+   sale_date so each row reports its own day's count, not a cross-day total. #}
 
-with today_sales as (
+with recent_sales as (
     select
         CREATED_AT,
         TIMEDATE,
@@ -43,24 +45,32 @@ with today_sales as (
         TESTC,
         TESTR,
         TESTFR,
-        TESTFC
+        TESTFC,
+        cast(CREATED_AT as date) as sale_date
     from {{ ref('f_sales') }}
-    where cast(CREATED_AT as date) = cast(
-        {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_timestamp()') }} as date
+    where cast(CREATED_AT as date) >= dateadd(
+        day, -4,
+        cast(
+            {{ convert_tz('UTC', var("ammodepot_timezone"), 'current_timestamp()') }} as date
+        )
     )
 ),
 
-distinct_count as (
-    select count(distinct order_id) as distinct_order_id_count
-    from today_sales
+distinct_count_by_day as (
+    select
+        sale_date,
+        count(distinct order_id) as distinct_order_id_count
+    from recent_sales
+    group by sale_date
 ),
 
-sku_order_counts as (
+sku_order_counts_by_day as (
     select
+        sale_date,
         testsku,
         count(distinct order_id) as distinct_order_id_by_testsku
-    from today_sales
-    group by testsku
+    from recent_sales
+    group by sale_date, testsku
 )
 
 select
@@ -106,6 +116,9 @@ select
     l.TESTFC,
     d.distinct_order_id_count                   as DISTINCT_ORDER_ID_COUNT,
     s.distinct_order_id_by_testsku              as DISTINCT_ORDER_ID_BY_TESTSKU
-from today_sales as l
-cross join distinct_count as d
-left join sku_order_counts as s on l.testsku = s.testsku
+from recent_sales as l
+left join distinct_count_by_day as d
+       on d.sale_date = l.sale_date
+left join sku_order_counts_by_day as s
+       on s.sale_date = l.sale_date
+      and s.testsku = l.testsku
