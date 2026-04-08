@@ -3,9 +3,11 @@ models:
     config:
       materialized: view
     description: >
-      Real-time sales view for today's orders. Filters to the last 4 days of
-      sales data and shows only today's transactions with order count metrics.
-      Materialized as a view for real-time freshness.
+      Real-time sales view. Mirrors the full f_sales column set filtered to
+      today's orders (in the configured business timezone) and adds two order
+      count metrics. Keeping the schema aligned with f_sales prevents Power BI
+      "column does not exist" errors when dashboards reference any field that
+      f_sales already exposes. Materialized as a view for real-time freshness.
     columns:
       - name: CREATED_AT
         description: "Order creation timestamp converted to local timezone"
@@ -13,8 +15,10 @@ models:
           - not_null
       - name: TIMEDATE
         description: "Order creation timestamp (same as CREATED_AT)"
-      - name: TRICKAT
-        description: "Original UTC timestamp from source"
+      - name: ID
+        description: "Magento sales_order_item.entity_id — order line PK"
+      - name: INCREMENT_ID
+        description: "Magento human-readable order number"
       - name: PRODUCT_ID
         description: "Magento product entity ID"
         tests:
@@ -23,16 +27,80 @@ models:
         description: "Magento order entity ID"
         tests:
           - not_null
+      - name: ID_RFV
+        description: >
+          Duplicate alias of ORDER_ID, exposed alongside ORDER_ID because the
+          Power BI dataset references both column names in its source query.
+      - name: TRICKAT
+        description: "Alias of TIMEDATE, preserved for legacy dashboards"
+      - name: PRODUCT_OPTIONS
+        description: "Raw Magento product options payload"
+      - name: PRODUCT_TYPE
+        description: "Magento product type (simple, bundle, configurable, etc.)"
+      - name: PARENT_ITEM_ID
+        description: "Parent order item ID for configurable/bundle children"
+      - name: TESTSKU
+        description: "Product SKU"
+      - name: CONVERSION
+        description: "UoM conversion factor from int_magento_product_conversion"
+      - name: CUSTOMER_EMAIL
+        description: "Customer email address"
+      - name: POSTCODE
+        description: "Billing address postcode"
+      - name: COUNTRY
+        description: "Billing address country code"
+      - name: REGION
+        description: "Billing address region / state"
+      - name: CITY
+        description: "Billing address city"
+      - name: STREET
+        description: "Billing address street"
+      - name: TELEPHONE
+        description: "Billing address phone number"
+      - name: CUSTOMER_NAME
+        description: "Concatenated first + last name from the order"
+      - name: STORE_ID
+        description: "Magento store_id"
+      - name: STOREFRONT
+        description: "Storefront label (Gunbroker vs default store)"
+      - name: STATUS
+        description: "Upper-cased order status (COMPLETE, PROCESSING, …)"
       - name: ROW_TOTAL
         description: "Net line total (row_total - refunded - discount + discount_refunded)"
         tests:
           - assert_non_negative_values
+      - name: COST
+        description: >
+          Resolved unit cost from f_sales (Fishbowl total_cost with fallback
+          hierarchy: unique → duplicate average → average weighted × qty →
+          int_sales_cost_fallback → magento base_cost).
       - name: BASE_COST
-        description: "Base cost from Magento"
-      - name: TESTSKU
-        description: "Product SKU"
-      - name: PRODUCT_TYPE
-        description: "Magento product type (simple, bundle, etc.)"
+        description: >
+          Duplicate alias of COST, preserved for backward compatibility with
+          legacy Power BI consumers of the pre-rewrite f_sales_realtime view.
+          Prefer COST in new dashboards.
+      - name: QTY_ORDERED
+        description: "Quantity ordered (zeroed when ROW_TOTAL = 0)"
+      - name: FREIGHT_REVENUE
+        description: "Allocated freight revenue per line (from int_magento_order_freight)"
+      - name: FREIGHT_COST
+        description: "Allocated freight cost per line (from int_magento_order_freight)"
+      - name: VENDOR
+        description: "Vendor ID from the order line"
+      - name: CUSTOMER_ID
+        description: "Magento customer entity ID"
+      - name: RANK_ID
+        description: "Customer rank ID joined from magento_d_customerupdated"
+      - name: PART_QTY_SOLD
+        description: "Bundle-component quantity sold (falls back to QTY_ORDERED)"
+      - name: TESTC
+        description: "Debug column passthrough from f_sales (configurable parent cost)"
+      - name: TESTR
+        description: "Debug column passthrough from f_sales (configurable parent row_total)"
+      - name: TESTFR
+        description: "Debug column passthrough from f_sales (configurable parent freight_revenue)"
+      - name: TESTFC
+        description: "Debug column passthrough from f_sales (configurable parent freight_cost)"
       - name: DISTINCT_ORDER_ID_COUNT
         description: "Total distinct orders for today (cross-joined metric)"
       - name: DISTINCT_ORDER_ID_BY_TESTSKU
