@@ -1,0 +1,27 @@
+definition_version: 2
+
+entities:
+  cost_monitor:
+    type: streamlit
+    identifier:
+      name: cost_monitor
+      schema: ops
+      database: ad_analytics
+    title: "Snowflake + AWS Cost Monitor"
+    main_file: streamlit_app.py
+
+    # Container runtime (GA 2026-03-09) — gives us Streamlit 1.55, full PyPI
+    # via requirements.txt, and network egress via External Access Integration.
+    # Warehouse runtime would be Streamlit 1.22 and boto3 would fail to import.
+    runtime_name: "SYSTEM$ST_CONTAINER_RUNTIME_PY3_11"
+    compute_pool: cost_monitor_pool
+    query_warehouse: compute_wh
+
+    stage: cost_monitor_stage
+    pages_dir: pages/
+    artifacts:
+      - streamlit_app.py
+      - requirements.txt
+      - pages/
+      - utils/
+      - .streamlit/

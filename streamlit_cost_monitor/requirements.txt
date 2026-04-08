@@ -1,0 +1,8 @@
+# SiS container runtime — pip install. Container runtime gives us the
+# latest Streamlit regardless of what we pin here, but we pin a floor so
+# local dev matches. Bump when new versions land.
+streamlit>=1.55
+pandas>=2.0
+plotly>=5.22
+boto3>=1.34
+snowflake-snowpark-python>=1.20
