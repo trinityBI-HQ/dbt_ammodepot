@@ -82,17 +82,20 @@ jobs:
           authenticator = "SNOWFLAKE_JWT"
           private_key_file = "${SNOWFLAKE_PRIVATE_KEY_PATH}"
           EOF
-          # private_key_file_pwd is optional — only emit the line if set
-          if [ -n "${SNOWFLAKE_PRIVATE_KEY_PASSPHRASE:-}" ]; then
-            printf 'private_key_file_pwd = "%s"\n' "$SNOWFLAKE_PRIVATE_KEY_PASSPHRASE" >> ~/.snowflake/config.toml
-          fi
           chmod 600 ~/.snowflake/config.toml
 
+      # snow CLI >=2.5 reads the private key passphrase from the env var
+      # PRIVATE_KEY_PASSPHRASE, not from config.toml. Re-export it under
+      # the name the CLI expects for the deploy + smoke-test steps.
       - name: Deploy Streamlit app
         working-directory: streamlit_cost_monitor
+        env:
+          PRIVATE_KEY_PASSPHRASE: ${{ env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
         run: |
           snow streamlit deploy --replace --connection deploy
 
       - name: Smoke test — describe the Streamlit object
+        env:
+          PRIVATE_KEY_PASSPHRASE: ${{ env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
         run: |
           snow sql --connection deploy -q "describe streamlit ad_analytics.ops.cost_monitor"
