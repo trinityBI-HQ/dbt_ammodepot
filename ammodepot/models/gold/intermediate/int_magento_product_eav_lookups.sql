@@ -1,49 +1,26 @@
-with int_entity as (
+{# Resolves Magento EAV product attributes for d_product. Optimized to:
+   1. Single-scan each underlying EAV value table (int / varchar / text)
+      via MAX(CASE WHEN ...) pivots — no per-attribute CTE+JOIN pairs.
+   2. Filter the option-value lookup once and reuse it across both the
+      int pivot and dd_suggested_use explosion.
+   3. Replace the manual 1..10 counter + split_part loop with a native
+      LATERAL FLATTEN(SPLIT(...)) for dd_suggested_use parsing — no
+      element-count cap and no repeated string scans. #}
+
+with product_entity as (
+    select
+        product_entity_id
+    from {{ ref('magento_catalog_product_entity') }}
+),
+
+cpe_int as (
     select
         entity_id,
         attribute_id,
-        store_id,
         value
     from {{ ref('magento_catalog_product_entity_int') }}
-),
-
-attribute_id_cte as (
-    select
-        attribute_id,
-        attribute_code
-    from {{ ref('magento_eav_attribute') }}
-    where attribute_code in (
-        'name', 'url_key', 'manufacturer_sku', 'upc', 'image', 'cost', 'price',
-        'status', 'visibility', 'weight', 'manufacturer', 'attribute_set_name',
-        'brand_type', 'grain_weight', 'unit_type', 'projectile', 'caliber',
-        'boxes_case', 'rounds_package', 'suggested_use', 'gun_type', 'ddcaliber',
-        'capacity', 'ddaction', 'ddcondition', 'material', 'ddgun_parts',
-        'primary_category', 'ddcolor', 'optic_coating', 'ddweapons_platform',
-        'thread_pattern', 'thread_type', 'model', 'dd_suggested_use'
-    )
-),
-
--- Single-scan pivot: resolve all 10 int-based EAV attributes in one pass
--- instead of 10 separate CTE+JOIN pairs that each re-scan eav_attribute_option_value
-eav_option_pivot as (
-    select
-        cpi.entity_id,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_manufacturer') }} then eov.value end) as manufacturer,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_projectile') }} then eov.value end) as projectile,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_unit_type') }} then eov.value end) as unit_type,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddcaliber') }} then eov.value end) as ddcaliber,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddaction') }} then eov.value end) as ddaction,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddcondition') }} then eov.value end) as ddcondition,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddgun_parts') }} then eov.value end) as ddgun_parts,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_primary_category') }} then eov.value end) as primary_category,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddcolor') }} then eov.value end) as ddcolor,
-        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddweapons_platform') }} then eov.value end) as ddweapons_platform
-    from int_entity as cpi
-    inner join {{ ref('magento_eav_attribute_option_value') }} as eov
-        on cpi.value = eov.option_id
-        and eov.store_id = {{ var('ammodepot_default_store_id') }}
-    where cpi.store_id = {{ var('ammodepot_default_store_id') }}
-      and cpi.attribute_id in (
+    where store_id = {{ var('ammodepot_default_store_id') }}
+      and attribute_id in (
           {{ var('ammodepot_magento_attr_id_manufacturer') }},
           {{ var('ammodepot_magento_attr_id_projectile') }},
           {{ var('ammodepot_magento_attr_id_unit_type') }},
@@ -55,115 +32,133 @@ eav_option_pivot as (
           {{ var('ammodepot_magento_attr_id_ddcolor') }},
           {{ var('ammodepot_magento_attr_id_ddweapons_platform') }}
       )
+),
+
+cpe_varchar as (
+    select
+        entity_id,
+        attribute_id,
+        value
+    from {{ ref('magento_catalog_product_entity_varchar') }}
+    where store_id = {{ var('ammodepot_default_store_id') }}
+      and attribute_id in (
+          {{ var('ammodepot_magento_attr_id_rounds_package') }},
+          {{ var('ammodepot_magento_attr_id_capacity') }},
+          {{ var('ammodepot_magento_attr_id_material') }}
+      )
+),
+
+optic_coating_attr as (
+    select
+        attribute_id
+    from {{ ref('magento_eav_attribute') }}
+    where attribute_code = 'optic_coating'
+),
+
+cpe_text as (
+    select
+        cpt.entity_id,
+        cpt.attribute_id,
+        cpt.value
+    from {{ ref('magento_catalog_product_entity_text') }} as cpt
+    left join optic_coating_attr as oca
+        on cpt.attribute_id = oca.attribute_id
+    where cpt.store_id = {{ var('ammodepot_default_store_id') }}
+      and (
+          cpt.attribute_id = {{ var('ammodepot_magento_attr_id_dd_suggested_use') }}
+          or oca.attribute_id is not null
+      )
+),
+
+option_value as (
+    select
+        option_id,
+        value
+    from {{ ref('magento_eav_attribute_option_value') }}
+    where store_id = {{ var('ammodepot_default_store_id') }}
+),
+
+{# Single-scan pivot for all 10 int-based option-id attributes. #}
+int_pivot as (
+    select
+        cpi.entity_id,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_manufacturer') }}        then ov.value end) as manufacturer,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_projectile') }}          then ov.value end) as projectile,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_unit_type') }}           then ov.value end) as unit_type,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddcaliber') }}           then ov.value end) as ddcaliber,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddaction') }}            then ov.value end) as ddaction,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddcondition') }}         then ov.value end) as ddcondition,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddgun_parts') }}         then ov.value end) as ddgun_parts,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_primary_category') }}    then ov.value end) as primary_category,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddcolor') }}             then ov.value end) as ddcolor,
+        max(case when cpi.attribute_id = {{ var('ammodepot_magento_attr_id_ddweapons_platform') }}  then ov.value end) as ddweapons_platform
+    from cpe_int as cpi
+    inner join option_value as ov
+        on cpi.value = ov.option_id
     group by cpi.entity_id
 ),
 
-rounds_package_data as (
+{# Single-scan pivot for all 3 varchar attributes. #}
+varchar_pivot as (
     select
         cpv.entity_id,
-        cpv.value as rounds_package
-    from {{ ref('magento_catalog_product_entity_varchar') }} as cpv
-    where cpv.attribute_id = {{ var('ammodepot_magento_attr_id_rounds_package') }}
-        and cpv.store_id = {{ var('ammodepot_default_store_id') }}
-),
-
-capacity_data as (
-    select
-        cpv.entity_id,
-        cpv.value as capacity
-    from {{ ref('magento_catalog_product_entity_varchar') }} as cpv
-    where cpv.attribute_id = {{ var('ammodepot_magento_attr_id_capacity') }}
-        and cpv.store_id = {{ var('ammodepot_default_store_id') }}
-),
-
-material_data as (
-    select
-        cpv.entity_id,
-        cpv.value as material
-    from {{ ref('magento_catalog_product_entity_varchar') }} as cpv
-    where cpv.attribute_id = {{ var('ammodepot_magento_attr_id_material') }}
-        and cpv.store_id = {{ var('ammodepot_default_store_id') }}
+        max(case when cpv.attribute_id = {{ var('ammodepot_magento_attr_id_rounds_package') }} then cpv.value end) as rounds_package,
+        max(case when cpv.attribute_id = {{ var('ammodepot_magento_attr_id_capacity') }}       then cpv.value end) as capacity,
+        max(case when cpv.attribute_id = {{ var('ammodepot_magento_attr_id_material') }}      then cpv.value end) as material
+    from cpe_varchar as cpv
+    group by cpv.entity_id
 ),
 
 optic_coating_data as (
     select
         cpt.entity_id,
         cpt.value as optic_coating
-    from {{ ref('magento_catalog_product_entity_text') }} as cpt
-    inner join attribute_id_cte as ac
-        on cpt.attribute_id = ac.attribute_id
-    where ac.attribute_code = 'optic_coating'
-        and cpt.store_id = {{ var('ammodepot_default_store_id') }}
+    from cpe_text as cpt
+    inner join optic_coating_attr as oca
+        on cpt.attribute_id = oca.attribute_id
 ),
 
-dd_suggested_use_raw as (
-    select
-        cpt.entity_id,
-        cpt.value as raw_value
-    from {{ ref('magento_catalog_product_entity_text') }} as cpt
-    where cpt.attribute_id = {{ var('ammodepot_magento_attr_id_dd_suggested_use') }}
-      and cpt.store_id = {{ var('ammodepot_default_store_id') }}
-),
-
-counter as (
-    select 1 as n
-    union all select 2
-    union all select 3
-    union all select 4
-    union all select 5
-    union all select 6
-    union all select 7
-    union all select 8
-    union all select 9
-    union all select 10
-),
-
+{# dd_suggested_use is a comma-separated list of option_ids stored as text.
+   LATERAL FLATTEN explodes it natively (no 10-element cap, single scan). #}
 dd_suggested_use_exploded as (
     select
-        rt.entity_id,
-        case
-            when regexp_like(trim(split_part(rt.raw_value, ',', c.n)), '^[0-9]+$')
-            then cast(trim(split_part(rt.raw_value, ',', c.n)) as int)
-            else null
-        end as option_id
-    from dd_suggested_use_raw as rt
-    inner join counter as c on c.n <= 10
-    where split_part(rt.raw_value, ',', c.n) is not null
-      and regexp_like(trim(split_part(rt.raw_value, ',', c.n)), '^[0-9]+$')
+        cpt.entity_id,
+        try_to_number(trim(f.value::string)) as option_id
+    from cpe_text as cpt,
+        lateral flatten(input => split(cpt.value, ',')) as f
+    where cpt.attribute_id = {{ var('ammodepot_magento_attr_id_dd_suggested_use') }}
+      and try_to_number(trim(f.value::string)) is not null
 ),
 
 dd_suggested_use_data as (
     select
         ex.entity_id,
-        {{ string_agg('eov.value', ', ', 'eov.value') }} as dd_suggested_use
+        {{ string_agg('ov.value', ', ', 'ov.value') }} as dd_suggested_use
     from dd_suggested_use_exploded as ex
-    inner join {{ ref('magento_eav_attribute_option_value') }} as eov
-        on eov.option_id = ex.option_id
-        and eov.store_id = {{ var('ammodepot_default_store_id') }}
+    inner join option_value as ov
+        on ov.option_id = ex.option_id
     group by ex.entity_id
 )
 
 select
     e.product_entity_id as entity_id,
-    eop.manufacturer,
-    eop.projectile,
-    eop.unit_type,
-    rpd.rounds_package,
-    cap.capacity,
-    mat.material,
-    eop.primary_category,
-    eop.ddcaliber,
-    eop.ddaction,
-    eop.ddcondition,
-    eop.ddgun_parts,
-    eop.ddcolor,
-    oc.optic_coating,
-    eop.ddweapons_platform,
+    ip.manufacturer,
+    ip.projectile,
+    ip.unit_type,
+    vp.rounds_package,
+    vp.capacity,
+    vp.material,
+    ip.primary_category,
+    ip.ddcaliber,
+    ip.ddaction,
+    ip.ddcondition,
+    ip.ddgun_parts,
+    ip.ddcolor,
+    ocd.optic_coating,
+    ip.ddweapons_platform,
     dsud.dd_suggested_use
-from {{ ref('magento_catalog_product_entity') }} as e
-left join eav_option_pivot             as eop  on e.product_entity_id = eop.entity_id
-left join rounds_package_data          as rpd  on e.product_entity_id = rpd.entity_id
-left join capacity_data                as cap  on e.product_entity_id = cap.entity_id
-left join material_data                as mat  on e.product_entity_id = mat.entity_id
-left join optic_coating_data           as oc   on e.product_entity_id = oc.entity_id
-left join dd_suggested_use_data        as dsud on e.product_entity_id = dsud.entity_id
+from product_entity as e
+left join int_pivot           as ip   on e.product_entity_id = ip.entity_id
+left join varchar_pivot       as vp   on e.product_entity_id = vp.entity_id
+left join optic_coating_data  as ocd  on e.product_entity_id = ocd.entity_id
+left join dd_suggested_use_data as dsud on e.product_entity_id = dsud.entity_id

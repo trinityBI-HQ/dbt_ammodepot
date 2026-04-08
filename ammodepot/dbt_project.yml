@@ -156,6 +156,16 @@ models:
           +materialized: table
         magento_sales_order:
           +materialized: table
+        # EAV value tables: scanned 6+ times across gold intermediates
+        # (int_magento_product_eav_lookups, int_magento_product_attributes,
+        # int_fishbowl_product_enrichment). Pay the QUALIFY ROW_NUMBER scan
+        # once at silver build instead of on every downstream reference.
+        magento_catalog_product_entity_int:
+          +materialized: table
+        magento_catalog_product_entity_varchar:
+          +materialized: table
+        magento_catalog_product_entity_text:
+          +materialized: table
       inventory:
         inventory_qtyinventorytotals:
           +materialized: table
