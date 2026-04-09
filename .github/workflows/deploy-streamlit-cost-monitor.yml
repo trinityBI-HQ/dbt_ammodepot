@@ -94,6 +94,20 @@ jobs:
         run: |
           snow streamlit deploy --replace --connection deploy
 
+      # snow streamlit deploy --replace recreates the object and strips any
+      # previously-set EAI / secrets.  Re-attach them immediately after every
+      # deploy so the container runtime can reach PyPI (package install) and
+      # the AWS Cost Explorer API (runtime boto3 calls).
+      - name: Attach EAI + secret to Streamlit app
+        env:
+          PRIVATE_KEY_PASSPHRASE: ${{ env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
+        run: |
+          snow sql --connection deploy -q "
+            alter streamlit ad_analytics.ops.cost_monitor set
+              external_access_integrations = (aws_cost_explorer_integration)
+              secrets = ('aws_cost_explorer_creds' = ad_analytics.ops.aws_cost_explorer_creds)
+          "
+
       - name: Smoke test — describe the Streamlit object
         env:
           PRIVATE_KEY_PASSPHRASE: ${{ env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
