@@ -82,7 +82,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (local + Streamlit in Snowflake) + Snowsight dashboards |
-| Cost Monitoring | Snowsight dashboard (8 tiles: credits, utilization, anomalies, storage) |
+| Cost Monitoring | Snowsight dashboard (8 tiles) + Streamlit cost monitor app (`AD_ANALYTICS.OPS.COST_MONITOR`, SiS container runtime, GA) |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 | Archive | Decommissioned Redshift project + old artifacts |
 
@@ -131,7 +131,7 @@ All visual components force a unified dark background (`#1E1E1E`) via `utils/cha
 
 ### SiS Compatibility Notes
 
-- **Runtime**: Currently "Run on warehouse" (Streamlit 1.22, limited); migration target is "Run on container" (Streamlit 1.50+, PREVIEW)
+- **Runtime**: Currently "Run on warehouse" (Streamlit 1.22, limited); container runtime (GA 2026-03-09, Streamlit 1.55+) used by `streamlit_cost_monitor/` — see container runtime notes below
 - **Plotly**: Use `go.Bar`/`go.Figure` with `.tolist()` — `px.bar` fails serialization in SiS
 - **Plotly x-axis**: Use numeric positions + `tickvals`/`ticktext` to avoid duplicate category merging
 - **Plotly on_select**: Guard with `if not _is_sis:` — SiS returns `event.selection` as a function, not data object
@@ -205,6 +205,39 @@ The standalone `ammodepot_lakehouse/` dbt-duckdb project was removed during cuto
 ```
 streamlit_app/                          # See "Streamlit Dashboard App" section above
 ```
+
+### Streamlit Cost Monitor App
+
+```
+streamlit_cost_monitor/
+├── streamlit_app.py               # Entry point (SiS + local)
+├── snowflake.yml                  # SiS definition v2 — container runtime, cost_monitor_pool
+├── requirements.txt               # streamlit>=1.55, pandas, plotly, boto3, snowflake-snowpark-python
+├── pages/
+│   ├── 1_Snowflake_Compute.py     # MTD KPIs, daily trend by warehouse + user, anomaly detector
+│   ├── 2_Snowflake_Storage.py     # DB snapshot + 30d growth stacked area
+│   ├── 3_AWS_Infrastructure.py    # MTD KPIs, daily/monthly service spend, boto3 via EAI
+│   └── 4_Combined.py              # 6M monthly SF+AWS trend, MTD totals
+├── utils/
+│   ├── config.py                  # CREDIT_PRICE_USD, lookback windows, allow-list
+│   ├── db.py                      # Snowpark session (active session in SiS, key-pair local)
+│   ├── snowflake_queries.py       # All ACCOUNT_USAGE SQL (mtd_summary, daily_cost_*, anomalies)
+│   └── aws_costs.py               # boto3 Cost Explorer wrapper, dual-mode creds
+└── setup/
+    ├── 01_bootstrap.sql           # ACCOUNTADMIN one-time: schema, stage, compute pool, EAI
+    ├── 02_create_secret.sql       # Write real AWS key to Snowflake secret
+    ├── 03_post_deploy.sql         # Attach EAI + viewer grants (now superseded by CI step)
+    └── 04_fix_pypi_access.sql     # Add PyPI egress to EAI (one-time fix, 2026-04-09)
+```
+
+- **Deployed to**: `AD_ANALYTICS.OPS.COST_MONITOR` (SiS container runtime, Streamlit 1.55+)
+- **Compute pool**: `cost_monitor_pool` (CPU_X64_XS, 1 node, auto-suspend 300s, ~$5/mo)
+- **EAI**: `aws_cost_explorer_integration` — egress to `ce.us-east-1.amazonaws.com` + `pypi.org` + `files.pythonhosted.org`
+- **Secret**: `AD_ANALYTICS.OPS.AWS_COST_EXPLORER_CREDS` — generic-string `{"access_key":...,"secret_key":...}` for IAM user `svc_snowflake_costs`
+- **CI/CD**: `.github/workflows/deploy-streamlit-cost-monitor.yml` — triggers on push to `streamlit_cost_monitor/`; re-attaches EAI + secret after every `snow streamlit deploy --replace`
+- **Container runtime secret access**: `_snowflake` module not available in container runtime; secret NOT exposed as env var `AWS_COST_EXPLORER_CREDS` (env var name TBD — diagnostic error added to log all env-var keys when secret load fails)
+- **ACCOUNT_USAGE queries**: All wrapped in `st.cache_data(ttl="1h")`; credit allocation by user uses proportional `execution_time` per warehouse-hour
+- **Viewers**: `DASHBOARD_VIEWER_ROLE` + `POWERBI_READONLY_ROLE` granted USAGE on Streamlit object
 
 ### Airbyte EC2 Maintenance Scripts
 
@@ -416,6 +449,14 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 - **Iceberg cutover fixes (2026-04-07)**: NULL-PK guard on `silver/magento/magento_catalog_product_entity.sql` (Iceberg append-only preserves NULL-PK rows that Snowflake MERGE silently dropped); 2-arg `convert_timezone(target, ltz_value)` cast to NTZ in `f_sales`, `int_sales_cost_fallback`, `f_shippment` to preserve PBI's cached datetime schema
 - **Storage (2026-03-23)**: AD_AIRBYTE 56.8 GB active + 247 GB failsafe = 304 GB (now read-only since cutover); AD_ANALYTICS 98.3 GB; PC_FIVETRAN_DB 8.8 GB (candidate for drop)
 
+### Streamlit Cost Monitor (SiS container runtime)
+
+Built 2026-04-09 — `AD_ANALYTICS.OPS.COST_MONITOR` (4 pages, container runtime):
+- Deployed via GitHub Actions (`deploy-streamlit-cost-monitor.yml`)
+- PyPI access: requires `pypi_rule` in EAI (added `04_fix_pypi_access.sql`)
+- `--replace` strips EAI on every deploy: CI step re-attaches via `ALTER STREAMLIT SET`
+- Container runtime secret mechanism: `_snowflake` module unavailable; env var name undetermined (diagnostic logging active)
+
 ### Snowflake Cost Dashboard (Snowsight)
 
 Built 2026-03-23 — "Snowflake Cost & Usage Monitor" with 8 tiles:
@@ -486,15 +527,15 @@ Airbyte CDC → S3 Iceberg (Glue catalog) → Snowflake LAKEHOUSE_LANDING → db
 
 ---
 
-## Knowledge Base (611 files / 46 technologies in 6 categories)
+## Knowledge Base (671 files / 46 technologies in 6 categories)
 
 | Category | Files | Technologies | Key Technologies |
 |---|---|---|---|
-| data-engineering | 220 | 16 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
-| cloud | 133 | 11 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
-| devops-sre | 124 | 9 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
-| ai-ml | 81 | 6 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
-| automation | 38 | 3 | streamlit, n8n, mermaid |
+| data-engineering | 230 | 16 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
+| cloud | 140 | 11 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
+| devops-sre | 130 | 9 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
+| ai-ml | 88 | 6 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
+| automation | 39 | 3 | streamlit, n8n, mermaid |
 | document-processing | 15 | 1 | docling |
 
 Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.
