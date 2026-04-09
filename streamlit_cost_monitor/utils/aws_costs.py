@@ -47,10 +47,14 @@ class AwsCreds:
 def _load_sis_creds() -> AwsCreds:
     """Load AWS creds from the Snowflake secret bound via EAI.
 
-    Tries two mechanisms in order:
+    Tries three mechanisms in order:
       1. ``_snowflake`` module  — injected by Snowflake in warehouse runtime.
-      2. Environment variable   — SPCS container runtime exposes the secret
-         under the alias uppercased (``AWS_COST_EXPLORER_CREDS``).
+      2. Env var exact alias    — e.g. ``aws_cost_explorer_creds`` (as written
+         in the SECRETS clause, case-sensitive).
+      3. Env var alias uppercased — e.g. ``AWS_COST_EXPLORER_CREDS``.
+
+    If all fail, the RuntimeError includes every env-var KEY visible to the
+    container (values are never logged) to aid diagnosis.
     """
     import os
 
@@ -63,17 +67,20 @@ def _load_sis_creds() -> AwsCreds:
     except ImportError:
         pass
 
-    # 2. Container runtime — alias uppercased as env var
-    env_var = AWS_SECRET_NAME.upper()
-    raw = os.environ.get(env_var)
-    if raw:
-        data = json.loads(raw)
-        return AwsCreds(access_key=data["access_key"], secret_key=data["secret_key"])
+    # 2 + 3. Container runtime — try both casing conventions
+    for env_key in (AWS_SECRET_NAME, AWS_SECRET_NAME.upper()):
+        raw = os.environ.get(env_key)
+        if raw:
+            data = json.loads(raw)
+            return AwsCreds(access_key=data["access_key"], secret_key=data["secret_key"])
 
+    # Diagnostic: expose env-var KEYS (never values) to help identify the name
+    # Snowflake chose for the mounted secret.
+    all_keys = sorted(os.environ.keys())
     raise RuntimeError(
-        f"Cannot load AWS credentials in SiS. "
-        f"Expected env var {env_var!r} (generic-string secret alias uppercased). "
-        f"Check that the EAI + secret are attached to the Streamlit object."
+        f"Cannot load AWS credentials. "
+        f"Tried env vars {AWS_SECRET_NAME!r} and {AWS_SECRET_NAME.upper()!r} — both unset. "
+        f"All env var keys visible to the container: {all_keys}"
     )
 
 
