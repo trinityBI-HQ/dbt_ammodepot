@@ -2,7 +2,7 @@
 
 Analytics pipeline for [Ammunition Depot](https://www.ammunitiondepot.com), transforming raw data from **Fishbowl** (ERP) and **Magento** (e-commerce) into structured, tested datasets using Medallion Architecture.
 
-Data is ingested via Airbyte CDC every 10 minutes, transformed by dbt on ECS Fargate Spot, and served to Power BI and a Streamlit dashboard via Snowflake.
+Data is ingested via Airbyte CDC into **S3 Iceberg** (Glue catalog), read by Snowflake via External Volume, transformed by dbt on ECS Fargate Spot every 10 minutes, and served to Power BI and a Streamlit dashboard.
 
 ---
 
@@ -15,16 +15,20 @@ flowchart TD
     FB[Fishbowl<br/>ERP] --> AC[Airbyte CDC<br/>10-min sync]
     MG[Magento<br/>E-commerce] --> AC
 
-    AC --> BR[(Bronze<br/>AD_AIRBYTE<br/>59 source tables)]
+    AC --> S3[(S3 Iceberg<br/>ammodepot-lakehouse<br/>Glue Catalog)]
 
-    BR --> SV[(Silver<br/>AD_ANALYTICS.SILVER<br/>71 views + 7 tables)]
+    S3 --> LL[(LAKEHOUSE_LANDING<br/>AD_ANALYTICS<br/>55 UNMANAGED Iceberg tables)]
 
-    SV --> GD[(Gold<br/>AD_ANALYTICS.GOLD<br/>13 tables + 8 views)]
+    LL --> SV[(Silver<br/>AD_ANALYTICS.SILVER<br/>69 views + 7 tables)]
 
-    GD --> PBI[Power BI<br/>Legacy]
+    SV --> GD[(Gold<br/>AD_ANALYTICS.GOLD<br/>13 tables + 10 views)]
+
+    GD --> PBI[Power BI<br/>POWERBI_ROLE]
     GD --> ST[Streamlit<br/>Dashboard]
+    GD --> CM[Cost Monitor<br/>SiS App]
 
-    style BR fill:#cd7f32,color:#fff
+    style S3 fill:#2e7d32,color:#fff
+    style LL fill:#cd7f32,color:#fff
     style SV fill:#c0c0c0,color:#000
     style GD fill:#ffd700,color:#000
     style FB fill:#2d5986,color:#fff
@@ -32,6 +36,7 @@ flowchart TD
     style AC fill:#6c4fb8,color:#fff
     style PBI fill:#f2c811,color:#000
     style ST fill:#ff4b4b,color:#fff
+    style CM fill:#ff4b4b,color:#fff
 ```
 
 ### Orchestration
@@ -43,7 +48,8 @@ flowchart LR
     SM[Secrets Manager<br/>RSA Key] --> ECS
     ECR[ECR<br/>Docker Image] --> ECS
 
-    ECS --> DBT[dbt build<br/>99 models ~3 min]
+    ECS --> RF[Iceberg Refresh<br/>ALTER ICEBERG TABLE x55]
+    RF --> DBT[dbt build<br/>99 models ~6 min]
     DBT --> SF[(Snowflake<br/>ETL_WH)]
     DBT --> CW[CloudWatch<br/>Logs]
 
@@ -54,11 +60,50 @@ flowchart LR
     style ECS fill:#ff9900,color:#000
     style SM fill:#dd344c,color:#fff
     style ECR fill:#ff9900,color:#000
+    style RF fill:#2e7d32,color:#fff
     style DBT fill:#ff694f,color:#fff
     style SF fill:#29b5e8,color:#fff
     style CW fill:#ff9900,color:#000
     style AL fill:#ff9900,color:#000
     style SNS fill:#ff9900,color:#000
+```
+
+### Snowflake Database Layout
+
+```mermaid
+flowchart LR
+    subgraph AWS["AWS"]
+        S3[(S3 Iceberg<br/>ammodepot-lakehouse)]
+        GL[Glue Catalog<br/>production2018<br/>ammuni_prod]
+        S3 --- GL
+    end
+
+    subgraph AD_ANALYTICS["AD_ANALYTICS (TRANSFORMER_ROLE)"]
+        LL[LAKEHOUSE_LANDING<br/>55 UNMANAGED Iceberg tables]
+        SIL[SILVER<br/>69 views + 7 tables]
+        GOL[GOLD<br/>13 tables + 10 views]
+        OPS[OPS<br/>COST_MONITOR app]
+    end
+
+    AWS -->|External Volume<br/>+ Catalog Integration| LL
+    LL --> SIL
+    SIL --> GOL
+
+    GOL --> PBI[Power BI<br/>POWERBI_ROLE]
+    GOL --> STR[Streamlit<br/>STREAMLIT_ROLE]
+    GOL --> DV[Dashboards<br/>DASHBOARD_VIEWER_ROLE]
+
+    style AWS fill:#1a2a1a,color:#fff
+    style S3 fill:#2e7d32,color:#fff
+    style GL fill:#2e7d32,color:#fff
+    style AD_ANALYTICS fill:#16213e,color:#fff
+    style LL fill:#cd7f32,color:#fff
+    style SIL fill:#c0c0c0,color:#000
+    style GOL fill:#ffd700,color:#000
+    style OPS fill:#ff4b4b,color:#fff
+    style PBI fill:#f2c811,color:#000
+    style STR fill:#ff4b4b,color:#fff
+    style DV fill:#0078d4,color:#fff
 ```
 
 ---
@@ -67,27 +112,18 @@ flowchart LR
 
 | Component | Technology |
 |-----------|------------|
-| Transformation | dbt-core 1.11.7 + dbt-snowflake 1.11.3 (primary) / dbt-redshift 1.10.1 (legacy) |
-| Warehouse | Snowflake `AD_ANALYTICS` (primary) / Amazon Redshift (legacy production) |
-| Ingestion | Airbyte CDC — 6 connections, 64 active streams, 10-min sync |
-| Orchestration | ECS Fargate Spot + EventBridge scheduler (~$2.55/mo) |
-| Packages | dbt_utils, dbt_expectations (metaplane fork) |
+| Transformation | dbt-core 1.11.6 + dbt-snowflake 1.11.2 |
+| Warehouse | Snowflake `AD_ANALYTICS` |
+| Ingestion | Airbyte CDC on EC2 c6a.2xlarge → S3 Iceberg (Glue catalog) |
+| Bronze refresh | `on-run-start` hook: `ALTER ICEBERG TABLE ... REFRESH` x55 |
+| Orchestration | ECS Fargate Spot + EventBridge scheduler (~$3.70/mo) |
+| Packages | dbt_utils |
 | Cross-db macros | `adapter.dispatch` — `convert_tz`, `string_agg`, `format_timestamp`, `json_extract_text` |
-| Linting | SQLFluff (Snowflake + Redshift dialects) |
+| Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
-| BI Dashboard | Streamlit (local + Streamlit in Snowflake) / Power BI (legacy) |
+| BI Dashboard | Streamlit (local + Streamlit in Snowflake) + Power BI |
+| Cost Monitoring | Snowsight dashboard (8 tiles) + Streamlit SiS app (`AD_ANALYTICS.OPS.COST_MONITOR`) |
 | Secrets | AWS Secrets Manager (`ammodepot/dbt/snowflake`) |
-
----
-
-## Two dbt Projects
-
-| Project | Path | Warehouse | Models | Status |
-|---------|------|-----------|--------|--------|
-| Snowflake | `ammodepot/` | Snowflake | 99 | Primary — ECS Fargate, every 10 min |
-| Redshift | `projects/ammodepot/` | Amazon Redshift | 95 | Legacy — dbt Cloud scheduled runs |
-
-The Snowflake project adds three new Gold models (`f_cohort`, `f_cohort_detailed`, `f_sales_realtime`) and a fourth cross-db dispatch macro (`json_extract_text`).
 
 ---
 
@@ -95,60 +131,72 @@ The Snowflake project adds three new Gold models (`f_cohort`, `f_cohort_detailed
 
 ```
 dbt_ammodepot/
-├── ammodepot/                     # Snowflake project (primary)
-│   ├── dbt_project.yml            # version 2.0 — vars, materialization, schema routing
+├── ammodepot/                         # Snowflake dbt project (production)
+│   ├── dbt_project.yml                # version 2.0 — vars, materialization, schema routing
 │   ├── packages.yml
-│   ├── .env.example               # Snowflake connection vars template
+│   ├── .env.example                   # Snowflake connection vars template
 │   ├── macros/
 │   │   ├── generate_schema_name.sql
 │   │   ├── json_extract_text.sql
-│   │   └── cross_db/              # convert_tz, string_agg, format_timestamp
-│   ├── tests/generic/             # 16 custom generic tests (assert_*)
+│   │   ├── refresh_lakehouse_landing.sql  # on-run-start: ALTER ICEBERG TABLE REFRESH x55
+│   │   └── cross_db/                  # convert_tz, string_agg, format_timestamp
+│   ├── tests/generic/                 # 8 custom generic tests (assert_*)
 │   └── models/
-│       ├── bronze/                # Source YAML definitions (59 source tables)
-│       │   ├── fishbowl/          # 34 tables — AD_AIRBYTE.AD_FISHBOWL
-│       │   └── magento/           # 25 tables — AD_AIRBYTE.AD_MAGENTO
-│       ├── silver/                # 78 models (71 views + 7 tables)
-│       │   ├── fishbowl/          # 34 ERP models
-│       │   ├── magento/           # 23 e-commerce models
-│       │   └── inventory/         # 21 quantity calculation models
-│       └── gold/                  # 13 table models + 8 intermediate views
-│           ├── intermediate/      # 8 reusable view models
+│       ├── bronze/                    # Source YAML definitions (60 source tables)
+│       │   ├── fishbowl/              # 34 tables — AD_ANALYTICS.LAKEHOUSE_LANDING
+│       │   ├── magento/               # 25 tables — AD_ANALYTICS.LAKEHOUSE_LANDING
+│       │   └── ups/                   # 1 table — PC_FIVETRAN_DB.UPS_INVOICE_HISTORY
+│       ├── silver/                    # 76 models (69 views + 7 tables)
+│       │   ├── fishbowl/              # 34 ERP models
+│       │   ├── magento/               # 23 e-commerce models
+│       │   └── inventory/             # 19 quantity calculation models
+│       └── gold/                      # 13 table models + 10 intermediate views
+│           ├── intermediate/          # 10 reusable view models (3 override to table)
 │           ├── d_customer.sql, d_customer_segmentation.sql, d_product.sql
 │           ├── d_product_bundle.sql, d_store.sql, d_vendor.sql
 │           ├── f_inventoryview.sql, f_pos.sql, f_sales.sql, f_shippment.sql
 │           ├── f_cohort.sql, f_cohort_detailed.sql
 │           └── f_sales_realtime.sql
-├── projects/ammodepot/            # Redshift project (legacy)
-│   └── models/                    # 95 models — same Bronze/Silver layers, 10 Gold + 7 Int
-├── streamlit_app/                 # BI dashboard (local + SiS)
-│   ├── app.py                     # Local entry point
-│   ├── streamlit_app.py           # Streamlit in Snowflake entry point
+├── streamlit_app/                     # BI dashboard (local + SiS)
+│   ├── app.py                         # Local entry point
+│   ├── streamlit_app.py               # Streamlit in Snowflake entry point
 │   ├── pages/
-│   │   ├── 1_Today_Yesterday.py   # Real-time sales + cross-filtering
-│   │   ├── 2_Sales_Overview.py    # Historical sales with category drilldown
-│   │   └── 3_Inventory.py         # Inventory, vendor analysis, open POs
+│   │   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering
+│   │   ├── 2_Sales_Overview.py        # Historical sales with category drilldown
+│   │   └── 3_Inventory.py             # Inventory, vendor analysis, open POs
 │   └── utils/
-│       ├── chart_theme.py         # Unified dark theme (Plotly + HTML tables)
-│       ├── db.py                  # Query runner with local/SiS dual-mode
-│       └── zip3_coords.py         # ZIP3 centroid lookup for geographic maps
-├── ecs/                           # ECS Fargate deployment artifacts
+│       ├── chart_theme.py             # Unified dark theme (Plotly + HTML tables)
+│       ├── db.py                      # Query runner with local/SiS dual-mode
+│       └── zip3_coords.py             # ZIP3 centroid lookup for geographic maps
+├── streamlit_cost_monitor/            # Cost monitoring app (SiS container runtime)
+│   ├── streamlit_app.py               # Entry point (SiS + local)
+│   ├── snowflake.yml                  # SiS definition v2 — container runtime
+│   ├── pages/
+│   │   ├── 1_Snowflake_Compute.py     # MTD KPIs, daily trend, anomaly detection
+│   │   ├── 2_Snowflake_Storage.py     # DB snapshot + 30d growth
+│   │   ├── 3_AWS_Infrastructure.py    # MTD KPIs, daily/monthly service spend (boto3)
+│   │   └── 4_Combined.py             # 6M monthly SF+AWS trend, MTD totals
+│   └── utils/
+│       ├── config.py, db.py, snowflake_queries.py, aws_costs.py
+│       └── setup/                     # SQL bootstrap scripts
+├── ecs/                               # ECS Fargate deployment artifacts
 │   ├── Dockerfile
 │   ├── entrypoint.sh
 │   ├── task-definition.json
 │   ├── eventbridge-rule.json
 │   ├── iam-policies/
-│   └── README.md                  # Full ECS setup guide
-├── scripts/                       # Airbyte EC2 maintenance scripts
-│   ├── airbyte-cleanup.sh
-│   ├── disk-alert.sh
-│   └── deploy.sh
-└── docs/
-    ├── snowflake_access_setup.md
-    ├── PIPELINE_ASSESSMENT.md
-    ├── AIRBYTE_MAINTENANCE.md
-    ├── COST_OPTIMIZATION_PROPOSAL.md
-    └── CONSOLIDATION_EXECUTIVE_SUMMARY.md
+│   └── README.md                      # Full ECS setup guide
+├── airbyte-ec2/                       # EC2 maintenance scripts
+│   ├── airbyte-cleanup.sh             # Monthly cleanup (Minio logs + DB pruning)
+│   ├── disk-alert.sh                  # 6-hourly disk usage alert
+│   └── deploy.sh                      # One-command EC2 installer
+├── docs/
+│   ├── snowflake_access_setup.md
+│   ├── SNOWFLAKE_COST_DASHBOARD.md
+│   ├── POC_S3_DUCKDB_LAKEHOUSE.md
+│   └── AIRBYTE_2_0_UPGRADE_PLAN.md
+└── archive/
+    └── projects/ammodepot/            # Redshift dbt project (decommissioned)
 ```
 
 ---
@@ -157,22 +205,24 @@ dbt_ammodepot/
 
 ### Bronze — Source Definitions
 
-YAML source definitions only. No SQL models. Airbyte loads directly into the Bronze schemas; dbt references them as `source()` calls.
+YAML source definitions only. No SQL models. Airbyte writes to S3 Iceberg; Snowflake reads via External Volume + Glue Catalog Integration into `LAKEHOUSE_LANDING`. dbt references them as `source()` calls.
 
-- Snowflake: `AD_AIRBYTE.AD_FISHBOWL` (34 tables), `AD_AIRBYTE.AD_MAGENTO` (25 tables)
+- `AD_ANALYTICS.LAKEHOUSE_LANDING`: 55 UNMANAGED Iceberg tables (34 Fishbowl + 21 Magento)
+- `PC_FIVETRAN_DB.UPS_INVOICE_HISTORY`: 1 table (manually uploaded weekly)
 - Source freshness: warn after 24h, error after 48h (field: `_airbyte_extracted_at`)
+- All 55 Iceberg tables refreshed via `on-run-start` hook before every dbt build
 
 ### Silver — Cleaned Views
 
-One model per source table. Each model applies three transformations:
+One model per source table. Each model applies:
 
 1. Filters deleted CDC rows: `WHERE _ab_cdc_deleted_at IS NULL`
 2. Renames columns to `snake_case`
 3. Casts types as needed
 
-High-fan-out tables override to `table` materialization: `fishbowl_soitem`, `fishbowl_product`, `fishbowl_uomconversion`, `fishbowl_part`, `magento_sales_order_item`, `magento_sales_order`, `inventory_qtyinventorytotals`.
-
 All 55 Fishbowl + Magento Silver models include `QUALIFY ROW_NUMBER()` dedup guards to handle CDC replication artifacts.
+
+High-fan-out tables override to `table` materialization: `fishbowl_soitem`, `fishbowl_product`, `fishbowl_uomconversion`, `fishbowl_part`, `magento_sales_order_item`, `magento_sales_order`, `inventory_qtyinventorytotals`.
 
 ### Gold — Business Tables
 
@@ -186,17 +236,17 @@ Consumption-ready facts and dimensions. All columns use `UPPER_CASE` aliases for
 | `d_product_bundle` | Dimension | Kit/bundle compositions |
 | `d_store` | Dimension | Magento store reference |
 | `d_vendor` | Dimension | Vendor/supplier master |
-| `f_sales` | Fact | Sales orders with Fishbowl cost data (incremental) |
+| `f_sales` | Fact | Sales orders with Fishbowl cost data (incremental merge) |
 | `f_pos` | Fact | Purchase orders |
 | `f_inventoryview` | Fact | Real-time inventory quantities |
-| `f_shippment` | Fact | Shipment tracking |
-| `f_cohort` | Fact | Customer cohort analysis (Snowflake only) |
-| `f_cohort_detailed` | Fact | Detailed cohort metrics (Snowflake only) |
-| `f_sales_realtime` | View | Real-time sales feed (Snowflake only) |
+| `f_shippment` | Fact | Shipment tracking with UPS freight costs |
+| `f_cohort` | Fact | Customer cohort analysis |
+| `f_cohort_detailed` | Fact | Detailed cohort metrics |
+| `f_sales_realtime` | View | Real-time sales feed (filtered view of f_sales) |
 
 ### Intermediate Views
 
-Reusable pre-computations materialized as views in the `gold` schema. Three high-cost nodes override to `table`: `int_fishbowl_order_cost`, `int_magento_product_eav_lookups`, `int_sales_cost_fallback`.
+10 reusable pre-computations in the `gold` schema. Three high-cost nodes override to `table`: `int_fishbowl_order_cost`, `int_magento_product_eav_lookups`, `int_sales_cost_fallback`.
 
 ---
 
@@ -255,24 +305,6 @@ uv run dbt source freshness --profiles-dir .
 
 ---
 
-## Quick Start (Redshift Project)
-
-Run from `projects/ammodepot/`. Credentials via `.env` (see `.env.example`).
-
-```bash
-uv run dbt deps --profiles-dir .
-uv run dbt parse --profiles-dir .
-uv run dbt debug --profiles-dir .
-uv run dbt build --profiles-dir .
-uv run dbt build --profiles-dir . --select +f_sales
-uv run dbt test --profiles-dir . --select gold
-uv run dbt source freshness --profiles-dir .
-uv run sqlfluff lint models/
-uv run sqlfluff fix models/
-```
-
----
-
 ## Deployment (ECS Fargate)
 
 The Snowflake project runs on ECS Fargate Spot, triggered by EventBridge every 10 minutes. Full setup instructions are in `ecs/README.md`.
@@ -282,19 +314,13 @@ The Snowflake project runs on ECS Fargate Spot, triggered by EventBridge every 1
 | Cluster | `ammodepot-dbt` (us-east-1, Fargate Spot) |
 | Task | `ammodepot-dbt-build` (0.5 vCPU, 1 GB) |
 | Schedule | `rate(10 minutes)` via EventBridge |
-| Runtime | ~3 min per run, 99 models + 340 tests |
+| Runtime | ~6 min per run (99 models + Iceberg refresh x55) |
 | Secrets | `ammodepot/dbt/snowflake` in Secrets Manager |
 | Logs | CloudWatch `/ecs/ammodepot-dbt` (14-day retention) |
-| Image | ECR `ammodepot/dbt` |
-| Cost | ~$2.55/month |
+| Image | ECR `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt` |
+| Cost | ~$3.70/month |
 
-To deploy a model update, push to `main` then run:
-
-```bash
-./scripts/deploy-ecs.sh
-```
-
-The next scheduled run (within 10 minutes) picks up the new image automatically.
+Push to `main` — GitHub Actions builds and pushes to ECR automatically. The next EventBridge trigger (within 10 minutes) picks up the new image.
 
 ---
 
@@ -315,49 +341,27 @@ cd streamlit_app
 uv run streamlit run app.py
 ```
 
-The `utils/db.py` module detects SiS via the `_is_sis` flag and switches rendering paths accordingly (maps, clickable charts, and `st.dataframe` all have SiS-safe fallbacks).
+The `utils/db.py` module detects SiS via the `_is_sis` flag and switches rendering paths (maps, clickable charts, and `st.dataframe` all have SiS-safe fallbacks).
+
+## Streamlit Cost Monitor
+
+Deployed at `AD_ANALYTICS.OPS.COST_MONITOR` on SiS container runtime. Tracks Snowflake compute/storage and AWS infrastructure costs across 4 pages.
+
+| Resource | Detail |
+|----------|--------|
+| Runtime | SiS container runtime (Streamlit 1.55+) |
+| Compute pool | `cost_monitor_pool` (CPU_X64_XS, ~$5/mo) |
+| Deployment | GitHub Actions (`deploy-streamlit-cost-monitor.yml`) on push |
+| Viewers | `DASHBOARD_VIEWER_ROLE`, `POWERBI_READONLY_ROLE` |
 
 ---
 
-## Snowflake Database Layout
-
-```mermaid
-flowchart LR
-    subgraph AD_AIRBYTE["AD_AIRBYTE (AIRBYTE_ROLE)"]
-        FB_S[AD_FISHBOWL<br/>34 streams]
-        MG_S[AD_MAGENTO<br/>29 streams]
-        AI[airbyte_internal]
-    end
-
-    subgraph AD_ANALYTICS["AD_ANALYTICS (TRANSFORMER_ROLE)"]
-        SIL[SILVER<br/>71 views + 7 tables]
-        GOL[GOLD<br/>13 tables + 8 views]
-    end
-
-    FB_S --> SIL
-    MG_S --> SIL
-    SIL --> GOL
-
-    GOL --> PBI[Power BI<br/>POWERBI_ROLE]
-    GOL --> STR[Streamlit<br/>STREAMLIT_ROLE]
-    GOL --> DV[Dashboards<br/>DASHBOARD_VIEWER_ROLE]
-
-    style AD_AIRBYTE fill:#1a1a2e,color:#fff
-    style AD_ANALYTICS fill:#16213e,color:#fff
-    style FB_S fill:#2d5986,color:#fff
-    style MG_S fill:#f26322,color:#fff
-    style AI fill:#444,color:#fff
-    style SIL fill:#c0c0c0,color:#000
-    style GOL fill:#ffd700,color:#000
-    style PBI fill:#f2c811,color:#000
-    style STR fill:#ff4b4b,color:#fff
-    style DV fill:#0078d4,color:#fff
-```
+## Roles
 
 | Role | Purpose |
 |------|---------|
-| `AIRBYTE_ROLE` | Airbyte ingestion writes |
-| `TRANSFORMER_ROLE` | dbt reads Bronze, writes Silver + Gold |
+| `AIRBYTE_ROLE` | Airbyte ingestion writes (legacy Snowflake connections, now inactive) |
+| `TRANSFORMER_ROLE` | dbt reads LAKEHOUSE_LANDING, writes Silver + Gold |
 | `POWERBI_ROLE` | Power BI read-only access to Gold |
 | `POWERBI_READONLY_ROLE` | Read-only Gold + Streamlit viewer access |
 | `STREAMLIT_ROLE` | Streamlit in Snowflake app owner |
@@ -370,11 +374,10 @@ flowchart LR
 | Document | Description |
 |----------|-------------|
 | `docs/snowflake_access_setup.md` | Roles, warehouses, RSA keys, Power BI access, SiS setup, SSO |
-| `docs/PIPELINE_ASSESSMENT.md` | End-to-end pipeline audit — Airbyte connections, Power BI, dbt |
-| `docs/AIRBYTE_MAINTENANCE.md` | EC2 maintenance scripts, cleanup procedures, emergency recovery |
-| `docs/COST_OPTIMIZATION_PROPOSAL.md` | AWS cost optimization plan (~$41K/year savings) |
-| `docs/CONSOLIDATION_EXECUTIVE_SUMMARY.md` | Project consolidation summary |
-| `ecs/README.md` | ECS Fargate deployment guide (one-time setup + ongoing operations) |
+| `docs/SNOWFLAKE_COST_DASHBOARD.md` | Cost monitoring queries, Snowsight dashboard (8 tiles), alerts |
+| `docs/POC_S3_DUCKDB_LAKEHOUSE.md` | S3 + Iceberg migration plan and POC results |
+| `docs/AIRBYTE_2_0_UPGRADE_PLAN.md` | Airbyte upgrade procedure, rollback plan, risk assessment |
+| `ecs/README.md` | ECS Fargate deployment guide (one-time setup + ongoing ops) |
 
 ---
 
@@ -382,5 +385,5 @@ flowchart LR
 
 | Project | Last Build | Result |
 |---------|------------|--------|
-| Snowflake (ECS Fargate) | 2026-03-20 | PASS=429 WARN=10 ERROR=0 — 99 models, ~3 min |
-| Redshift (dbt Cloud) | — | PASS=402 WARN=32 ERROR=0 — 95 models |
+| Snowflake (ECS Fargate) | 2026-04-07 | PASS=363 WARN=11 ERROR=0 — 99 models, ~6 min |
+| Redshift | Archived | Decommissioned — see `archive/projects/ammodepot/` |
