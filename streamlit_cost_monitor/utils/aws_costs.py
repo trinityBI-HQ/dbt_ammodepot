@@ -1,9 +1,15 @@
 """AWS Cost Explorer client — dual-mode credential loader.
 
-SiS container runtime:
-    Credentials live in a Snowflake generic-string secret called
-    ``aws_cost_explorer_creds`` attached to the Streamlit app via an
-    External Access Integration.  The secret value is a JSON string
+SiS warehouse runtime:
+    Credentials are read via ``_snowflake.get_generic_secret_string()``,
+    a module injected by Snowflake only in the warehouse runtime.
+
+SiS container runtime (SPCS):
+    The ``_snowflake`` module is NOT available.  Snowflake exposes secrets
+    bound via ``ALTER STREAMLIT SET SECRETS = ('alias' = ...)`` as env vars
+    inside the container.  The variable name is the alias uppercased:
+    alias ``aws_cost_explorer_creds`` → env var ``AWS_COST_EXPLORER_CREDS``.
+    The value is the raw generic-string JSON:
     ``{"access_key": "...", "secret_key": "..."}``.
 
 Local dev:
@@ -39,12 +45,36 @@ class AwsCreds:
 
 
 def _load_sis_creds() -> AwsCreds:
-    """Load AWS creds from the Snowflake secret bound via EAI."""
-    import _snowflake  # type: ignore  # only available in SiS container runtime
+    """Load AWS creds from the Snowflake secret bound via EAI.
 
-    raw = _snowflake.get_generic_secret_string(AWS_SECRET_NAME)
-    data = json.loads(raw)
-    return AwsCreds(access_key=data["access_key"], secret_key=data["secret_key"])
+    Tries two mechanisms in order:
+      1. ``_snowflake`` module  — injected by Snowflake in warehouse runtime.
+      2. Environment variable   — SPCS container runtime exposes the secret
+         under the alias uppercased (``AWS_COST_EXPLORER_CREDS``).
+    """
+    import os
+
+    # 1. Warehouse runtime
+    try:
+        import _snowflake  # type: ignore
+        raw = _snowflake.get_generic_secret_string(AWS_SECRET_NAME)
+        data = json.loads(raw)
+        return AwsCreds(access_key=data["access_key"], secret_key=data["secret_key"])
+    except ImportError:
+        pass
+
+    # 2. Container runtime — alias uppercased as env var
+    env_var = AWS_SECRET_NAME.upper()
+    raw = os.environ.get(env_var)
+    if raw:
+        data = json.loads(raw)
+        return AwsCreds(access_key=data["access_key"], secret_key=data["secret_key"])
+
+    raise RuntimeError(
+        f"Cannot load AWS credentials in SiS. "
+        f"Expected env var {env_var!r} (generic-string secret alias uppercased). "
+        f"Check that the EAI + secret are attached to the Streamlit object."
+    )
 
 
 @st.cache_resource
