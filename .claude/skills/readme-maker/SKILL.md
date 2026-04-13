@@ -54,7 +54,7 @@ Generates a professional README.md by combining codebase exploration with docume
 │  ├─ Create compelling project description                   │
 │  ├─ Build Quick Start with tested commands                  │
 │  ├─ Document features with examples                         │
-│  ├─ Add architecture overview (if complex)                  │
+│  ├─ Add architecture diagram (Mermaid — REQUIRED)           │
 │  └─ Include contributing guidelines                         │
 │                                                             │
 │  Phase 4: VALIDATE (quality checks)                         │
@@ -172,10 +172,13 @@ Use this template structure:
 
 ## Architecture
 
-{Only include if project is complex enough}
+{REQUIRED for all projects — use Mermaid diagrams, never ASCII art}
 
-```text
-{Simple ASCII diagram}
+```mermaid
+flowchart LR
+    {Source} -->|ingest| {Warehouse}
+    {Warehouse} -->|transform| {dbt}
+    {dbt} -->|serve| {BI/API}
 ```
 
 ## Configuration
@@ -208,6 +211,48 @@ Use this template structure:
 
 {License name} - see [LICENSE](LICENSE)
 ```
+
+---
+
+## Mermaid Diagram Requirements
+
+All README files MUST use Mermaid diagrams for architecture and data flow visuals. See `.claude/rules/mermaid-diagrams.md` for the full standard.
+
+### Diagram Selection by Project Type
+
+| Project Type | Diagram | Mermaid Type |
+|-------------|---------|--------------|
+| dbt / data pipeline | Data flow (source -> warehouse -> BI) | `flowchart LR` |
+| API / microservice | Request flow, component interaction | `sequenceDiagram` |
+| Infrastructure | System components, cloud architecture | `flowchart TD` or `C4Context` |
+| Multi-layer (Medallion) | Bronze -> Silver -> Gold with subgraphs | `flowchart TD` with `subgraph` |
+| CI/CD | Pipeline stages | `flowchart LR` |
+
+### Minimum Diagrams per Style
+
+- **Minimal**: 1 architecture flowchart
+- **Comprehensive**: Architecture flowchart + data flow diagram (+ ER diagram if database-heavy)
+
+### Example (Data Pipeline)
+
+````markdown
+```mermaid
+flowchart LR
+    subgraph Ingestion
+        A[Fivetran] -->|CDC| B[(Snowflake)]
+        C[n8n] -->|CSV| B
+    end
+    subgraph Transformation
+        B --> D[dbt Bronze]
+        D --> E[dbt Silver]
+        E --> F[dbt Gold]
+    end
+    subgraph Orchestration
+        G[Dagster] -.->|schedule| D
+    end
+    F --> H[Power BI]
+```
+````
 
 ---
 
@@ -245,6 +290,12 @@ CONTENT
 [ ] Quick Start works (commands tested)
 [ ] Features accurately reflect codebase
 [ ] No placeholder text like "TODO" or "{}"
+
+DIAGRAMS (REQUIRED)
+[ ] Architecture diagram uses Mermaid (never ASCII art)
+[ ] Data flow diagram uses Mermaid flowchart LR/TD
+[ ] Diagrams render correctly in GitHub preview
+[ ] No ASCII box diagrams remain (convert if found)
 
 FORMAT
 [ ] Badges are valid (if included)
