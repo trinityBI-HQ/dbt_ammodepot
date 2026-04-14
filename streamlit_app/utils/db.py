@@ -16,6 +16,9 @@ try:
     from snowflake.snowpark.context import get_active_session
     _session = get_active_session()
     _is_sis = True
+    # SiS session defaults to the Streamlit object's schema (OPS).
+    # Queries use unqualified table names from GOLD, so switch context.
+    _session.sql("USE SCHEMA AD_ANALYTICS.GOLD").collect()
 except (ImportError, ModuleNotFoundError):
     pass
 except Exception:
