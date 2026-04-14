@@ -79,7 +79,7 @@ models:
               arguments:
                 values: ['GunBroker', 'Website']
       - name: STATUS
-        description: "Order status. Magento status for website orders; mapped from Fishbowl status_id for GunBroker orders (20/25→PROCESSING, 30→COMPLETE, 50→CANCELED)."
+        description: "Order status. Magento status for website orders; mapped from Fishbowl status_id for GunBroker orders (20/25→PROCESSING, 30/40/60→COMPLETE, 50→CANCELED)."
         tests:
           - not_null
       - name: ROW_TOTAL

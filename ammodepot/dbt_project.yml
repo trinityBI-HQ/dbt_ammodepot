@@ -77,7 +77,7 @@ vars:
 
   # Storefront identification (order prefix → channel name)
   # GunBroker orders exist only in Fishbowl (not Magento).
-  # Fishbowl status_id mapping: 20/25→PROCESSING, 30→COMPLETE, 50→CANCELED
+  # Fishbowl status_id mapping: 20/25→PROCESSING, 30/40/60→COMPLETE, 50→CANCELED
   ammodepot_gunbroker_order_prefix: 'GB'
   ammodepot_gunbroker_store_name: 'GunBroker'
   ammodepot_default_store_name: 'Website'

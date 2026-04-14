@@ -88,10 +88,13 @@ joined as (
         o.bill_to_name                                  as customer_name,
 
         {# Map Fishbowl status_id to Magento-compatible text statuses
-           so existing Streamlit default filters work (COMPLETE, PROCESSING) #}
+           so existing Streamlit default filters work (COMPLETE, PROCESSING).
+           Fishbowl lifecycle: 10 Estimate → 20 Issued → 25 In Progress
+           → 30 Fulfilled → 60 Historical (archived after completion).
+           40 = Closed Short (partial), 50 = Void. #}
         case
             when o.status_id in (20, 25) then 'PROCESSING'
-            when o.status_id = 30        then 'COMPLETE'
+            when o.status_id in (30, 40, 60) then 'COMPLETE'
             when o.status_id = 50        then 'CANCELED'
             else 'ESTIMATE'
         end                                             as status,
