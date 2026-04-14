@@ -147,7 +147,7 @@ All visual components force a unified dark background (`#1E1E1E`) via `utils/cha
 - **Plotly on_select**: `on_select="rerun"` enabled in SiS (1.55+); `not callable(sel)` defensive guard retained
 - **Maps**: `go.Scattermap` with CARTO `carto-darkmatter` tiles — requires EAI egress to `basemaps.cartocdn.com`
 - **Data types**: All plotly data must be plain Python types (`float()`, `.tolist()`), not numpy/pandas
-- **Dual-mode**: `_is_sis` flag in `utils/db.py` controls session/connection routing (no rendering guards remain)
+- **Dual-mode**: `_is_sis` flag in `utils/db.py` controls session/connection routing (no rendering guards remain). SiS session runs `USE SCHEMA AD_ANALYTICS.GOLD` on init — Streamlit object lives in OPS but queries target GOLD
 - **st.dataframe**: Renders inside iframe that ignores external CSS on SiS — use `dark_dataframe()` instead
 - **Theme detection**: `st.get_option("theme.base")` unreliable on SiS — force dark backgrounds explicitly
 - **Session state pattern**: Initialize defaults in `st.session_state`, render widgets with `key=` only (no `value=`)
