@@ -1,4 +1,12 @@
-with interaction_base as (
+{# Orders containing internal/operational SKUs are excluded entirely.
+   The list is maintained in dbt_project.yml and will grow over time. #}
+with excluded_orders as (
+    select distinct order_id
+    from {{ ref('magento_sales_order_item') }}
+    where sku in ({{ var('ammodepot_excluded_order_skus') }})
+),
+
+interaction_base as (
     select
         {# Convert LTZ -> target wall clock and strip the offset back to NTZ.
 
@@ -90,8 +98,12 @@ with interaction_base as (
     left join {{ ref('magento_sales_order') }}         as o  on z.order_id           = o.order_id
     left join {{ ref('magento_sales_order_address') }} as a  on o.billing_address_id = a.order_address_id
     left join {{ ref('int_fishbowl_order_cost') }}     as c  on z.order_item_id      = c.order_item_id
+    where not exists (
+        select 1 from excluded_orders as eo
+        where eo.order_id = z.order_id
+    )
     {% if is_incremental() %}
-    where z.item_created_at >= dateadd(day, -3, current_date())
+    and z.item_created_at >= dateadd(day, -3, current_date())
     {% endif %}
 ),
 
