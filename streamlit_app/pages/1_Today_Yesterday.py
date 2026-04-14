@@ -206,11 +206,12 @@ for name in store_names:
         sid = store_df[store_df["NAME"] == name]["STORE_ID"].values[0]
         selected_store_ids.append(sid)
 if selected_store_ids and not df_target.empty:
-    df_target = df_target[df_target["STORE_ID"].isin(selected_store_ids)]
-    df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids)]
+    # Include NaN STORE_ID rows (GunBroker orders have no Magento store)
+    df_target = df_target[df_target["STORE_ID"].isin(selected_store_ids) | df_target["STORE_ID"].isna()]
+    df_compare = df_compare[df_compare["STORE_ID"].isin(selected_store_ids) | df_compare["STORE_ID"].isna()]
     if not df_last_month.empty:
         df_last_month = df_last_month[
-            df_last_month["STORE_ID"].isin(selected_store_ids)
+            df_last_month["STORE_ID"].isin(selected_store_ids) | df_last_month["STORE_ID"].isna()
         ]
 
 # --- Cross-filters (PBI-style click-to-filter) ---
