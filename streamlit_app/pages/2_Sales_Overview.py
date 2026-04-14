@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import date, timedelta
 
-from utils.db import run_query, _is_sis
+from utils.db import run_query
 from utils.chart_theme import apply_theme, ACCENT, secondary_axis_style, dark_dataframe
 
 _logo_path = pathlib.Path(__file__).parents[1] / "AmmoDepot.png"
@@ -720,7 +720,7 @@ def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None,
         bargap=0.25,
     )
 
-    if chart_key and filter_key and not _is_sis:
+    if chart_key and filter_key:
         event = st.plotly_chart(
             fig, use_container_width=True,
             on_select="rerun", key=chart_key,
@@ -735,7 +735,7 @@ def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None,
                 st.session_state["_so_xf_pending"] = (filter_key, new_val)
                 st.rerun()
         except (AttributeError, TypeError, IndexError):
-            pass  # Older Streamlit — chart click not supported
+            pass  # Defensive: ignore malformed selection objects
     else:
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1457,41 +1457,29 @@ with geo_right:
                 f"${float(r['NET_SALES']):,.0f} | {int(r['ORDERS'])} orders"
                 for _, r in map_df.iterrows()
             ]
-            from utils.db import _is_sis
-            if _is_sis:
-                sis_map = pd.DataFrame({
-                    "latitude": lat_list,
-                    "longitude": lon_list,
-                    "size": size_list,
-                })
-                try:
-                    st.map(sis_map, size="size")
-                except TypeError:
-                    st.map(sis_map[["latitude", "longitude"]])
-            else:
-                fig = go.Figure(go.Scattermapbox(
-                    lat=lat_list,
-                    lon=lon_list,
-                    marker=dict(
-                        size=size_list,
-                        color="#00d4aa",
-                        opacity=0.6,
-                    ),
-                    text=hover_texts,
-                    hoverinfo="text",
-                ))
-                apply_theme(
-                    fig, height=350, show_legend=False,
-                    margin=dict(l=0, r=0, t=0, b=0),
-                )
-                fig.update_layout(
-                    mapbox=dict(
-                        style="carto-darkmatter",
-                        center=dict(lat=38, lon=-97),
-                        zoom=3,
-                    ),
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            fig = go.Figure(go.Scattermap(
+                lat=lat_list,
+                lon=lon_list,
+                marker=dict(
+                    size=size_list,
+                    color="#00d4aa",
+                    opacity=0.6,
+                ),
+                text=hover_texts,
+                hoverinfo="text",
+            ))
+            apply_theme(
+                fig, height=350, show_legend=False,
+                margin=dict(l=0, r=0, t=0, b=0),
+            )
+            fig.update_layout(
+                map=dict(
+                    style="carto-darkmatter",
+                    center=dict(lat=38, lon=-97),
+                    zoom=3,
+                ),
+            )
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No geographic data to map.")
     else:
