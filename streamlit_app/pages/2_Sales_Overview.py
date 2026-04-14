@@ -747,7 +747,7 @@ def _render_hbar(df, group_col, metric, label, limit=15, df_compare=None,
         except (AttributeError, TypeError, IndexError):
             pass  # Defensive: ignore malformed selection objects
     else:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key=f"hbar_{group_col}_{label}")
 
 
 # Helper: aggregate by time bucket (Series-based groupby)
