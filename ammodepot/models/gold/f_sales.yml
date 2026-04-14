@@ -1,7 +1,7 @@
 
 models:
   - name: f_sales
-    description: "Consolidated sales fact combining Magento orders and Fishbowl cost data, with timezone conversion, freight allocation, and customer ranking."
+    description: "Consolidated sales fact combining Magento website orders and Fishbowl GunBroker orders, with timezone conversion, freight allocation, cost resolution, and customer ranking. The STOREFRONT column distinguishes Website vs GunBroker channels."
     columns:
       - name: CREATED_AT
         description: "Order datetime converted from UTC to America/New_York."
@@ -10,12 +10,12 @@ models:
       - name: TIMEDATE
         description: "Original order timestamp."
       - name: ID
-        description: "Magento order item ID."
+        description: "Order line item identifier. Positive values are Magento order_item_ids; negative values are Fishbowl so_item_ids for GunBroker orders."
         tests:
           - not_null:
               severity: error
       - name: INCREMENT_ID
-        description: "Magento order increment identifier."
+        description: "Order number. Standard Magento increment_id for website orders; GB-prefixed Fishbowl SO number for GunBroker orders."
         tests:
           - not_null
       - name: "Início da Hora - Copiar"
@@ -64,7 +64,7 @@ models:
       - name: CUSTOMER_NAME
         description: "Customer full name."
       - name: STORE_ID
-        description: "Magento store identifier."
+        description: "Magento store identifier. NULL for GunBroker orders (Fishbowl-only, no Magento store)."
         tests:
           - relationships:
               arguments:
@@ -79,7 +79,7 @@ models:
               arguments:
                 values: ['GunBroker', 'Website']
       - name: STATUS
-        description: "Magento order status."
+        description: "Order status. Magento status for website orders; mapped from Fishbowl status_id for GunBroker orders (20/25→PROCESSING, 30/40/60→COMPLETE, 50→CANCELED)."
         tests:
           - not_null
       - name: ROW_TOTAL
@@ -105,7 +105,7 @@ models:
       - name: VENDOR
         description: "Fishbowl vendor identifier."
       - name: CUSTOMER_ID
-        description: "Magento customer entity identifier."
+        description: "Magento customer entity identifier. NULL for GunBroker orders."
         tests:
           - relationships:
               arguments:

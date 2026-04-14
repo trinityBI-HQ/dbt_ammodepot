@@ -305,3 +305,51 @@ left join {{ ref("magento_d_customerupdated") }} as cu
         )
      ) = cu.customer_email
 where l.product_type <> 'configurable'
+
+union all
+
+{# GunBroker orders: Fishbowl-only, not in Magento.
+   The intermediate shapes them to the same 36-column schema. #}
+select
+    gb.CREATED_AT,
+    gb.TIMEDATE,
+    gb.ID,
+    gb.INCREMENT_ID,
+    gb."Início da Hora - Copiar",
+    gb.PRODUCT_ID,
+    gb.ORDER_ID,
+    gb.TRICKAT,
+    gb.PRODUCT_OPTIONS,
+    gb.PRODUCT_TYPE,
+    gb.PARENT_ITEM_ID,
+    gb.TESTSKU,
+    gb.CONVERSION,
+    gb."Início da Hora",
+    gb.CUSTOMER_EMAIL,
+    gb.POSTCODE,
+    gb.COUNTRY,
+    gb.REGION,
+    gb.CITY,
+    gb.STREET,
+    gb.TELEPHONE,
+    gb.CUSTOMER_NAME,
+    gb.STORE_ID,
+    gb.STOREFRONT,
+    gb.STATUS,
+    gb.ROW_TOTAL,
+    gb.COST,
+    gb.QTY_ORDERED,
+    gb.FREIGHT_REVENUE,
+    gb.FREIGHT_COST,
+    gb.VENDOR,
+    gb.CUSTOMER_ID,
+    gb.RANK_ID,
+    gb.PART_QTY_SOLD,
+    gb.TESTC,
+    gb.TESTR,
+    gb.TESTFR,
+    gb.TESTFC
+from {{ ref('int_fishbowl_gunbroker_sales') }} as gb
+{% if is_incremental() %}
+where gb.CREATED_AT >= dateadd(day, -3, current_date())
+{% endif %}

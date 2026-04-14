@@ -102,6 +102,30 @@ models:
         tests:
           - not_null
 
+  - name: int_fishbowl_gunbroker_sales
+    description: >
+      GunBroker sales from Fishbowl-only orders (GB-prefixed SO numbers).
+      Shapes Fishbowl soitem line items to match the f_sales 36-column schema
+      so they can be UNION ALL'd into the fact table. Uses negative IDs to
+      avoid collision with positive Magento IDs. Maps Fishbowl product_id to
+      Magento product_entity_id via plugininfo for d_product compatibility.
+    columns:
+      - name: ID
+        description: "Negative of Fishbowl so_item_id (avoids Magento ID collision)."
+        tests:
+          - unique
+          - not_null
+      - name: INCREMENT_ID
+        description: "Fishbowl SO number with GB prefix (e.g. GB123456)."
+        tests:
+          - not_null
+      - name: STOREFRONT
+        description: "Always 'GunBroker' for this intermediate."
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['GunBroker']
+
   - name: int_fishbowl_product_enrichment
     description: >
       Fishbowl-sourced product enrichment data including vendor assignment, discontinued
