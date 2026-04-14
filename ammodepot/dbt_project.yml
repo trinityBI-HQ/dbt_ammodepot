@@ -77,7 +77,7 @@ vars:
 
   # Internal/operational SKUs — entire order is excluded from f_sales
   # when any line item matches (exact match). List will grow over time.
-  ammodepot_excluded_order_skus: "'00-CSG','00-Replacement','00-Marketing'"
+  ammodepot_excluded_order_skus: "'00-CSG','00-Replacement','00-Replacement-1','00-Marketing'"
 
   # Storefront identification (order prefix → channel name)
   # GunBroker orders exist only in Fishbowl (not Magento).
