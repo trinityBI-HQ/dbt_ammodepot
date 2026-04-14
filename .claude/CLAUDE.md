@@ -29,7 +29,7 @@ S3 Iceberg (Glue catalog)          AD_ANALYTICS (TRANSFORMER_ROLE)
     ├── production2018/            │      ↑ Snowflake reads via External Volume
     └── ammuni_prod/               │        + Glue Catalog Integration
                                    ├── SILVER (69 views + 7 tables)
-                                   └── GOLD (13 tables + 10 views)
+                                   └── GOLD (13 tables + 11 views)
                                           ↑ Power BI reads here
 
 AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
@@ -451,7 +451,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 ### Snowflake (Production — ECS Fargate, Iceberg-backed)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=12, WARN=5, ERROR=0 (f_sales full-refresh — 2026-04-14, GunBroker storefront feature)
+- **Last build**: PASS=12, WARN=5, ERROR=0 (f_sales full-refresh — 2026-04-14, GunBroker v2: freight + UOM + SKU exclusions)
 - **Previous full build**: PASS=363, WARN=11, ERROR=0 (100 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
 - **Build duration**: ~6 min steady state (was ~3 min pre-Iceberg). Refresh hook adds ~45-90s warm / ~3-5min cold. Headroom under 10-min schedule is the main watchpoint
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
