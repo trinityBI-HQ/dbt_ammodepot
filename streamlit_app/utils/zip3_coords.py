@@ -305,3 +305,41 @@ ZIP3_COORDS = {
     "999": (55.37, -131.68),
 }
 # fmt: on
+
+# USPS ZIP prefix ranges → state abbreviation.
+# Used to derive REGION when Fishbowl orders have POSTCODE but no state.
+_ZIP_STATE_RANGES: list[tuple[int, int, str]] = [
+    (5, 5, "NY"), (10, 27, "MA"), (28, 29, "RI"), (30, 38, "NH"),
+    (39, 39, "ME"), (40, 49, "ME"), (50, 54, "VT"), (55, 55, "MA"),
+    (56, 59, "VT"), (60, 69, "CT"), (70, 89, "NJ"), (90, 99, "NY"),
+    (100, 149, "NY"), (150, 196, "PA"), (197, 199, "DE"),
+    (200, 205, "DC"), (206, 219, "MD"), (220, 246, "VA"),
+    (247, 268, "WV"), (270, 289, "NC"), (290, 299, "SC"),
+    (300, 319, "GA"), (320, 339, "FL"), (340, 349, "FL"),
+    (350, 369, "AL"), (370, 385, "TN"), (386, 397, "MS"),
+    (398, 399, "GA"), (400, 418, "KY"), (420, 427, "KY"),
+    (430, 458, "OH"), (460, 479, "IN"), (480, 499, "MI"),
+    (500, 528, "IA"), (530, 549, "WI"), (550, 567, "MN"),
+    (570, 577, "SD"), (580, 588, "ND"), (590, 599, "MT"),
+    (600, 629, "IL"), (630, 658, "MO"), (660, 679, "KS"),
+    (680, 693, "NE"), (700, 714, "LA"), (716, 729, "AR"),
+    (730, 749, "OK"), (750, 799, "TX"), (800, 816, "CO"),
+    (820, 831, "WY"), (832, 838, "ID"), (840, 847, "UT"),
+    (850, 865, "AZ"), (870, 884, "NM"), (889, 898, "NV"),
+    (900, 935, "CA"), (936, 966, "CA"), (967, 968, "HI"),
+    (970, 979, "OR"), (980, 994, "WA"), (995, 999, "AK"),
+]
+
+
+def zip_to_state(postcode: str | None) -> str | None:
+    """Derive US state abbreviation from a ZIP or ZIP+4 code."""
+    if not postcode:
+        return None
+    digits = "".join(c for c in str(postcode) if c.isdigit())
+    if len(digits) < 3:
+        return None
+    z = int(digits[:3])
+    for lo, hi, st in _ZIP_STATE_RANGES:
+        if lo <= z <= hi:
+            return st
+    return None

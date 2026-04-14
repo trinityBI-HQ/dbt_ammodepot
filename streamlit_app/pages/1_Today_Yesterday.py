@@ -177,6 +177,14 @@ df_target = load_sales(target_date, statuses)
 df_compare = load_sales(compare_date, statuses)
 df_last_month = load_last_month_sales(statuses)
 
+# --- Derive REGION from POSTCODE for orders missing state (e.g. GunBroker) ---
+from utils.zip3_coords import zip_to_state
+
+for _df in (df_target, df_compare, df_last_month):
+    if not _df.empty and "REGION" in _df.columns and "POSTCODE" in _df.columns:
+        _mask = _df["REGION"].isna() & _df["POSTCODE"].notna()
+        if _mask.any():
+            _df.loc[_mask, "REGION"] = _df.loc[_mask, "POSTCODE"].apply(zip_to_state)
 
 # --- Storefront + Store filters (UI rendered at bottom, filtering here) ---
 STOREFRONTS = ["Website", "GunBroker"]

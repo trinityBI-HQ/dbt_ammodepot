@@ -136,7 +136,7 @@ select
                                                         as "Início da Hora",
     j.customer_email                                    as CUSTOMER_EMAIL,
     j.postcode                                          as POSTCODE,
-    cast(null as varchar)                               as COUNTRY,
+    'US'                                                as COUNTRY,
     cast(null as varchar)                               as REGION,
     j.city                                              as CITY,
     j.street                                            as STREET,

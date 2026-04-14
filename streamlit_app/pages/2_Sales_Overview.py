@@ -256,6 +256,15 @@ store_df = load_store_names()
 df_target = load_sales_data(start_date, end_date, statuses)
 df_compare = load_sales_data(compare_start, compare_end, statuses)
 
+# --- Derive REGION from POSTCODE for orders missing state (e.g. GunBroker) ---
+from utils.zip3_coords import zip_to_state
+
+for _df in (df_target, df_compare):
+    if not _df.empty and "REGION" in _df.columns and "POSTCODE" in _df.columns:
+        _mask = _df["REGION"].isna() & _df["POSTCODE"].notna()
+        if _mask.any():
+            _df.loc[_mask, "REGION"] = _df.loc[_mask, "POSTCODE"].apply(zip_to_state)
+
 # --- Apply Custom Filters: Week / Day of Week ---
 if custom_active and not df_target.empty:
     sel_week = st.session_state.get("so_custom_week", "All")
