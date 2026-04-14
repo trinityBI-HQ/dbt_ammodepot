@@ -44,6 +44,7 @@ AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
 - **Pre-cutover credits (30d)**: ETL_WH ~2,053 ($6,159), COMPUTE_WH ~62 ($186), total ~2,464 credits ($7,392)
 - **Pre-cutover cost by user**: SVC_AIRBYTE 678 (74%), SVC_DBT 137 (15%), POWERBI_READER 103 (11%)
 - **Realized savings**: ~$847/mo (dbt Cloud + EC2 downsize + MWAA) + **~$2,034/mo (Iceberg cutover, 2026-04-07)** = **~$2,881/mo total / ~$34,572/year**
+- **Streamlit compute pools**: `cost_monitor_pool` (~$5/mo) + `sales_dashboard_pool` (~$5/mo) = ~$10/mo incremental
 
 ---
 
@@ -76,12 +77,12 @@ Airbyte CDC (Fishbowl, Magento)
 | Ingestion | Airbyte CDC on EC2 c6a.2xlarge → S3 Iceberg (Glue catalog). Legacy → Snowflake connections inactive 2026-04-07 |
 | Bronze refresh | `on-run-start` hook: `ALTER ICEBERG TABLE ... REFRESH` for all 55 LAKEHOUSE_LANDING tables before each build |
 | Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
-| CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/) |
+| CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/); Streamlit deploys via `snow streamlit deploy` (path-filtered: streamlit_app/, streamlit_cost_monitor/) |
 | Packages | dbt_utils |
 | Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
 | Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
-| BI Dashboard | Streamlit (local + Streamlit in Snowflake) + Snowsight dashboards |
+| BI Dashboard | Streamlit (`AD_ANALYTICS.OPS.SALES_DASHBOARD`, SiS container runtime) + Snowsight dashboards |
 | Cost Monitoring | Snowsight dashboard (8 tiles) + Streamlit cost monitor app (`AD_ANALYTICS.OPS.COST_MONITOR`, SiS container runtime, GA) |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 | Archive | Decommissioned Redshift project + old artifacts |
@@ -90,15 +91,24 @@ Airbyte CDC (Fishbowl, Magento)
 
 ## Streamlit Dashboard App
 
-Replacement for Power BI dashboards, running locally and targeting Streamlit in Snowflake (SiS).
+Replacement for Power BI dashboards, deployed to Streamlit in Snowflake (SiS) on container runtime.
+
+- **Deployed to**: `AD_ANALYTICS.OPS.SALES_DASHBOARD` (SiS container runtime, Streamlit 1.55+)
+- **Compute pool**: `sales_dashboard_pool` (CPU_X64_XS, 1 node, auto-suspend 300s, ~$5/mo)
+- **EAI**: `sales_dashboard_integration` — egress to `basemaps.cartocdn.com` (CARTO tiles) + `pypi.org` + `files.pythonhosted.org`
+- **CI/CD**: `.github/workflows/deploy-streamlit-dashboard.yml` — triggers on push to `streamlit_app/`; re-attaches EAI after every `snow streamlit deploy --replace`
 
 ```
 streamlit_app/
 ├── app.py                         # Entry point (local) (~38 lines)
 ├── streamlit_app.py               # Entry point (SiS) (~32 lines)
+├── snowflake.yml                  # SiS definition v2 — container runtime, sales_dashboard_pool
+├── requirements.txt               # streamlit>=1.55, pandas, plotly, snowflake-snowpark-python
+├── setup/
+│   └── 01_bootstrap.sql           # ACCOUNTADMIN one-time: pool, EAI, network rules, grants
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,380 lines
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,529 lines
+│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering (replaces PBI SALES OVERVIEW FASTER) ~1,355 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,505 lines
 │   └── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,272 lines
 └── utils/
     ├── __init__.py
@@ -107,7 +117,7 @@ streamlit_app/
     └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps (~307 lines)
 ```
 
-**Total:** ~4,840 lines across 9 Python files
+**Total:** ~4,790 lines across 9 Python files
 
 ### Cross-Filtering (PBI-style)
 
@@ -117,7 +127,7 @@ Pages 1 and 2 implement PBI-style cross-filtering with selectbox dropdowns + cli
 - **`on_click` callback**: Clear All button uses `st.button(on_click=fn)` — avoids `StreamlitAPIException` from setting widget keys after instantiation
 - **Active filter pills**: HTML spans with colored badges showing current filters
 - **Bar dimming**: Non-selected Plotly bars render at 20% opacity when a filter is active
-- **Clickable charts**: Local only — SiS older Streamlit returns `event.selection` as callable, guarded with `_is_sis`
+- **Clickable charts**: Enabled in both local and SiS (container runtime 1.55+); `not callable(sel)` guard handles edge cases defensively
 - **Dropdown options**: Built from pre-filter data (PBI behavior — show all values regardless of active filters)
 
 ### Dark Theme Architecture
@@ -131,14 +141,13 @@ All visual components force a unified dark background (`#1E1E1E`) via `utils/cha
 
 ### SiS Compatibility Notes
 
-- **Runtime**: Currently "Run on warehouse" (Streamlit 1.22, limited); container runtime (GA 2026-03-09, Streamlit 1.55+) used by `streamlit_cost_monitor/` — see container runtime notes below
+- **Runtime**: Container runtime (`SYSTEM$ST_CONTAINER_RUNTIME_PY3_11`, Streamlit 1.55+) — migrated from warehouse runtime 2026-04-14
 - **Plotly**: Use `go.Bar`/`go.Figure` with `.tolist()` — `px.bar` fails serialization in SiS
 - **Plotly x-axis**: Use numeric positions + `tickvals`/`ticktext` to avoid duplicate category merging
-- **Plotly on_select**: Guard with `if not _is_sis:` — SiS returns `event.selection` as a function, not data object
-- **Maps**: Scattermapbox (local only, CARTO tiles blocked in SiS), `st.map()` fallback for SiS
+- **Plotly on_select**: `on_select="rerun"` enabled in SiS (1.55+); `not callable(sel)` defensive guard retained
+- **Maps**: `go.Scattermap` with CARTO `carto-darkmatter` tiles — requires EAI egress to `basemaps.cartocdn.com`
 - **Data types**: All plotly data must be plain Python types (`float()`, `.tolist()`), not numpy/pandas
-- **Dual-mode**: `_is_sis` flag in `utils/db.py` controls local vs SiS rendering paths
-- **st.toggle**: Not available in SiS (Python 3.11) — use `st.checkbox` instead
+- **Dual-mode**: `_is_sis` flag in `utils/db.py` controls session/connection routing (no rendering guards remain)
 - **st.dataframe**: Renders inside iframe that ignores external CSS on SiS — use `dark_dataframe()` instead
 - **Theme detection**: `st.get_option("theme.base")` unreliable on SiS — force dark backgrounds explicitly
 - **Session state pattern**: Initialize defaults in `st.session_state`, render widgets with `key=` only (no `value=`)
@@ -146,6 +155,7 @@ All visual components force a unified dark background (`#1E1E1E`) via `utils/cha
 - **PBI data filters**: Vendor Analysis + Open POs filter to `Ammunition` category + `QTY != 0` (matches PBI)
 - **KPI cards**: Custom HTML/CSS with `st.markdown(unsafe_allow_html=True)` — PBI-style icons, colored borders
 - **Default filters**: Order Status preselected to COMPLETE, PROCESSING, UNVERIFIED (matches PBI)
+- **`--replace` strips EAI**: CI step re-attaches `sales_dashboard_integration` after every deploy (same pattern as cost monitor)
 
 ---
 
@@ -200,7 +210,7 @@ The standalone `ammodepot_lakehouse/` dbt-duckdb project was removed during cuto
 - **Bronze sources**: All `bronze_*_sources.yml` point to `database: AD_ANALYTICS, schema: LAKEHOUSE_LANDING` with explicit `identifier:` mapping
 - **Type pitfalls**: Iceberg writes `_airbyte_extracted_at` as NUMBER (epoch ms) vs legacy TIMESTAMP_TZ; business timestamps come through as TIMESTAMP_LTZ vs legacy TIMESTAMP_TZ. Silver models use `to_timestamp(_airbyte_extracted_at, 3)`. Gold models that feed Power BI cast convert_timezone results back to TIMESTAMP_NTZ to preserve the cached PBI schema.
 
-### Streamlit App (BI Dashboard)
+### Streamlit App (BI Dashboard — SiS container runtime)
 
 ```
 streamlit_app/                          # See "Streamlit Dashboard App" section above
@@ -449,6 +459,17 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
 - **Iceberg cutover fixes (2026-04-07)**: NULL-PK guard on `silver/magento/magento_catalog_product_entity.sql` (Iceberg append-only preserves NULL-PK rows that Snowflake MERGE silently dropped); 2-arg `convert_timezone(target, ltz_value)` cast to NTZ in `f_sales`, `int_sales_cost_fallback`, `f_shippment` to preserve PBI's cached datetime schema
 - **Storage (2026-03-23)**: AD_AIRBYTE 56.8 GB active + 247 GB failsafe = 304 GB (now read-only since cutover); AD_ANALYTICS 98.3 GB; PC_FIVETRAN_DB 8.8 GB (candidate for drop)
+
+### Streamlit Sales Dashboard (SiS container runtime)
+
+Migrated 2026-04-14 — `AD_ANALYTICS.OPS.SALES_DASHBOARD` (3 pages, container runtime):
+- Deployed via GitHub Actions (`deploy-streamlit-dashboard.yml`)
+- Compute pool: `sales_dashboard_pool` (CPU_X64_XS, 1 node, auto-suspend 300s, ~$5/mo)
+- EAI: `sales_dashboard_integration` — CARTO tiles (`basemaps.cartocdn.com`) + PyPI egress
+- `--replace` strips EAI on every deploy: CI step re-attaches via `ALTER STREAMLIT SET`
+- Full feature parity with local dev: Plotly Scattermap + chart click cross-filtering enabled
+- Migrated from `go.Scattermapbox` to `go.Scattermap` (Plotly MapLibre migration)
+- Viewers: `DASHBOARD_VIEWER_ROLE` + `POWERBI_READONLY_ROLE` granted USAGE on Streamlit object
 
 ### Streamlit Cost Monitor (SiS container runtime)
 
