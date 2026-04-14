@@ -17,7 +17,7 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 ### Warehouse Migration (Complete)
 
 Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
-- **Snowflake** (`ammodepot/`): Production — 99 models, ECS Fargate orchestration every 10 min
+- **Snowflake** (`ammodepot/`): Production — 100 models, ECS Fargate orchestration every 10 min
 - **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
 - **Adapter**: dbt-snowflake 1.11.2
 
@@ -175,8 +175,8 @@ ammodepot/
 │   │   ├── magento/            # schema: AD_MAGENTO (25 source tables)
 │   │   └── ups/                # schema: UPS_INVOICE_HISTORY in PC_FIVETRAN_DB (1 source table)
 │   ├── silver/                 # 76 models (69 views + 7 high-fan-out tables)
-│   └── gold/                   # 13 table models + 10 views (including intermediates)
-│       ├── intermediate/       # 10 reusable view models (3 materialized as tables)
+│   └── gold/                   # 13 table models + 11 views (including intermediates)
+│       ├── intermediate/       # 11 reusable view models (3 materialized as tables)
 │       ├── _exposures.yml      # BI dashboard dependency documentation
 │       ├── f_cohort.sql        # Customer cohort analysis
 │       ├── f_cohort_detailed.sql  # Detailed cohort metrics
@@ -187,7 +187,7 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 99 models (34 FB + 23 MG + 19 Inv + 13 Gold + 10 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
+**Snowflake Counts:** 100 models (34 FB + 23 MG + 19 Inv + 13 Gold + 11 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
 
 ### Lakehouse (Iceberg via Snowflake — CUTOVER COMPLETE 2026-04-07)
 
@@ -441,7 +441,8 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 ### Snowflake (Production — ECS Fargate, Iceberg-backed)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=363, WARN=11, ERROR=0 (99 models + 273 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
+- **Last build**: PASS=12, WARN=5, ERROR=0 (f_sales full-refresh — 2026-04-14, GunBroker storefront feature)
+- **Previous full build**: PASS=363, WARN=11, ERROR=0 (100 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
 - **Build duration**: ~6 min steady state (was ~3 min pre-Iceberg). Refresh hook adds ~45-90s warm / ~3-5min cold. Headroom under 10-min schedule is the main watchpoint
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
@@ -527,16 +528,16 @@ Airbyte CDC → S3 Iceberg (Glue catalog) → Snowflake LAKEHOUSE_LANDING → db
 
 ---
 
-## Knowledge Base (671 files / 46 technologies in 6 categories)
+## Knowledge Base (612 files / 47 technologies in 6 categories)
 
 | Category | Files | Technologies | Key Technologies |
 |---|---|---|---|
-| data-engineering | 230 | 16 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
-| cloud | 140 | 11 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
-| devops-sre | 130 | 9 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
-| ai-ml | 88 | 6 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
-| automation | 39 | 3 | streamlit, n8n, mermaid |
-| document-processing | 15 | 1 | docling |
+| data-engineering | 220 | 19 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
+| cloud | 133 | 12 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
+| devops-sre | 124 | 13 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
+| ai-ml | 81 | 6 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
+| automation | 38 | 4 | streamlit, n8n, mermaid |
+| document-processing | 15 | 2 | docling |
 
 Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.
 
@@ -554,13 +555,15 @@ Located in `.claude/skills/<name>/SKILL.md`:
 
 ## Rules
 
-Path-scoped instruction files in `.claude/rules/` (8 files):
+Path-scoped instruction files in `.claude/rules/` (10 files):
 - **kb-development.md** — KB file conventions and size limits
 - **agent-development.md** — Agent template and MCP validation conventions
 - **git-workflow.md** — Commit message and PR conventions
 - **sql-standards.md** — SQL coding standards for dbt models
 - **dbt-conventions.md** — dbt project conventions and patterns
 - **snowflake-standards.md** — Snowflake SQL and architecture standards
+- **snowflake-finops-tagging.md** — FinOps: every Snowflake resource must be tagged for cost attribution
+- **mermaid-diagrams.md** — Mermaid diagram conventions and rendering
 - **skill-development.md** — Skill template and creation conventions
 - **ecs-deploy.md** — Auto-deploy to ECS after dbt model changes (scoped to ammodepot/, ecs/)
 
