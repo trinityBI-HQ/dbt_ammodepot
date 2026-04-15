@@ -14,15 +14,15 @@ AWS Cost Explorer access differs by mode:
 import streamlit as st
 
 st.set_page_config(
-    page_title="Snowflake + AWS Cost Monitor",
-    page_icon=":material/savings:",
+    page_title="Snowflake + AWS Infra Monitor",
+    page_icon=":material/monitoring:",
     layout="wide",
 )
 
-st.title("Snowflake + AWS Cost Monitor")
+st.title("Snowflake + AWS Infra Monitor")
 st.markdown(
-    "Unified compute + storage + infrastructure cost tracking for the "
-    "Ammunition Depot analytics pipeline."
+    "Unified compute, storage, infrastructure cost, and pipeline health "
+    "monitoring for the Ammunition Depot analytics pipeline."
 )
 
 st.markdown(
@@ -33,8 +33,9 @@ st.markdown(
 - **Snowflake Storage** — Storage growth by database (active + failsafe)
 - **AWS Infrastructure** — ECS Fargate, EC2, S3 Iceberg, CloudWatch, Secrets Manager (MTD, daily 90d, monthly 6M)
 - **Combined** — Total pipeline cost (Snowflake + AWS) with an explicit allow-list of what counts as AWS infrastructure
+- **dbt Pipeline** — Build duration, build health, and interactive dbt documentation
 """
 )
 
 with st.sidebar:
-    st.caption("Cost Monitor v0.1 — local")
+    st.caption("Infra Monitor v0.2 — local")

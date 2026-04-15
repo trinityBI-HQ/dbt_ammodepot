@@ -85,20 +85,28 @@ def _load_sis_creds() -> AwsCreds:
 
 
 @st.cache_resource
-def get_ce_client():
-    """Return a boto3 ``ce`` client using the right credential source."""
+def get_boto3_client(service: str):
+    """Return a boto3 client for any AWS service using the right credential source.
+
+    SiS: credentials from Snowflake secret via env var.
+    Local: default boto3 chain (AWS_PROFILE=ammodepot).
+    """
     import boto3
 
     if is_sis():
         creds = _load_sis_creds()
         return boto3.client(
-            "ce",
+            service,
             aws_access_key_id=creds.access_key,
             aws_secret_access_key=creds.secret_key,
             region_name="us-east-1",
         )
-    # Local dev: fall through to default chain (AWS_PROFILE=ammodepot).
-    return boto3.client("ce", region_name="us-east-1")
+    return boto3.client(service, region_name="us-east-1")
+
+
+def get_ce_client():
+    """Cost Explorer client (backward-compatible wrapper)."""
+    return get_boto3_client("ce")
 
 
 # --------------------------------------------------------------------------- #

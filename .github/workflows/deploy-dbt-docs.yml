@@ -1,0 +1,73 @@
+name: Deploy dbt Docs to S3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ammodepot/**'
+      - '.github/workflows/deploy-dbt-docs.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SNOWFLAKE_ACCOUNT: iwb48385.us-east-1
+      SNOWFLAKE_USER: SVC_DBT
+      SNOWFLAKE_ROLE: TRANSFORMER_ROLE
+      SNOWFLAKE_WAREHOUSE: ETL_WH
+      SNOWFLAKE_DATABASE: AD_ANALYTICS
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Reuse same Secrets Manager key as Streamlit deploy + ECS
+      - name: Fetch Snowflake private key from Secrets Manager
+        run: |
+          set -euo pipefail
+          aws secretsmanager get-secret-value \
+            --secret-id ammodepot/dbt/snowflake \
+            --query SecretString --output text > /tmp/sf_secret.json
+          python3 <<'PY'
+          import json, os, pathlib
+          with open("/tmp/sf_secret.json") as f:
+              d = json.load(f)
+          key_path = pathlib.Path("/tmp/sf_rsa_key.p8")
+          key_path.write_text(d["SNOWFLAKE_PRIVATE_KEY"])
+          key_path.chmod(0o600)
+          passphrase = d.get("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE", "") or ""
+          if passphrase:
+              print(f"::add-mask::{passphrase}")
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write("SNOWFLAKE_PRIVATE_KEY_PATH=/tmp/sf_rsa_key.p8\n")
+              if passphrase:
+                  env.write(f"SNOWFLAKE_PRIVATE_KEY_PASSPHRASE={passphrase}\n")
+          PY
+          rm /tmp/sf_secret.json
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dbt and generate static docs
+        working-directory: ammodepot
+        run: |
+          uv sync
+          uv run dbt deps --profiles-dir .
+          uv run dbt docs generate --static --profiles-dir . --target prod
+
+      - name: Upload static docs to S3
+        run: |
+          aws s3 cp ammodepot/target/static_index.html \
+            s3://ammodepot-lakehouse/dbt-docs/index.html \
+            --content-type "text/html" \
+            --cache-control "max-age=300"

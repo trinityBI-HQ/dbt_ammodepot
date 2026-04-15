@@ -103,7 +103,7 @@ jobs:
           PRIVATE_KEY_PASSPHRASE: ${{ env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
         run: |
           snow sql --connection deploy -q "
-            alter streamlit ad_analytics.ops.cost_monitor set
+            alter streamlit ad_analytics.ops.infra_monitor set
               external_access_integrations = (aws_cost_explorer_integration)
               secrets = ('aws_cost_explorer_creds' = ad_analytics.ops.aws_cost_explorer_creds)
           "
@@ -112,4 +112,4 @@ jobs:
         env:
           PRIVATE_KEY_PASSPHRASE: ${{ env.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
         run: |
-          snow sql --connection deploy -q "describe streamlit ad_analytics.ops.cost_monitor"
+          snow sql --connection deploy -q "describe streamlit ad_analytics.ops.infra_monitor"

@@ -1,13 +1,13 @@
 definition_version: 2
 
 entities:
-  cost_monitor:
+  infra_monitor:
     type: streamlit
     identifier:
-      name: cost_monitor
+      name: infra_monitor
       schema: ops
       database: ad_analytics
-    title: "Snowflake + AWS Cost Monitor"
+    title: "Snowflake + AWS Infra Monitor"
     main_file: streamlit_app.py
 
     # Container runtime (GA 2026-03-09) — gives us Streamlit 1.55, full PyPI

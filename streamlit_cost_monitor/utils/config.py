@@ -36,3 +36,14 @@ AWS_RELEVANT_SERVICES: tuple[str, ...] = (
 
 # Snowflake secret name for AWS Cost Explorer creds. Must match bootstrap SQL.
 AWS_SECRET_NAME: str = "aws_cost_explorer_creds"
+
+# CloudWatch — dbt build metrics (published by ecs/entrypoint.sh)
+CW_NAMESPACE: str = "AmmoDepot/dbt"
+CW_METRIC_NAME: str = "BuildDurationMinutes"
+CW_LOG_GROUP: str = "/ecs/ammodepot-dbt"
+CW_BUILD_CEILING_MIN: float = 10.0
+CW_METRIC_LOOKBACK_DAYS: int = 7
+
+# S3 — dbt docs (single static_index.html via dbt docs generate --static)
+DBT_DOCS_S3_BUCKET: str = "ammodepot-lakehouse"
+DBT_DOCS_S3_KEY: str = "dbt-docs/index.html"
