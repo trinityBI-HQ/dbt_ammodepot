@@ -17,7 +17,7 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 ### Warehouse Migration (Complete)
 
 Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
-- **Snowflake** (`ammodepot/`): Production — 100 models, ECS Fargate orchestration every 10 min
+- **Snowflake** (`ammodepot/`): Production — 101 models, ECS Fargate orchestration every 10 min
 - **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
 - **Adapter**: dbt-snowflake 1.11.2
 
@@ -29,7 +29,7 @@ S3 Iceberg (Glue catalog)          AD_ANALYTICS (TRANSFORMER_ROLE)
     ├── production2018/            │      ↑ Snowflake reads via External Volume
     └── ammuni_prod/               │        + Glue Catalog Integration
                                    ├── SILVER (69 views + 7 tables)
-                                   └── GOLD (13 tables + 11 views)
+                                   └── GOLD (13 tables + 12 views)
                                           ↑ Power BI reads here
 
 AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
@@ -44,7 +44,7 @@ AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
 - **Pre-cutover credits (30d)**: ETL_WH ~2,053 ($6,159), COMPUTE_WH ~62 ($186), total ~2,464 credits ($7,392)
 - **Pre-cutover cost by user**: SVC_AIRBYTE 678 (74%), SVC_DBT 137 (15%), POWERBI_READER 103 (11%)
 - **Realized savings**: ~$847/mo (dbt Cloud + EC2 downsize + MWAA) + **~$2,034/mo (Iceberg cutover, 2026-04-07)** = **~$2,881/mo total / ~$34,572/year**
-- **Streamlit compute pools**: `cost_monitor_pool` (~$5/mo) + `sales_dashboard_pool` (~$5/mo) = ~$10/mo incremental
+- **Streamlit compute pools**: `cost_monitor_pool` (~$5/mo) + `sales_dashboard_pool` (~$5/mo, shared with Analyst chatbot) = ~$10/mo incremental
 
 ---
 
@@ -77,13 +77,14 @@ Airbyte CDC (Fishbowl, Magento)
 | Ingestion | Airbyte CDC on EC2 c6a.2xlarge → S3 Iceberg (Glue catalog). Legacy → Snowflake connections inactive 2026-04-07 |
 | Bronze refresh | `on-run-start` hook: `ALTER ICEBERG TABLE ... REFRESH` for all 55 LAKEHOUSE_LANDING tables before each build |
 | Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
-| CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/); Streamlit deploys via `snow streamlit deploy` (path-filtered: streamlit_app/, streamlit_cost_monitor/) |
+| CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/); Streamlit deploys via `snow streamlit deploy` (path-filtered: streamlit_app/, streamlit_cost_monitor/, streamlit_analyst/) |
 | Packages | dbt_utils |
 | Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
 | Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (`AD_ANALYTICS.OPS.SALES_DASHBOARD`, SiS container runtime) + Snowsight dashboards |
 | Cost Monitoring | Snowsight dashboard (8 tiles) + Streamlit cost monitor app (`AD_ANALYTICS.OPS.COST_MONITOR`, SiS container runtime, GA) |
+| AI Analyst | Streamlit chatbot (`AD_ANALYTICS.OPS.ANALYST`, SiS container runtime) powered by Snowflake Cortex Analyst + Semantic View |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 | Archive | Decommissioned Redshift project + old artifacts |
 
@@ -185,8 +186,8 @@ ammodepot/
 │   │   ├── magento/            # schema: AD_MAGENTO (25 source tables)
 │   │   └── ups/                # schema: UPS_INVOICE_HISTORY in PC_FIVETRAN_DB (1 source table)
 │   ├── silver/                 # 76 models (69 views + 7 high-fan-out tables)
-│   └── gold/                   # 13 table models + 11 views (including intermediates)
-│       ├── intermediate/       # 11 reusable view models (3 materialized as tables)
+│   └── gold/                   # 13 table models + 12 views (including intermediates)
+│       ├── intermediate/       # 12 reusable view models (3 materialized as tables)
 │       ├── _exposures.yml      # BI dashboard dependency documentation
 │       ├── f_cohort.sql        # Customer cohort analysis
 │       ├── f_cohort_detailed.sql  # Detailed cohort metrics
@@ -197,7 +198,7 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 100 models (34 FB + 23 MG + 19 Inv + 13 Gold + 11 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
+**Snowflake Counts:** 101 models (34 FB + 23 MG + 19 Inv + 13 Gold + 12 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 5 macros (2 root + 3 cross_db), 5 exposures
 
 ### Lakehouse (Iceberg via Snowflake — CUTOVER COMPLETE 2026-04-07)
 
@@ -248,6 +249,38 @@ streamlit_cost_monitor/
 - **Container runtime secret access**: `_snowflake` module not available in container runtime; secret NOT exposed as env var `AWS_COST_EXPLORER_CREDS` (env var name TBD — diagnostic error added to log all env-var keys when secret load fails)
 - **ACCOUNT_USAGE queries**: All wrapped in `st.cache_data(ttl="1h")`; credit allocation by user uses proportional `execution_time` per warehouse-hour
 - **Viewers**: `DASHBOARD_VIEWER_ROLE` + `POWERBI_READONLY_ROLE` granted USAGE on Streamlit object
+
+### Streamlit Analyst App (Cortex Analyst Chatbot)
+
+```
+streamlit_analyst/
+├── app.py                         # Entry point (local) (~124 lines)
+├── streamlit_app.py               # Entry point (SiS) (~152 lines)
+├── snowflake.yml                  # SiS definition v2 — container runtime, sales_dashboard_pool
+├── requirements.txt               # streamlit>=1.55, requests, pandas, snowflake-snowpark-python
+├── test_golden_questions.py       # Automated golden question smoke test (25 questions) (~175 lines)
+├── .streamlit/
+│   └── config.toml                # Dark theme config
+├── setup/
+│   └── 01_bootstrap.sql           # ACCOUNTADMIN one-time: semantic view + RBAC grants + stage (~847 lines)
+└── utils/
+    ├── __init__.py
+    ├── analyst.py                 # Cortex Analyst REST API wrapper + response parser (~108 lines)
+    ├── chart_theme.py             # Minimal theme constants (~7 lines)
+    └── db.py                      # Dual-mode Snowflake connection (SiS/local) (~89 lines)
+```
+
+**Total:** ~1,529 lines across 10 files (7 Python, 2 SQL/TOML, 1 YAML)
+
+- **Deployed to**: `AD_ANALYTICS.OPS.ANALYST` (SiS container runtime, Streamlit 1.55+)
+- **Compute pool**: `sales_dashboard_pool` (shared with Sales Dashboard — no incremental cost)
+- **Query warehouse**: `COMPUTE_WH`
+- **Semantic View**: `AD_ANALYTICS.GOLD.AMMODEPOT_ANALYST` — covers 6 Gold tables (F_SALES, F_INVENTORYVIEW, F_POS, INT_PRODUCT_ANALYST, D_VENDOR, D_CUSTOMER_SEGMENTATION) with 20 verified golden queries
+- **dbt dependency**: `int_product_analyst` (new intermediate view) — re-aliases quoted D_PRODUCT columns to UPPERCASE unquoted for Cortex Analyst compatibility
+- **Authentication**: SiS container runtime reads OAuth token from `/snowflake/session/token`; local dev uses snowflake-connector REST token
+- **API**: REST POST to `/api/v2/cortex/analyst/message` with full conversation history for multi-turn context
+- **CI/CD**: `.github/workflows/deploy-streamlit-analyst.yml` — triggers on push to `streamlit_analyst/`; uses `snow streamlit deploy --replace`
+- **Viewers**: `DASHBOARD_VIEWER_ROLE` + `POWERBI_READONLY_ROLE` + `STREAMLIT_ROLE` granted SELECT on semantic view
 
 ### Airbyte EC2 Maintenance Scripts
 
@@ -420,7 +453,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 
 3. **Silver views, Gold tables** -- Silver is lightweight (views) for real-time freshness, with 7 high-fan-out models overridden to tables (fishbowl_soitem, fishbowl_product, fishbowl_uomconversion, fishbowl_part, magento_sales_order_item, magento_sales_order, inventory_qtyinventorytotals). Gold materializes as tables for BI query performance.
 
-4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 10 reusable intermediate views, materialized in the `gold` schema. Includes `int_fishbowl_magento_order_map` (NUM-based SO-to-order mapping), `int_sales_cost_fallback` (cost fallback logic extracted from f_sales), `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution), and `int_customer_cohort` (shared cohort base for f_cohort/f_cohort_detailed).
+4. **Intermediate views in Gold schema** -- Complex CTEs extracted from `f_sales` and `d_product` into 12 reusable intermediate views, materialized in the `gold` schema. Includes `int_fishbowl_magento_order_map` (NUM-based SO-to-order mapping), `int_sales_cost_fallback` (cost fallback logic extracted from f_sales), `int_magento_product_eav_lookups` (single-scan pivot for EAV resolution), `int_customer_cohort` (shared cohort base for f_cohort/f_cohort_detailed), and `int_product_analyst` (UPPERCASE unquoted re-alias of D_PRODUCT for Cortex Analyst compatibility).
 
 5. **UPPER_CASE gold columns** -- Gold layer output uses UPPER_CASE aliases for backward compatibility with existing Power BI consumers.
 
@@ -452,7 +485,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
 - **Last build**: PASS=12, WARN=5, ERROR=0 (f_sales full-refresh — 2026-04-14, GunBroker v2: freight + UOM + SKU exclusions)
-- **Previous full build**: PASS=363, WARN=11, ERROR=0 (100 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
+- **Previous full build**: PASS=363, WARN=11, ERROR=0 (101 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
 - **Build duration**: ~6 min steady state (was ~3 min pre-Iceberg). Refresh hook adds ~45-90s warm / ~3-5min cold. Headroom under 10-min schedule is the main watchpoint
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
@@ -478,6 +511,15 @@ Built 2026-04-09 — `AD_ANALYTICS.OPS.COST_MONITOR` (4 pages, container runtime
 - PyPI access: requires `pypi_rule` in EAI (added `04_fix_pypi_access.sql`)
 - `--replace` strips EAI on every deploy: CI step re-attaches via `ALTER STREAMLIT SET`
 - Container runtime secret mechanism: `_snowflake` module unavailable; env var name undetermined (diagnostic logging active)
+
+### Streamlit Analyst Chatbot (SiS container runtime)
+
+Built 2026-04-14 — `AD_ANALYTICS.OPS.ANALYST` (Cortex Analyst chatbot, container runtime):
+- Natural language query interface powered by Snowflake Cortex Analyst + Semantic View (`AD_ANALYTICS.GOLD.AMMODEPOT_ANALYST`)
+- Covers 6 Gold tables with 20 verified golden queries; `int_product_analyst` intermediate view resolves D_PRODUCT quoted-column issues
+- Deployed via GitHub Actions (`deploy-streamlit-analyst.yml`)
+- Shares `sales_dashboard_pool` compute pool (no incremental cost)
+- Automated smoke test: `test_golden_questions.py` (25 questions, API + SQL execution validation)
 
 ### Snowflake Cost Dashboard (Snowsight)
 
@@ -549,18 +591,18 @@ Airbyte CDC → S3 Iceberg (Glue catalog) → Snowflake LAKEHOUSE_LANDING → db
 
 ---
 
-## Knowledge Base (612 files / 47 technologies in 6 categories)
+## Knowledge Base (616 files / 47 technologies in 6 categories)
 
 | Category | Files | Technologies | Key Technologies |
 |---|---|---|---|
-| data-engineering | 220 | 19 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
+| data-engineering | 224 | 19 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
 | cloud | 133 | 12 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
 | devops-sre | 124 | 13 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
 | ai-ml | 81 | 6 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
 | automation | 38 | 4 | streamlit, n8n, mermaid |
 | document-processing | 15 | 2 | docling |
 
-Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Code, Interactive Tables, and OpenFlow.
+Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Analyst, Semantic Views, Cortex ML Functions, Cortex Code, Interactive Tables, and OpenFlow.
 
 ---
 
