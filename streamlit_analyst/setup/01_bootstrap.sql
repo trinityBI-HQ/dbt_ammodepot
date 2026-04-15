@@ -132,31 +132,31 @@ tables:
         description: "Piece quantity sold (adjusted by UOM conversion)"
     metrics:
       - name: total_revenue
-        expr: SUM(ROW_TOTAL)
+        expr: SUM(revenue)
         description: "Total net revenue"
         synonyms: ["gross sales", "total sales"]
       - name: total_orders
-        expr: COUNT(DISTINCT ORDER_ID)
+        expr: COUNT(DISTINCT order_id)
         description: "Count of unique orders"
       - name: gross_profit
-        expr: SUM(ROW_TOTAL) - SUM(COST)
+        expr: SUM(revenue) - SUM(cost)
         description: "Gross profit (revenue minus COGS)"
         synonyms: ["GP", "profit"]
       - name: gross_margin
-        expr: (SUM(ROW_TOTAL) - SUM(COST)) / NULLIF(SUM(ROW_TOTAL), 0)
+        expr: (SUM(revenue) - SUM(cost)) / NULLIF(SUM(revenue), 0)
         description: "Gross margin percentage"
         synonyms: ["margin"]
       - name: aov
-        expr: SUM(ROW_TOTAL) / NULLIF(COUNT(DISTINCT ORDER_ID), 0)
+        expr: SUM(revenue) / NULLIF(COUNT(DISTINCT order_id), 0)
         description: "Average order value"
         synonyms: ["average order value", "avg ticket"]
       - name: total_units
-        expr: SUM(QTY_ORDERED)
+        expr: SUM(qty_ordered)
         description: "Total units sold"
     filters:
       - name: standard_statuses
         description: "Active orders (excludes CANCELED, CLOSED)"
-        expr: "STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')"
+        expr: "status IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')"
 
   # ── F_INVENTORYVIEW ────────────────────────────────────────────────────────
   - name: inventory
@@ -197,14 +197,14 @@ tables:
         description: "Total inventory valuation (qty * cost)"
     metrics:
       - name: total_on_hand
-        expr: SUM(QTY_AVAILABLE)
+        expr: SUM(qty_available)
         description: "Total units in stock across all SKUs"
       - name: total_inventory_value
-        expr: SUM(EXTENDED_COST)
+        expr: SUM(extended_cost)
         description: "Total dollar value of current inventory"
         synonyms: ["inventory cost", "stock value"]
       - name: total_on_order
-        expr: SUM(QTY_ON_ORDER)
+        expr: SUM(qty_on_order)
         description: "Total units on open purchase orders"
 
   # ── F_POS ──────────────────────────────────────────────────────────────────
@@ -271,18 +271,18 @@ tables:
         description: "Quantity already delivered on this PO item"
     metrics:
       - name: avg_lead_time
-        expr: AVG(PRECISE_LEADTIME)
+        expr: AVG(lead_time)
         description: "Average lead time in days"
       - name: total_po_cost
-        expr: SUM(TOTAL_COST)
+        expr: SUM(total_cost)
         description: "Total procurement cost"
       - name: total_qty_received
-        expr: SUM(QTY)
+        expr: SUM(qty_received)
         description: "Total units received"
     filters:
       - name: open_pos
         description: "PO items not yet received"
-        expr: "DATERECEIVED IS NULL AND QUANTITY_TO_FULFILL > 0"
+        expr: "date_received IS NULL AND qty_to_fulfill > 0"
 
   # ── D_PRODUCT ──────────────────────────────────────────────────────────────
   - name: products
@@ -477,10 +477,10 @@ tables:
         description: "Total purchases across all time (any status)"
     metrics:
       - name: customer_count
-        expr: COUNT(DISTINCT RANK_ID)
+        expr: COUNT(DISTINCT rank_id)
         description: "Number of unique customers"
       - name: avg_customer_revenue
-        expr: AVG(TOTAL_REVENUE)
+        expr: AVG(total_revenue)
         description: "Average 12-month revenue per customer"
 
 # ── RELATIONSHIPS ──────────────────────────────────────────────────────────
