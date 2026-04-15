@@ -126,6 +126,25 @@ models:
               arguments:
                 values: ['GunBroker']
 
+  - name: int_daily_sales_by_caliber
+    description: >
+      Daily units sold aggregated by caliber for SNOWFLAKE.ML.FORECAST training.
+      Filters to calibers with 90+ unique sale dates to avoid sparse series failures.
+      Used by SP_TRAIN_FORECAST stored procedure, not consumed directly by dashboards.
+    columns:
+      - name: SALE_DATE
+        description: "Date of sales (truncated from CREATED_AT)."
+        tests:
+          - not_null
+      - name: CALIBER
+        description: "Product caliber from INT_PRODUCT_ANALYST."
+        tests:
+          - not_null
+      - name: UNITS_SOLD
+        description: "Total units sold for this caliber on this date."
+        tests:
+          - assert_non_negative_values
+
   - name: int_product_analyst
     description: >
       Thin view over d_product with UPPERCASE unquoted column names for
