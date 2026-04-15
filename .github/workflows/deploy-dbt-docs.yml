@@ -19,6 +19,7 @@ jobs:
       SNOWFLAKE_ROLE: TRANSFORMER_ROLE
       SNOWFLAKE_WAREHOUSE: ETL_WH
       SNOWFLAKE_DATABASE: AD_ANALYTICS
+      SNOWFLAKE_SCHEMA: GOLD
 
     steps:
       - name: Checkout repo
