@@ -103,6 +103,11 @@ tables:
         data_type: TIMESTAMP_NTZ
         description: "Order creation date/time in Eastern (EDT/EST)"
         synonyms: ["date", "sale date", "order date"]
+      - name: timedate
+        expr: TIMEDATE
+        data_type: TIMESTAMP_NTZ
+        description: "Original order timestamp in UTC. Use EXTRACT(HOUR FROM timedate) for hourly sales analysis."
+        synonyms: ["original timestamp", "utc timestamp"]
     facts:
       - name: row_total
         expr: ROW_TOTAL
