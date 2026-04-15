@@ -154,6 +154,14 @@ tables:
       - name: total_units
         expr: SUM(qty_ordered)
         description: "Total units sold"
+      - name: gp_after_variable_cost
+        expr: SUM(row_total) - SUM(cost) - SUM(freight_cost)
+        description: "Gross profit after variable costs. Variable costs include COGS (cost) plus freight/shipping cost (freight_cost). Use this metric when asked about GP after variable cost or contribution margin."
+        synonyms: ["GP after variable cost", "contribution margin", "profit after freight"]
+      - name: shipping_pct
+        expr: ROUND(SUM(freight_revenue) / NULLIF(SUM(row_total), 0) * 100, 2)
+        description: "Shipping/freight revenue as a percentage of net sales (row_total)"
+        synonyms: ["shipping percent", "freight percent", "shipping revenue percentage"]
     filters:
       - name: standard_statuses
         description: "Active orders (excludes CANCELED, CLOSED)"
@@ -319,7 +327,7 @@ tables:
       - name: caliber
         expr: CALIBER
         data_type: VARCHAR
-        description: "Ammunition caliber (e.g., 9mm, 5.56 NATO, .308 Win)"
+        description: "Ammunition caliber. Values include variants like '9mm', '9mm Luger', '9mm Luger +P', '5.56 NATO', '.308 Win'. When filtering by caliber, use ILIKE with wildcards to match all variants (e.g. ILIKE '%9mm%' to match all 9mm types)."
       - name: manufacturer
         expr: MANUFACTURER
         data_type: VARCHAR
@@ -612,10 +620,25 @@ verified_queries:
     sql: |
       SELECT SUM(i.QTY_AVAILABLE) AS UNITS_IN_STOCK
       FROM AD_ANALYTICS.GOLD.F_INVENTORYVIEW i
-      JOIN AD_ANALYTICS.GOLD.D_PRODUCT p ON i.PART_NUMBER = p.SKU
-      WHERE p."Caliber" ILIKE '%9mm%'
+      JOIN AD_ANALYTICS.GOLD.INT_PRODUCT_ANALYST p ON i.PART_NUMBER = p.SKU
+      WHERE p.CALIBER ILIKE '%9mm%'
     verified_by: "Victor"
     use_as_onboarding_question: true
+
+  - name: units_by_caliber_in_stock
+    question: "How many units are in stock by caliber?"
+    sql: |
+      SELECT
+        p.CALIBER,
+        SUM(i.QTY_AVAILABLE) AS UNITS_IN_STOCK,
+        SUM(i.EXTENDED_COST) AS INVENTORY_VALUE
+      FROM AD_ANALYTICS.GOLD.F_INVENTORYVIEW i
+      JOIN AD_ANALYTICS.GOLD.INT_PRODUCT_ANALYST p ON i.PART_NUMBER = p.SKU
+      WHERE p.CALIBER IS NOT NULL
+      GROUP BY p.CALIBER
+      ORDER BY UNITS_IN_STOCK DESC
+      LIMIT 20
+    verified_by: "Victor"
 
   - name: vendors_longest_lead_times
     question: "Which vendors have the longest lead times?"
@@ -660,6 +683,41 @@ verified_queries:
       SELECT COUNT(DISTINCT RANK_ID) AS AT_RISK_REGULAR_COUNT
       FROM AD_ANALYTICS.GOLD.D_CUSTOMER_SEGMENTATION
       WHERE CUSTOMER_CLASSIFICATION = 'At-Risk Regular'
+    verified_by: "Victor"
+
+  - name: gp_after_variable_cost_today
+    question: "GP after variable cost today"
+    sql: |
+      SELECT
+        ROUND(SUM(ROW_TOTAL) - SUM(COST) - SUM(FREIGHT_COST), 2) AS GP_AFTER_VARIABLE_COST,
+        ROUND((SUM(ROW_TOTAL) - SUM(COST) - SUM(FREIGHT_COST)) / NULLIF(SUM(ROW_TOTAL), 0) * 100, 2) AS CONTRIBUTION_MARGIN_PCT
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE CREATED_AT::DATE = CURRENT_DATE()
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+    verified_by: "Victor"
+
+  - name: shipping_pct_today
+    question: "Shipping revenue as % of net sales today"
+    sql: |
+      SELECT
+        ROUND(SUM(FREIGHT_REVENUE) / NULLIF(SUM(ROW_TOTAL), 0) * 100, 2) AS SHIPPING_REVENUE_PCT
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE CREATED_AT::DATE = CURRENT_DATE()
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+    verified_by: "Victor"
+
+  - name: sales_by_hour_today
+    question: "Sales by hour today"
+    sql: |
+      SELECT
+        EXTRACT(HOUR FROM TIMEDATE) AS HOUR_OF_DAY,
+        SUM(ROW_TOTAL) AS REVENUE,
+        COUNT(DISTINCT ORDER_ID) AS ORDERS
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE CREATED_AT::DATE = CURRENT_DATE()
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      GROUP BY HOUR_OF_DAY
+      ORDER BY HOUR_OF_DAY
     verified_by: "Victor"
 
   # ── PBI Top 20 — Additional Verified Queries ──────────────────────────────
