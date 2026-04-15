@@ -290,19 +290,19 @@ tables:
         description: "PO items not yet received"
         expr: "datereceived IS NULL AND quantity_to_fulfill > 0"
 
-  # ── D_PRODUCT ──────────────────────────────────────────────────────────────
+  # ── D_PRODUCT (via D_PRODUCT_ANALYST view — UPPERCASE unquoted columns) ──
   - name: products
-    description: "Product catalog with ammunition attributes. One row per product."
+    description: "Product catalog with ammunition attributes. One row per product. Uses D_PRODUCT_ANALYST view to avoid mixed-case quoted column issues."
     base_table:
       database: AD_ANALYTICS
       schema: GOLD
-      table: D_PRODUCT
+      table: D_PRODUCT_ANALYST
     primary_key:
       columns:
         - product_id
     dimensions:
       - name: product_id
-        expr: '"Product ID"'
+        expr: PRODUCT_ID
         data_type: NUMBER
         unique: true
         description: "Magento product entity ID (primary key)"
@@ -312,57 +312,59 @@ tables:
         unique: true
         description: "Stock keeping unit"
       - name: product_name
-        expr: '"Product Name"'
+        expr: PRODUCT_NAME
         data_type: VARCHAR
         description: "Full product name"
         synonyms: ["product", "item", "name"]
       - name: caliber
-        expr: '"Caliber"'
+        expr: CALIBER
         data_type: VARCHAR
         description: "Ammunition caliber (e.g., 9mm, 5.56 NATO, .308 Win)"
       - name: manufacturer
-        expr: '"Manufacturer SKU"'
+        expr: MANUFACTURER
         data_type: VARCHAR
         description: "Manufacturer / brand name"
         synonyms: ["brand", "maker", "mfr"]
       - name: projectile
-        expr: '"Projectile"'
+        expr: PROJECTILE
         data_type: VARCHAR
         description: "Projectile type: FMJ, JHP, SP, HP, Buck, Slug, etc."
-      - name: vendor
-        expr: '"Vendor"'
+      - name: product_vendor
+        expr: PRODUCT_VENDOR
         data_type: VARCHAR
         description: "Fishbowl vendor / fulfillment source"
-        synonyms: ["fulfilled by", "supplier"]
-      - name: use_type
+        synonyms: ["fulfilled by", "supplier", "vendor"]
+      - name: use_type_category
         expr: USE_TYPE_CATEGORY
         data_type: VARCHAR
         description: "Product use classification: Hunting, Self-Defense, Tactical, Sporting, Collector, Unclassified"
         is_enum: true
         synonyms: ["use type", "product type", "use case"]
       - name: primary_category
-        expr: '"Primary Category"'
+        expr: PRIMARY_CATEGORY
         data_type: VARCHAR
         description: "Top-level product category: Ammunition, Guns, Magazines, Gun Parts, Gear, Optics, etc."
         is_enum: true
         synonyms: ["category"]
       - name: discontinued
-        expr: '"Discontinued"'
+        expr: DISCONTINUED
         data_type: BOOLEAN
         description: "Whether the product is discontinued"
       - name: unit_type
-        expr: '"Unit Type"'
+        expr: UNIT_TYPE
         data_type: VARCHAR
         description: "Unit of measure (Box, Case, Each)"
     facts:
-      - name: avg_cost
+      - name: avgcost
         expr: AVGCOST
         data_type: NUMBER
         description: "Average cost from Fishbowl"
-      - name: last_vendor_cost
+        synonyms: ["average cost"]
+      - name: lastvendorcost
         expr: LASTVENDORCOST
         data_type: NUMBER
         description: "Most recent vendor cost"
+        synonyms: ["last vendor cost"]
 
   # ── D_VENDOR ───────────────────────────────────────────────────────────────
   - name: vendors
