@@ -11,14 +11,32 @@ import os
 
 import requests
 
-SNOWFLAKE_ACCOUNT = os.environ.get("SNOWFLAKE_ACCOUNT", "iwb48385.us-east-1")
 SEMANTIC_VIEW = "AD_ANALYTICS.GOLD.AMMODEPOT_ANALYST"
 API_TIMEOUT = int(os.environ.get("API_TIMEOUT", "90"))
 
-_API_URL = (
-    f"https://{SNOWFLAKE_ACCOUNT}.snowflakecomputing.com"
-    f"/api/v2/cortex/analyst/message"
-)
+# Default account with region; container runtime may override via env var.
+_ACCOUNT_LOCATOR = "iwb48385.us-east-1"
+
+
+def _get_api_host() -> str:
+    """Derive the Cortex Analyst API host.
+
+    In SiS container runtime, SNOWFLAKE_HOST is the most reliable env var
+    (e.g. 'iwb48385.us-east-1.snowflakecomputing.com'). Falls back to
+    constructing from the account locator.
+    """
+    host = os.environ.get("SNOWFLAKE_HOST", "")
+    if host:
+        return host
+    account = os.environ.get("SNOWFLAKE_ACCOUNT", _ACCOUNT_LOCATOR)
+    # If env var is missing the region, use the hardcoded full locator
+    if "." not in account:
+        account = _ACCOUNT_LOCATOR
+    return f"{account}.snowflakecomputing.com"
+
+
+def _get_api_url() -> str:
+    return f"https://{_get_api_host()}/api/v2/cortex/analyst/message"
 
 
 def _get_token() -> str:
@@ -50,7 +68,7 @@ def send_message(messages: list[dict]) -> dict:
         RuntimeError: On non-2xx HTTP responses.
     """
     resp = requests.post(
-        _API_URL,
+        _get_api_url(),
         headers={
             "Authorization": f"Bearer {_get_token()}",
             "Content-Type": "application/json",
