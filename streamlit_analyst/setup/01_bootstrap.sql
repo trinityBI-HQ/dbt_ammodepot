@@ -92,6 +92,10 @@ tables:
         expr: VENDOR
         data_type: NUMBER
         description: "Fishbowl vendor ID (FK to vendors)"
+      - name: rank_id
+        expr: RANK_ID
+        data_type: NUMBER
+        description: "Customer rank ID for segmentation join (FK to customer_segments)"
     time_dimensions:
       - name: order_date
         expr: CREATED_AT
@@ -289,7 +293,7 @@ tables:
       table: D_PRODUCT
     primary_key:
       columns:
-        - '"Product ID"'
+        - product_id
     dimensions:
       - name: product_id
         expr: '"Product ID"'
@@ -363,7 +367,7 @@ tables:
       table: D_VENDOR
     primary_key:
       columns:
-        - VENDOR_ID
+        - vendor_id
     dimensions:
       - name: vendor_id
         expr: VENDOR_ID
@@ -406,7 +410,7 @@ tables:
       table: D_CUSTOMER_SEGMENTATION
     primary_key:
       columns:
-        - RANK_ID
+        - rank_id
     dimensions:
       - name: customer_email
         expr: CUSTOMER_EMAIL
@@ -485,30 +489,26 @@ relationships:
     left_table: sales
     right_table: products
     relationship_columns:
-      - left_column: PRODUCT_ID
-        right_column: '"Product ID"'
+      - left_column: product_id
+        right_column: product_id
   - name: sales_to_vendors
     left_table: sales
     right_table: vendors
     relationship_columns:
-      - left_column: VENDOR
-        right_column: VENDOR_ID
+      - left_column: vendor_id
+        right_column: vendor_id
   - name: sales_to_segments
     left_table: sales
     right_table: customer_segments
     relationship_columns:
-      - left_column: RANK_ID
-        right_column: RANK_ID
+      - left_column: rank_id
+        right_column: rank_id
   - name: pos_to_vendors
     left_table: purchase_orders
     right_table: vendors
     relationship_columns:
-      - left_column: VENDOR_ID
-        right_column: VENDOR_ID
-  # NOTE: pos_to_products and inventory_to_products removed — PART_NUMBER→SKU
-  # join fails validation because SKU is not the declared primary key
-  # ("Product ID" is). Cortex Analyst can still match on column names/synonyms.
-  # Phase 2: consider adding SKU as primary key if join accuracy is low.
+      - left_column: vendor_id
+        right_column: vendor_id
 
 # ── VERIFIED QUERIES (Golden Questions) ────────────────────────────────────
 verified_queries:

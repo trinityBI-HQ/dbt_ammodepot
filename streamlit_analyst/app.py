@@ -7,7 +7,6 @@ SiS entry point is streamlit_app.py (Snowflake convention).
 import streamlit as st
 
 from utils.analyst import extract_content, send_message
-from utils.chart_theme import ACCENT, BG_CHART, BG_INPUT, TEXT_PRIMARY
 from utils.db import run_query
 
 MAX_DISPLAY_ROWS = 500
@@ -16,17 +15,6 @@ st.set_page_config(
     page_title="Ammo Depot Sales Assistant",
     page_icon=":material/chat:",
     layout="wide",
-)
-
-# -- Dark theme CSS --
-st.markdown(
-    f"""<style>
-    .stApp {{ background-color: {BG_CHART}; color: {TEXT_PRIMARY}; }}
-    [data-testid="stChatMessage"] {{ background-color: {BG_INPUT}; border-radius: 8px; }}
-    [data-testid="stChatInput"] textarea {{ color: {TEXT_PRIMARY}; }}
-    .stMarkdown a {{ color: {ACCENT}; }}
-    </style>""",
-    unsafe_allow_html=True,
 )
 
 st.title("Sales Assistant")

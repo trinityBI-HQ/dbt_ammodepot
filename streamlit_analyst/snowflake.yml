@@ -20,3 +20,4 @@ entities:
       - streamlit_app.py
       - requirements.txt
       - utils/
+      - .streamlit/

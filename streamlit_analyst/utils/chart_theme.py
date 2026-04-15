@@ -1,11 +1,7 @@
-"""Dark theme constants for the Analyst chatbot.
+"""Theme constants for the Analyst chatbot.
 
-Subset of streamlit_app/utils/chart_theme.py — only the constants
-needed for the chat UI (no Plotly chart theming needed in Phase 1).
+Uses Streamlit's native dark theme via .streamlit/config.toml.
+Only defines accent color for links and minimal CSS overrides.
 """
 
-BG_CHART = "#1E1E1E"
-BG_INPUT = "#2a2a2a"
 ACCENT = "#00d4aa"
-TEXT_PRIMARY = "#e0e0e0"
-TEXT_SECONDARY = "#999999"

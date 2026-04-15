@@ -8,7 +8,6 @@ import requests.exceptions
 import streamlit as st
 
 from utils.analyst import extract_content, send_message
-from utils.chart_theme import ACCENT, BG_CHART, BG_INPUT, TEXT_PRIMARY
 from utils.db import run_query
 
 MAX_DISPLAY_ROWS = 500
@@ -22,17 +21,6 @@ try:
     )
 except Exception:
     pass
-
-# -- Dark theme CSS --
-st.markdown(
-    f"""<style>
-    .stApp {{ background-color: {BG_CHART}; color: {TEXT_PRIMARY}; }}
-    [data-testid="stChatMessage"] {{ background-color: {BG_INPUT}; border-radius: 8px; }}
-    [data-testid="stChatInput"] textarea {{ color: {TEXT_PRIMARY}; }}
-    .stMarkdown a {{ color: {ACCENT}; }}
-    </style>""",
-    unsafe_allow_html=True,
-)
 
 # -- Header --
 st.title("Sales Assistant")
@@ -120,4 +108,3 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.caption("Powered by Snowflake Cortex Analyst")
-    st.caption(f"Semantic View: `AMMODEPOT_ANALYST`")
