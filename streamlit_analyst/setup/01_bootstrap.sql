@@ -41,12 +41,12 @@ tables:
       schema: GOLD
       table: F_SALES
     dimensions:
-      - name: order_status
+      - name: status
         expr: STATUS
         data_type: VARCHAR
         description: "Order status: COMPLETE, PROCESSING, UNVERIFIED, CANCELED, CLOSED"
         is_enum: true
-        synonyms: ["status"]
+        synonyms: ["order status"]
       - name: storefront
         expr: STOREFRONT
         data_type: VARCHAR
@@ -88,26 +88,27 @@ tables:
         data_type: VARCHAR
         description: "Human-readable order number"
         synonyms: ["order number"]
-      - name: vendor_id
+      - name: vendor
         expr: VENDOR
         data_type: NUMBER
         description: "Fishbowl vendor ID (FK to vendors)"
+        synonyms: ["vendor_id"]
       - name: rank_id
         expr: RANK_ID
         data_type: NUMBER
         description: "Customer rank ID for segmentation join (FK to customer_segments)"
     time_dimensions:
-      - name: order_date
+      - name: created_at
         expr: CREATED_AT
         data_type: TIMESTAMP_NTZ
         description: "Order creation date/time in Eastern (EDT/EST)"
-        synonyms: ["date", "sale date", "created"]
+        synonyms: ["date", "sale date", "order date"]
     facts:
-      - name: revenue
+      - name: row_total
         expr: ROW_TOTAL
         data_type: NUMBER
         description: "Net line item revenue in USD (after discount)"
-        synonyms: ["sales", "net sales"]
+        synonyms: ["revenue", "sales", "net sales"]
       - name: cost
         expr: COST
         data_type: NUMBER
@@ -132,22 +133,22 @@ tables:
         description: "Piece quantity sold (adjusted by UOM conversion)"
     metrics:
       - name: total_revenue
-        expr: SUM(revenue)
+        expr: SUM(row_total)
         description: "Total net revenue"
         synonyms: ["gross sales", "total sales"]
       - name: total_orders
         expr: COUNT(DISTINCT order_id)
         description: "Count of unique orders"
       - name: gross_profit
-        expr: SUM(revenue) - SUM(cost)
+        expr: SUM(row_total) - SUM(cost)
         description: "Gross profit (revenue minus COGS)"
         synonyms: ["GP", "profit"]
       - name: gross_margin
-        expr: (SUM(revenue) - SUM(cost)) / NULLIF(SUM(revenue), 0)
+        expr: (SUM(row_total) - SUM(cost)) / NULLIF(SUM(row_total), 0)
         description: "Gross margin percentage"
         synonyms: ["margin"]
       - name: aov
-        expr: SUM(revenue) / NULLIF(COUNT(DISTINCT order_id), 0)
+        expr: SUM(row_total) / NULLIF(COUNT(DISTINCT order_id), 0)
         description: "Average order value"
         synonyms: ["average order value", "avg ticket"]
       - name: total_units
@@ -228,26 +229,29 @@ tables:
         data_type: NUMBER
         description: "PO identifier"
         synonyms: ["PO", "PO number"]
-      - name: receipt_status
+      - name: receipt_item_status_id
         expr: RECEIPT_ITEM_STATUS_ID
         data_type: NUMBER
         description: "2=Received, 4=Reconciled"
         is_enum: true
+        synonyms: ["receipt status"]
     time_dimensions:
-      - name: po_created_date
+      - name: po_created_at
         expr: PO_CREATED_AT
         data_type: TIMESTAMP_NTZ
         description: "Date PO was created"
         synonyms: ["PO date", "order date"]
-      - name: date_received
+      - name: datereceived
         expr: DATERECEIVED
         data_type: TIMESTAMP_NTZ
         description: "Date item was received (NULL if not yet received)"
+        synonyms: ["date received", "receipt date"]
     facts:
-      - name: qty_received
+      - name: qty
         expr: QTY
         data_type: NUMBER
         description: "Quantity received on this line"
+        synonyms: ["quantity received"]
       - name: unit_cost
         expr: UNIT_COST
         data_type: NUMBER
@@ -256,33 +260,35 @@ tables:
         expr: TOTAL_COST
         data_type: NUMBER
         description: "Total cost for this receipt line"
-      - name: lead_time
+      - name: precise_leadtime
         expr: PRECISE_LEADTIME
         data_type: NUMBER
         description: "Best available lead time in days (vendor-product > vendor > product)"
         synonyms: ["lead time", "delivery time"]
-      - name: qty_to_fulfill
+      - name: quantity_to_fulfill
         expr: QUANTITY_TO_FULFILL
         data_type: NUMBER
         description: "Quantity still to be delivered on this PO item"
-      - name: qty_fulfilled
+        synonyms: ["qty to fulfill"]
+      - name: quantity_fulfilled
         expr: QUANTITY_FULFILLED
         data_type: NUMBER
         description: "Quantity already delivered on this PO item"
+        synonyms: ["qty fulfilled"]
     metrics:
       - name: avg_lead_time
-        expr: AVG(lead_time)
+        expr: AVG(precise_leadtime)
         description: "Average lead time in days"
       - name: total_po_cost
         expr: SUM(total_cost)
         description: "Total procurement cost"
       - name: total_qty_received
-        expr: SUM(qty_received)
+        expr: SUM(qty)
         description: "Total units received"
     filters:
       - name: open_pos
         description: "PO items not yet received"
-        expr: "date_received IS NULL AND qty_to_fulfill > 0"
+        expr: "datereceived IS NULL AND quantity_to_fulfill > 0"
 
   # ── D_PRODUCT ──────────────────────────────────────────────────────────────
   - name: products
@@ -431,22 +437,24 @@ tables:
         data_type: VARCHAR
         description: "Recency band: R0 (>365 days) to R5 (within 30 days)"
         is_enum: true
-      - name: value_band
+      - name: value
         expr: VALUE
         data_type: VARCHAR
         description: "Revenue band: V0 (none) to V5 (>$500 in 12 months)"
         is_enum: true
-      - name: margin_band
+        synonyms: ["value band"]
+      - name: margin_classification
         expr: MARGIN_CLASSIFICATION
         data_type: VARCHAR
         description: "Margin band: M0 (none) to M5 (>=30%)"
         is_enum: true
+        synonyms: ["margin band"]
       - name: monetary_value
         expr: MONETARY_VALUE
         data_type: VARCHAR
         description: "Combined value+margin score: MV0 to MV5"
         is_enum: true
-      - name: classification
+      - name: customer_classification
         expr: CUSTOMER_CLASSIFICATION
         data_type: VARCHAR
         description: "Customer segment: Super Engaged, At-Risk Regular, Lost Buyer, New Buyer, etc. (16 segments)"
@@ -463,18 +471,20 @@ tables:
         expr: TOTAL_REVENUE
         data_type: NUMBER
         description: "Customer revenue in trailing 12 months"
-      - name: purchase_count
+      - name: number_of_purchases
         expr: NUMBER_OF_PURCHASES
         data_type: NUMBER
         description: "Number of purchases in trailing 12 months"
-      - name: days_since_last
+        synonyms: ["purchase count"]
+      - name: days_since_last_purchase
         expr: DAYS_SINCE_LAST_PURCHASE
         data_type: NUMBER
         description: "Days since most recent purchase"
-      - name: lifetime_purchases
+      - name: total_purchases_all_time
         expr: TOTAL_PURCHASES_ALL_TIME
         data_type: NUMBER
         description: "Total purchases across all time (any status)"
+        synonyms: ["lifetime purchases"]
     metrics:
       - name: customer_count
         expr: COUNT(DISTINCT rank_id)
@@ -495,7 +505,7 @@ relationships:
     left_table: sales
     right_table: vendors
     relationship_columns:
-      - left_column: vendor_id
+      - left_column: vendor
         right_column: vendor_id
   - name: sales_to_segments
     left_table: sales
