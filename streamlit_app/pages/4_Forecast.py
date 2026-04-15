@@ -57,6 +57,7 @@ def load_forecast() -> pd.DataFrame:
                FORECAST_TYPE, TRAINED_AT
         FROM F_FORECAST
         WHERE FORECAST_TYPE = 'caliber'
+          AND FORECAST_DATE > CURRENT_DATE()
         ORDER BY CALIBER, FORECAST_DATE
     """)
 
@@ -68,6 +69,7 @@ def load_revenue_forecast() -> pd.DataFrame:
                LOWER_BOUND, UPPER_BOUND, TRAINED_AT
         FROM F_FORECAST
         WHERE FORECAST_TYPE = 'revenue'
+          AND FORECAST_DATE > CURRENT_DATE()
         ORDER BY FORECAST_DATE
     """)
 
@@ -108,6 +110,7 @@ def load_stockout_risk() -> pd.DataFrame:
                    AVG(PREDICTED_UNITS) AS DAILY_AVG_PREDICTED
             FROM F_FORECAST
             WHERE FORECAST_TYPE = 'caliber'
+              AND FORECAST_DATE > CURRENT_DATE()
             GROUP BY CALIBER
         ),
         current_stock AS (
