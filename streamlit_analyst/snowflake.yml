@@ -1,0 +1,22 @@
+definition_version: 2
+
+entities:
+  analyst:
+    type: streamlit
+    identifier:
+      name: analyst
+      schema: ops
+      database: ad_analytics
+    title: "Ammunition Depot Sales Assistant"
+    main_file: streamlit_app.py
+
+    # Container runtime (GA 2026-03-09) — Streamlit 1.55+, full PyPI, EAI egress
+    runtime_name: "SYSTEM$ST_CONTAINER_RUNTIME_PY3_11"
+    compute_pool: sales_dashboard_pool
+    query_warehouse: compute_wh
+
+    stage: analyst_stage
+    artifacts:
+      - streamlit_app.py
+      - requirements.txt
+      - utils/

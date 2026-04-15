@@ -3,7 +3,7 @@
   "category": "data-engineering",
   "subcategory": "data-platforms",
   "version": "Current",
-  "last_updated": "2026-02-25",
+  "last_updated": "2026-04-14",
   "primary_use_cases": [
     "Cloud data warehousing",
     "Semi-structured data processing (VARIANT)",
@@ -15,7 +15,9 @@
     "Interactive Tables and Warehouses (sub-second low-latency analytics)",
     "Cortex Code (AI-native coding agent for data work)",
     "Openflow (managed Apache NiFi data integration)",
+    "Cortex Analyst (text-to-SQL via semantic models)",
     "Semantic Views (natural language query definitions)",
+    "Cortex ML Functions (FORECAST, ANOMALY_DETECTION, COMPLETE, SUMMARIZE)",
     "Adaptive Compute (auto-adjusting policy-driven compute)",
     "Gen2 Standard Warehouses (2.1x faster analytics)"
   ],

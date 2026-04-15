@@ -17,6 +17,9 @@
 | [concepts/roles-privileges.md](concepts/roles-privileges.md) | RBAC security model and access control |
 | [concepts/interactive-tables.md](concepts/interactive-tables.md) | Interactive Tables and Warehouses for sub-second latency (GA Dec 2025) |
 | [concepts/cortex-code.md](concepts/cortex-code.md) | AI-native coding agent for data work (GA Feb 2026) |
+| [concepts/cortex-analyst.md](concepts/cortex-analyst.md) | Text-to-SQL via semantic models (GA 2024, Semantic Views GA Oct 2025) |
+| [concepts/semantic-views.md](concepts/semantic-views.md) | Schema-level objects for Cortex Analyst natural language queries |
+| [concepts/cortex-ml-functions.md](concepts/cortex-ml-functions.md) | FORECAST, ANOMALY_DETECTION, COMPLETE, SUMMARIZE, SENTIMENT |
 | [concepts/openflow.md](concepts/openflow.md) | Managed Apache NiFi integration service (GA May 2025) |
 
 ### Patterns (< 200 lines each)
@@ -31,6 +34,7 @@
 | [patterns/spark-connector.md](patterns/spark-connector.md) | Apache Spark integration |
 | [patterns/interactive-analytics.md](patterns/interactive-analytics.md) | Low-latency dashboards and API serving (GA Dec 2025) |
 | [patterns/cortex-code-workflows.md](patterns/cortex-code-workflows.md) | AI-assisted data development workflows (GA Feb 2026) |
+| [patterns/cortex-analyst-streamlit.md](patterns/cortex-analyst-streamlit.md) | Text-to-SQL chatbot in Streamlit SiS (container runtime) |
 | [patterns/openflow-integration.md](patterns/openflow-integration.md) | Any-to-any data integration with Openflow (GA May 2025) |
 | [patterns/rbac-service-accounts.md](patterns/rbac-service-accounts.md) | Service account setup, key pair auth, grant templates |
 | [patterns/rbac-multi-tenant.md](patterns/rbac-multi-tenant.md) | Multi-client RBAC isolation and onboarding patterns |
@@ -78,6 +82,8 @@
 | **Advanced** | patterns/performance-optimization.md, patterns/semi-structured-queries.md |
 | **Interactive** | concepts/interactive-tables.md, patterns/interactive-analytics.md |
 | **AI/ML** | concepts/cortex-code.md, patterns/cortex-code-workflows.md |
+| **Cortex Analyst** | concepts/cortex-analyst.md, concepts/semantic-views.md, patterns/cortex-analyst-streamlit.md |
+| **Cortex ML** | concepts/cortex-ml-functions.md |
 | **Integration** | concepts/openflow.md, patterns/openflow-integration.md |
 
 ---

@@ -1,0 +1,10 @@
+-- =============================================================================
+-- Verified Queries — MERGED INTO 01_bootstrap.sql
+--
+-- Snowflake semantic views do not support ALTER ... SET VERIFIED_QUERIES.
+-- Verified queries must be included in the YAML body passed to
+-- SYSTEM$CREATE_SEMANTIC_VIEW_FROM_YAML().
+--
+-- All 10 golden questions are now in 01_bootstrap.sql under the
+-- verified_queries: section. To update, re-run 01_bootstrap.sql.
+-- =============================================================================
