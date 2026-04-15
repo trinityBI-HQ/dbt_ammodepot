@@ -296,7 +296,7 @@ tables:
     base_table:
       database: AD_ANALYTICS
       schema: GOLD
-      table: D_PRODUCT_ANALYST
+      table: INT_PRODUCT_ANALYST
     primary_key:
       columns:
         - product_id

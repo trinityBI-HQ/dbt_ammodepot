@@ -126,6 +126,24 @@ models:
               arguments:
                 values: ['GunBroker']
 
+  - name: int_product_analyst
+    description: >
+      Thin view over d_product with UPPERCASE unquoted column names for
+      Cortex Analyst compatibility. D_PRODUCT uses mixed-case quoted columns
+      ("Caliber", "Product Name") that break Cortex Analyst's CTE generation.
+      This view aliases them to standard identifiers (CALIBER, PRODUCT_NAME).
+    columns:
+      - name: PRODUCT_ID
+        description: "Magento product entity ID."
+        tests:
+          - unique
+          - not_null
+      - name: SKU
+        description: "Stock keeping unit."
+        tests:
+          - unique
+          - not_null
+
   - name: int_fishbowl_product_enrichment
     description: >
       Fishbowl-sourced product enrichment data including vendor assignment, discontinued
