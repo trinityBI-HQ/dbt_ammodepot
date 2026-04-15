@@ -661,6 +661,166 @@ verified_queries:
       FROM AD_ANALYTICS.GOLD.D_CUSTOMER_SEGMENTATION
       WHERE CUSTOMER_CLASSIFICATION = 'At-Risk Regular'
     verified_by: "Victor"
+
+  # ── PBI Top 20 — Additional Verified Queries ──────────────────────────────
+
+  - name: revenue_mtd_vs_prior_month
+    question: "Revenue MTD vs prior month"
+    sql: |
+      SELECT
+        'Current MTD' AS PERIOD,
+        SUM(ROW_TOTAL) AS REVENUE
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE DATE_TRUNC('MONTH', CREATED_AT) = DATE_TRUNC('MONTH', CURRENT_DATE())
+        AND CREATED_AT::DATE <= CURRENT_DATE()
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      UNION ALL
+      SELECT
+        'Prior Month MTD' AS PERIOD,
+        SUM(ROW_TOTAL) AS REVENUE
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE CREATED_AT::DATE BETWEEN DATE_TRUNC('MONTH', DATEADD('MONTH', -1, CURRENT_DATE()))
+        AND DATEADD('MONTH', -1, CURRENT_DATE())
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+    verified_by: "Victor"
+    use_as_onboarding_question: true
+
+  - name: revenue_ytd_vs_prior_year
+    question: "Revenue YTD vs prior year"
+    sql: |
+      SELECT
+        'Current YTD' AS PERIOD,
+        SUM(ROW_TOTAL) AS REVENUE
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE DATE_TRUNC('YEAR', CREATED_AT) = DATE_TRUNC('YEAR', CURRENT_DATE())
+        AND CREATED_AT::DATE <= CURRENT_DATE()
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      UNION ALL
+      SELECT
+        'Prior Year YTD' AS PERIOD,
+        SUM(ROW_TOTAL) AS REVENUE
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE CREATED_AT::DATE BETWEEN DATE_TRUNC('YEAR', DATEADD('YEAR', -1, CURRENT_DATE()))
+        AND DATEADD('YEAR', -1, CURRENT_DATE())
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+    verified_by: "Victor"
+
+  - name: daily_revenue_last_30_days
+    question: "Daily revenue trend last 30 days"
+    sql: |
+      SELECT
+        CREATED_AT::DATE AS SALE_DATE,
+        SUM(ROW_TOTAL) AS REVENUE,
+        COUNT(DISTINCT ORDER_ID) AS ORDERS
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE CREATED_AT::DATE >= DATEADD('DAY', -30, CURRENT_DATE())
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      GROUP BY SALE_DATE
+      ORDER BY SALE_DATE
+    verified_by: "Victor"
+
+  - name: revenue_by_caliber_mtd
+    question: "Revenue by caliber this month"
+    sql: |
+      SELECT
+        p.CALIBER,
+        SUM(s.ROW_TOTAL) AS REVENUE,
+        SUM(s.QTY_ORDERED) AS UNITS_SOLD
+      FROM AD_ANALYTICS.GOLD.F_SALES s
+      JOIN AD_ANALYTICS.GOLD.INT_PRODUCT_ANALYST p ON s.PRODUCT_ID = p.PRODUCT_ID
+      WHERE DATE_TRUNC('MONTH', s.CREATED_AT) = DATE_TRUNC('MONTH', CURRENT_DATE())
+        AND s.STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      GROUP BY p.CALIBER
+      ORDER BY REVENUE DESC
+    verified_by: "Victor"
+
+  - name: margin_by_manufacturer
+    question: "Product margin by manufacturer"
+    sql: |
+      SELECT
+        p.MANUFACTURER,
+        SUM(s.ROW_TOTAL) AS REVENUE,
+        SUM(s.COST) AS TOTAL_COST,
+        ROUND((SUM(s.ROW_TOTAL) - SUM(s.COST)) / NULLIF(SUM(s.ROW_TOTAL), 0) * 100, 2) AS MARGIN_PCT
+      FROM AD_ANALYTICS.GOLD.F_SALES s
+      JOIN AD_ANALYTICS.GOLD.INT_PRODUCT_ANALYST p ON s.PRODUCT_ID = p.PRODUCT_ID
+      WHERE DATE_TRUNC('MONTH', s.CREATED_AT) = DATE_TRUNC('MONTH', CURRENT_DATE())
+        AND s.STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      GROUP BY p.MANUFACTURER
+      HAVING SUM(s.ROW_TOTAL) > 0
+      ORDER BY REVENUE DESC
+      LIMIT 20
+    verified_by: "Victor"
+
+  - name: revenue_by_storefront
+    question: "Revenue by storefront this month"
+    sql: |
+      SELECT
+        STOREFRONT,
+        SUM(ROW_TOTAL) AS REVENUE,
+        COUNT(DISTINCT ORDER_ID) AS ORDERS,
+        ROUND(SUM(ROW_TOTAL) / NULLIF(COUNT(DISTINCT ORDER_ID), 0), 2) AS AOV
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE DATE_TRUNC('MONTH', CREATED_AT) = DATE_TRUNC('MONTH', CURRENT_DATE())
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      GROUP BY STOREFRONT
+      ORDER BY REVENUE DESC
+    verified_by: "Victor"
+
+  - name: top_states_by_revenue
+    question: "Top states by revenue this month"
+    sql: |
+      SELECT
+        REGION AS STATE,
+        SUM(ROW_TOTAL) AS REVENUE,
+        COUNT(DISTINCT ORDER_ID) AS ORDERS
+      FROM AD_ANALYTICS.GOLD.F_SALES
+      WHERE DATE_TRUNC('MONTH', CREATED_AT) = DATE_TRUNC('MONTH', CURRENT_DATE())
+        AND STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+        AND REGION IS NOT NULL
+      GROUP BY REGION
+      ORDER BY REVENUE DESC
+      LIMIT 15
+    verified_by: "Victor"
+
+  - name: aov_by_store
+    question: "Average order value by store"
+    sql: |
+      SELECT
+        s.STORE_ID,
+        d.NAME AS STORE_NAME,
+        ROUND(SUM(s.ROW_TOTAL) / NULLIF(COUNT(DISTINCT s.ORDER_ID), 0), 2) AS AOV,
+        COUNT(DISTINCT s.ORDER_ID) AS ORDERS
+      FROM AD_ANALYTICS.GOLD.F_SALES s
+      LEFT JOIN AD_ANALYTICS.GOLD.D_STORE d ON s.STORE_ID = d.STORE_ID
+      WHERE DATE_TRUNC('MONTH', s.CREATED_AT) = DATE_TRUNC('MONTH', CURRENT_DATE())
+        AND s.STATUS IN ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+      GROUP BY s.STORE_ID, d.NAME
+      ORDER BY AOV DESC
+    verified_by: "Victor"
+
+  - name: total_inventory_value
+    question: "Total inventory value on hand"
+    sql: |
+      SELECT
+        SUM(QTY_AVAILABLE) AS TOTAL_UNITS,
+        SUM(EXTENDED_COST) AS TOTAL_VALUE
+      FROM AD_ANALYTICS.GOLD.F_INVENTORYVIEW
+    verified_by: "Victor"
+    use_as_onboarding_question: true
+
+  - name: customer_segment_distribution
+    question: "Customer count by segment"
+    sql: |
+      SELECT
+        CUSTOMER_CLASSIFICATION AS SEGMENT,
+        COUNT(DISTINCT RANK_ID) AS CUSTOMER_COUNT,
+        ROUND(AVG(TOTAL_REVENUE), 2) AS AVG_REVENUE,
+        ROUND(AVG(DAYS_SINCE_LAST_PURCHASE), 0) AS AVG_DAYS_SINCE_LAST
+      FROM AD_ANALYTICS.GOLD.D_CUSTOMER_SEGMENTATION
+      GROUP BY CUSTOMER_CLASSIFICATION
+      ORDER BY CUSTOMER_COUNT DESC
+    verified_by: "Victor"
 $$
 );
 
