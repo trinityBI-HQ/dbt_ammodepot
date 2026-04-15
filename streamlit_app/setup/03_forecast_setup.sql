@@ -106,8 +106,8 @@ $$;
 
 CREATE OR REPLACE TASK AD_ANALYTICS.GOLD.TASK_DAILY_FORECAST
     WAREHOUSE = ETL_WH
-    SCHEDULE = 'USING CRON 0 4 * * * UTC'
-    COMMENT = 'Daily demand forecast: trains ML.FORECAST on sales by caliber, writes 30d predictions to F_FORECAST'
+    SCHEDULE = 'USING CRON 0 4 * * 0 UTC'
+    COMMENT = 'Weekly demand forecast (Sunday 4am UTC): trains ML.FORECAST on sales by caliber, writes 30d predictions to F_FORECAST'
 AS
     CALL AD_ANALYTICS.GOLD.SP_TRAIN_FORECAST();
 
