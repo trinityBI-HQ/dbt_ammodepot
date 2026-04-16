@@ -87,7 +87,7 @@ Airbyte CDC (Fishbowl, Magento)
 | AI Analyst | Streamlit chatbot (`AD_ANALYTICS.OPS.ANALYST`, SiS container runtime) powered by Snowflake Cortex Analyst + Semantic View |
 | Demand Forecasting | Snowflake Cortex ML (FORECAST) — 115 calibers + revenue, weekly Task `TASK_DAILY_FORECAST` (Sunday 4am UTC), outputs to `F_FORECAST` |
 | Anomaly Detection | Snowflake Cortex ML (ANOMALY_DETECTION) — revenue, orders, margin; alert banner on Page 1, outputs to `F_ANOMALIES` |
-| Churn Narratives | Snowflake Cortex LLM (`gemini-2-5-flash`) — Page 5 RFM segment health + executive summary, reads `D_CUSTOMER_SEGMENTATION` |
+| Churn Narratives | Snowflake Cortex LLM (`llama3.1-70b`) — Page 5 RFM segment health + executive summary, reads `D_CUSTOMER_SEGMENTATION` |
 | Reorder Intelligence | dbt Gold table `F_REORDER_RECOMMENDATIONS` + CORTEX.COMPLETE — per-caliber reorder qty + vendor, Page 4 tab |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 | Archive | Decommissioned Redshift project + old artifacts |
@@ -115,8 +115,8 @@ streamlit_app/
 │   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering + anomaly alert banner (replaces PBI SALES OVERVIEW FASTER) ~1,355 lines
 │   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,505 lines
 │   ├── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,272 lines
-│   ├── 4_Forecast.py             # Demand forecast + 4 tabs incl. Reorder Recommendations + Vendor Comparison (~549 lines)
-│   └── 5_Customer_Intelligence.py # RFM segment health + CORTEX.COMPLETE executive summary + MoM deltas (AI Phase 4) (~420 lines)
+│   ├── 4_Forecast.py             # Demand forecast + 5 tabs: Stock-Out Risk, Caliber Forecast, Revenue Forecast, Reorder Recommendations (+ Vendor Comparison), Forecast Accuracy (~697 lines)
+│   └── 5_Customer_Intelligence.py # RFM segment health + llama3.1-70b executive summary + MoM deltas (AI Phase 4) (~440 lines)
 └── utils/
     ├── __init__.py
     ├── chart_theme.py             # Unified dark theme for Plotly charts + HTML tables (~127 lines)
@@ -561,8 +561,8 @@ Built 2026-04-14 — automated sales anomaly detection:
 ### Customer Churn Narratives (CORTEX.COMPLETE — Phase 4)
 
 Built + Shipped 2026-04-16 — RFM segment health dashboard with LLM executive summary:
-- **Page 5**: `5_Customer_Intelligence.py` in Sales Dashboard — segment KPI cards, all 17 classifications table + MoM delta column (from `SNAP_CUSTOMER_SEGMENTATION`), top at-risk customers, `gemini-2-5-flash` executive summary banner
-- **LLM**: `SNOWFLAKE.CORTEX.COMPLETE('gemini-2-5-flash')` — cached 10 min, graceful fallback
+- **Page 5**: `5_Customer_Intelligence.py` in Sales Dashboard — segment KPI cards, all 17 classifications table + MoM delta column (from `SNAP_CUSTOMER_SEGMENTATION`), top at-risk customers, `llama3.1-70b` executive summary banner
+- **LLM**: `SNOWFLAKE.CORTEX.COMPLETE('llama3.1-70b')` — `gemini-2-5-flash` unavailable in this region (400 error); `llama3.1-70b` is native us-east-1. Cached 10 min, graceful fallback.
 - **Data**: `D_CUSTOMER_SEGMENTATION` (RFM) — no new dbt models
 - **Cost**: ~$0.15/mo (Cortex LLM credits)
 - **Archive**: `.claude/sdd/archive/CHURN_NARRATIVES/SHIPPED_2026-04-16.md`
@@ -574,9 +574,12 @@ Built 2026-04-16 — prescriptive purchasing recommendations per caliber:
 - **Formula**: `REORDER_QTY = GREATEST(0, DEMAND_UPPER_30D - QTY_AVAILABLE - QTY_ON_ORDER)` — UPPER_BOUND from F_FORECAST acts as ML-backed safety buffer
 - **Vendor**: Lowest avg `PRECISE_LEADTIME` from F_POS per caliber
 - **Page 4 tab**: New "Reorder Recommendations" tab in Sales Dashboard Page 4 — LLM brief, 3 KPI cards, urgency filter, reorder table
-- **Status**: Shipped 2026-04-16. Validated live: PASS=389, WARN=13, ERROR=0, 103 calibers, 30 Critical ($357K reorder value). Vendor comparison added same day.
-- **Vendor Comparison**: Page 4 tab — caliber selector (Critical/Warning only), top 5 vendors by lead time with unit cost + estimated order cost at recommended qty
-- **Cost**: ~$0.15/mo (Cortex LLM credits, no new infra)
+- **Status**: Shipped 2026-04-16. Validated live: PASS=389, WARN=13, ERROR=0, 103 calibers, 30 Critical ($357K reorder value).
+- **Vendor Comparison**: Page 4 "Reorder Recommendations" tab — caliber selector (Critical/Warning only), top 5 vendors by lead time with unit cost + estimated order cost at recommended qty
+- **Forecast Accuracy tab**: Page 4 5th tab — EVALUATE() unavailable for multi-series models; "Prediction vs Actual" section compares `F_FORECAST_HISTORY` to actuals (lights up as archived predictions' dates pass, ~7 days to first results)
+- **F_FORECAST_HISTORY**: Created 2026-04-16 (3,450 rows, 115 calibers × 30 days). Archived before each weekly retrain. `load_forecast_vs_actual()` joins history to F_SALES for MAE/MAPE/bias/coverage metrics.
+- **LLM model**: `llama3.1-70b` (was `gemini-2-5-flash` — unavailable in us-east-1 region, 400 error)
+- **Cost**: ~$0.60/mo (Cortex LLM credits, llama3.1-70b)
 
 ### Customer Segmentation Snapshot (2026-04-16)
 
