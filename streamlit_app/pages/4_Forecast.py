@@ -279,10 +279,13 @@ with tab_caliber:
 
         apply_theme(fig)
         fig.update_layout(
-            title=f"{selected} — Daily Units Sold (Actual + Forecast)",
+            title=None,
             xaxis_title="Date",
             yaxis_title="Units",
+            legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0),
+            margin=dict(t=40),
         )
+        st.subheader(f"{selected} — Daily Units Sold (Actual + Forecast)")
         st.plotly_chart(fig, use_container_width=True, key=f"fc_chart_{selected}")
 
         st.subheader("Forecast Data")
@@ -323,10 +326,13 @@ with tab_revenue:
 
         apply_theme(fig_rev)
         fig_rev.update_layout(
-            title="Daily Revenue — Actual + Forecast",
+            title=None,
             xaxis_title="Date",
             yaxis_title="Revenue ($)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0),
+            margin=dict(t=40),
         )
+        st.subheader("Daily Revenue — Actual + Forecast")
         st.plotly_chart(fig_rev, use_container_width=True, key="rev_fc_chart")
 
         total_predicted = sum(float(v) for v in rev_fc["PREDICTED_REVENUE"].tolist())
