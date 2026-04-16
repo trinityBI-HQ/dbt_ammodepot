@@ -139,6 +139,10 @@ seeds:
   ammodepot:
     +query_tag: 'dbt:seed'
 
+snapshots:
+  ammodepot:
+    +query_tag: 'dbt:snapshot'
+
 tests:
   ammodepot:
     # Default warn severity: Airbyte CDC source data naturally has duplicate

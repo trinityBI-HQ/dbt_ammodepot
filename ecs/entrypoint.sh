@@ -34,6 +34,13 @@ START_TIME=$(date +%s)
 uv run dbt build --profiles-dir . --target prod
 EXIT_CODE=$?
 END_TIME=$(date +%s)
+
+# Run snapshots after build so they capture fresh model output.
+# Runs every cycle but check strategy only writes rows when data changes.
+# Snapshot failures are non-fatal — don't override the build exit code.
+if [ $EXIT_CODE -eq 0 ]; then
+    uv run dbt snapshot --profiles-dir . --target prod || echo "Warning: snapshot step failed"
+fi
 DURATION=$((END_TIME - START_TIME))
 DURATION_MIN=$(echo "scale=2; $DURATION / 60" | bc)
 

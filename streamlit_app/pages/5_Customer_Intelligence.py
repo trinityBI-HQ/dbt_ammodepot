@@ -89,6 +89,24 @@ def load_segment_summary() -> pd.DataFrame:
 
 
 @st.cache_data(ttl="10m", show_spinner=False)
+def load_segment_prior(days: int = 30) -> pd.DataFrame:
+    """Segment counts from snapshot ~N days ago. Returns empty df if no history yet."""
+    try:
+        return run_query(f"""
+            select
+                customer_classification,
+                count(distinct rank_id) as prior_count
+            from ad_analytics.gold.snap_customer_segmentation
+            where dbt_valid_from <= dateadd('day', -{days}, current_date())
+              and (dbt_valid_to > dateadd('day', -{days}, current_date())
+                   or dbt_valid_to is null)
+            group by customer_classification
+        """)
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl="10m", show_spinner=False)
 def load_top_at_risk(n: int = 10) -> pd.DataFrame:
     """Top N highest-value customers in concerning segments."""
     segments_sql = ", ".join(f"'{s}'" for s in CONCERNING_SEGMENTS)
@@ -296,13 +314,24 @@ def render_kpi_cards(df_segments: pd.DataFrame):
             st.markdown(html, unsafe_allow_html=True)
 
 
-def render_segment_table(df_segments: pd.DataFrame):
-    """Render segment health table with dark theme."""
+def render_segment_table(df_segments: pd.DataFrame, df_prior: pd.DataFrame):
+    """Render segment health table with MoM delta column when prior data exists."""
     display = df_segments[
         ["CUSTOMER_CLASSIFICATION", "CUSTOMER_COUNT", "TOTAL_LTV",
          "AVG_DAYS_SILENT", "AVG_PURCHASES"]
     ].copy()
     display.columns = ["Segment", "Customers", "Total LTV", "Avg Days Silent", "Avg Purchases"]
+
+    if not df_prior.empty:
+        prior_map = df_prior.set_index("CUSTOMER_CLASSIFICATION")["PRIOR_COUNT"].to_dict()
+        def _mom(row):
+            prior = prior_map.get(row["Segment"])
+            if prior is None:
+                return "—"
+            delta = int(row["Customers"]) - int(prior)
+            return f"+{delta:,}" if delta > 0 else f"{delta:,}"
+        display["MoM"] = display.apply(_mom, axis=1)
+
     dark_dataframe(
         display,
         fmt={
@@ -375,6 +404,7 @@ def render_at_risk_table(df_at_risk: pd.DataFrame):
 # 1. Load data (all cached)
 df_segments = load_segment_summary()
 df_at_risk = load_top_at_risk()
+df_prior = load_segment_prior()
 
 if df_segments.empty:
     st.warning("No customer segmentation data available.")
@@ -393,7 +423,9 @@ st.divider()
 col_table, col_chart = st.columns([1, 1])
 with col_table:
     st.subheader("Segment Health")
-    render_segment_table(df_segments)
+    if df_prior.empty:
+        st.caption("MoM column will appear after 30 days of snapshot history.")
+    render_segment_table(df_segments, df_prior)
 with col_chart:
     st.subheader("Segment Distribution")
     render_segment_chart(df_segments)
