@@ -88,39 +88,6 @@ def load_segment_summary() -> pd.DataFrame:
     """)
 
 
-@st.cache_data(ttl="10m", show_spinner=False)
-def load_cohort_retention(months_back: int = 18, max_month: int = 11) -> pd.DataFrame:
-    """Monthly cohort retention rates — last N cohorts, first max_month+1 periods.
-
-    F_COHORT stores COHORT_SIZE only on month_number=0 rows; subsequent
-    months have COHORT_SIZE=0. Join to the M0 row to get the true cohort size.
-    """
-    return run_query(f"""
-        with base as (
-            select cohort_month, month_number, purchasers
-            from f_cohort
-            where cohort_month >= dateadd('month', -{months_back},
-                                          date_trunc('month', current_date()))
-              and month_number <= {max_month}
-        ),
-        sizes as (
-            select cohort_month, purchasers as cohort_size
-            from base
-            where month_number = 0
-        )
-        select
-            to_char(b.cohort_month, 'YYYY-MM')          as cohort_label,
-            b.month_number,
-            b.purchasers,
-            s.cohort_size,
-            case when s.cohort_size > 0
-                 then round(b.purchasers / s.cohort_size * 100, 1)
-                 else null
-            end                                          as retention_rate
-        from base as b
-        join sizes as s on b.cohort_month = s.cohort_month
-        order by b.cohort_month asc, b.month_number asc
-    """)
 
 
 @st.cache_data(ttl="10m", show_spinner=False)
@@ -434,70 +401,6 @@ def render_at_risk_table(df_at_risk: pd.DataFrame):
     )
 
 
-def render_cohort_chart(df_cohort: pd.DataFrame):
-    """Render cohort retention heatmap."""
-    if df_cohort.empty:
-        st.info("No cohort data available.")
-        return
-
-    pivot = df_cohort.pivot(
-        index="COHORT_LABEL", columns="MONTH_NUMBER", values="RETENTION_RATE"
-    ).sort_index(ascending=False)
-
-    y_labels = pivot.index.tolist()
-    x_labels = [f"M{n}" for n in pivot.columns.tolist()]
-
-    z = []
-    text = []
-    for _, row in pivot.iterrows():
-        z_row = []
-        t_row = []
-        for v in row:
-            if pd.isna(v):
-                z_row.append(None)
-                t_row.append("")
-            else:
-                z_row.append(float(v))
-                t_row.append(f"{float(v):.0f}%")
-        z.append(z_row)
-        text.append(t_row)
-
-    fig = go.Figure(
-        go.Heatmap(
-            z=z,
-            x=x_labels,
-            y=y_labels,
-            text=text,
-            texttemplate="%{text}",
-            textfont=dict(size=11, color="#ffffff"),
-            colorscale=[
-                [0.0,  "#1a0a0a"],
-                [0.05, "#7f0000"],
-                [0.15, "#FF4B4B"],
-                [0.35, "#FFD700"],
-                [0.65, ACCENT],
-                [1.0,  "#00ffcc"],
-            ],
-            zmin=0,
-            zmax=100,
-            colorbar=dict(
-                title=dict(text="Retention %",
-                           font=dict(color=TEXT_SECONDARY, size=11)),
-                tickfont=dict(color=TEXT_SECONDARY, size=10),
-            ),
-        )
-    )
-    apply_theme(
-        fig,
-        height=max(250, len(y_labels) * 28),
-        show_legend=False,
-        margin=dict(l=0, r=0, t=10, b=0),
-    )
-    fig.update_layout(
-        xaxis=dict(side="top", tickfont=dict(size=11, color=TEXT_SECONDARY)),
-        yaxis=dict(tickfont=dict(size=11, color=TEXT_SECONDARY)),
-    )
-    st.plotly_chart(fig, use_container_width=True, key="cohort_heatmap")
 
 
 # ── Page Execution ───────────────────────────────────────────────────────────
@@ -506,7 +409,6 @@ def render_cohort_chart(df_cohort: pd.DataFrame):
 df_segments = load_segment_summary()
 df_at_risk = load_top_at_risk()
 df_prior = load_segment_prior()
-df_cohort = load_cohort_retention()
 
 if df_segments.empty:
     st.warning("No customer segmentation data available.")
@@ -536,7 +438,3 @@ st.divider()
 st.subheader("Top At-Risk Customers (by Lifetime Value)")
 render_at_risk_table(df_at_risk)
 
-st.divider()
-st.subheader("Cohort Retention")
-st.caption("Rows = acquisition month · Columns = months since first purchase · Color = % still buying")
-render_cohort_chart(df_cohort)

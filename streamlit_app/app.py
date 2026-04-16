@@ -30,7 +30,7 @@ st.markdown("""
 - **Sales Overview** — Historical sales by category (TODAY / MTD / YTD)
 - **Inventory** — Stock levels, vendor analysis, open purchase orders
 - **Forecast** — 30-day demand forecast by caliber + reorder recommendations with vendor comparison
-- **Customer Intelligence** — RFM segment health, at-risk customers, cohort retention
+- **Customer Intelligence** — RFM segment health, at-risk customers
 """)
 
 if hasattr(st, "logo"):
