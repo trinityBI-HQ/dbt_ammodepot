@@ -13,6 +13,32 @@
   {# Train SNOWFLAKE.ML.FORECAST on daily units by caliber #}
   {% do log("Training caliber forecast model...", info=True) %}
 
+  {# Create forecast history table on first run #}
+  {% call statement('create_forecast_history') %}
+    CREATE TABLE IF NOT EXISTS AD_ANALYTICS.GOLD.F_FORECAST_HISTORY (
+        CALIBER         VARCHAR,
+        FORECAST_DATE   DATE,
+        PREDICTED_UNITS FLOAT,
+        LOWER_BOUND     FLOAT,
+        UPPER_BOUND     FLOAT,
+        FORECAST_TYPE   VARCHAR,
+        TRAINED_AT      TIMESTAMP_NTZ,
+        ARCHIVED_AT     TIMESTAMP_NTZ
+    )
+  {% endcall %}
+
+  {# Archive current caliber predictions before overwriting #}
+  {% do log("Archiving current caliber forecast to history...", info=True) %}
+  {% call statement('archive_caliber') %}
+    INSERT INTO AD_ANALYTICS.GOLD.F_FORECAST_HISTORY
+    SELECT
+        CALIBER, FORECAST_DATE, PREDICTED_UNITS,
+        LOWER_BOUND, UPPER_BOUND, FORECAST_TYPE,
+        TRAINED_AT, CURRENT_TIMESTAMP() AS ARCHIVED_AT
+    FROM AD_ANALYTICS.GOLD.F_FORECAST
+    WHERE FORECAST_TYPE = 'caliber'
+  {% endcall %}
+
   {% call statement('train_caliber') %}
     CREATE OR REPLACE SNOWFLAKE.ML.FORECAST AD_ANALYTICS.GOLD.CALIBER_FORECAST(
         INPUT_DATA => SYSTEM$REFERENCE('VIEW', 'AD_ANALYTICS.GOLD.INT_DAILY_SALES_BY_CALIBER'),

@@ -177,6 +177,74 @@ def load_stockout_risk() -> pd.DataFrame:
 
 # ── Reorder Intelligence ─────────────────────────────────────────────────────
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_caliber_evaluate() -> pd.DataFrame:
+    """Run CALIBER_FORECAST!EVALUATE() — cross-validated backtesting metrics per caliber."""
+    try:
+        return run_query("""
+            select *
+            from table(ad_analytics.gold.caliber_forecast!evaluate())
+            order by mape asc nulls last
+        """)
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl="10m", show_spinner=False)
+def load_forecast_vs_actual(lookback_days: int = 30) -> pd.DataFrame:
+    """Compare archived forecasts to actuals once F_FORECAST_HISTORY accumulates data."""
+    try:
+        return run_query(f"""
+            with actuals as (
+                select
+                    created_at::date          as sale_date,
+                    p.caliber,
+                    sum(qty_ordered)          as actual_units
+                from f_sales s
+                join int_product_analyst p on s.product_id = p.product_id
+                where s.status in ('COMPLETE', 'PROCESSING', 'UNVERIFIED')
+                  and p.caliber is not null
+                  and created_at >= dateadd('day', -{lookback_days}, current_date())
+                group by 1, 2
+            ),
+            predictions as (
+                select
+                    forecast_date,
+                    caliber,
+                    predicted_units,
+                    lower_bound,
+                    upper_bound,
+                    archived_at::date as run_date
+                from ad_analytics.gold.f_forecast_history
+                where forecast_type = 'caliber'
+                qualify row_number() over (
+                    partition by caliber, forecast_date
+                    order by archived_at asc
+                ) = 1
+            )
+            select
+                a.caliber,
+                count(*)                                                    as matched_days,
+                round(avg(abs(a.actual_units - p.predicted_units)), 1)      as mae,
+                round(avg(abs(a.actual_units - p.predicted_units)
+                          / nullif(a.actual_units, 0)) * 100, 1)            as mape,
+                round(avg(a.actual_units - p.predicted_units), 1)           as bias,
+                sum(case when a.actual_units between p.lower_bound
+                                                 and p.upper_bound
+                    then 1 else 0 end)                                      as within_band,
+                round(within_band / count(*) * 100, 1)                     as coverage_pct
+            from actuals a
+            join predictions p
+              on a.caliber = p.caliber
+             and a.sale_date = p.forecast_date
+            group by a.caliber
+            having matched_days >= 7
+            order by mape asc nulls last
+        """)
+    except Exception:
+        return pd.DataFrame()
+
+
 LLM_MODEL_REORDER = "gemini-2-5-flash"
 LLM_CACHE_TTL_REORDER = 600  # seconds — matches dbt build cadence
 
@@ -282,9 +350,9 @@ st.caption(f"Last trained: {trained_at}")
 
 # ── Tabs ─────────────────────────────────────────────────────────────────────
 
-tab_risk, tab_caliber, tab_revenue, tab_reorder = st.tabs(
+tab_risk, tab_caliber, tab_revenue, tab_reorder, tab_accuracy = st.tabs(
     ["Stock-Out Risk", "Caliber Forecast", "Revenue Forecast",
-     "Reorder Recommendations"]
+     "Reorder Recommendations", "Forecast Accuracy"]
 )
 
 # ── Tab 1: Stock-Out Risk ────────────────────────────────────────────────────
@@ -547,3 +615,90 @@ with tab_reorder:
                         "HISTORICAL_POS":     "{:,.0f}",
                     },
                 )
+
+# ── Tab 5: Forecast Accuracy ──────────────────────────────────────────────────
+
+with tab_accuracy:
+    st.subheader("Model Backtesting (EVALUATE)")
+    st.caption(
+        "Cross-validated metrics computed from the model's training data. "
+        "MAPE = Mean Absolute % Error — lower is better. "
+        "Updated weekly when the model retrains."
+    )
+
+    with st.spinner("Running model evaluation..."):
+        eval_df = load_caliber_evaluate()
+
+    if eval_df.empty:
+        st.info("Evaluation not available. The CALIBER_FORECAST model may not be trained yet.")
+    else:
+        eval_cols = [c for c in ["SERIES", "MAPE", "MAE", "RMSE", "WMAPE", "COVERAGE"] if c in eval_df.columns]
+        if eval_cols:
+            col_a, col_b, col_c = st.columns(3)
+            mape_vals = eval_df["MAPE"].dropna() if "MAPE" in eval_df.columns else None
+            if mape_vals is not None and not mape_vals.empty:
+                col_a.metric("Median MAPE", f"{float(mape_vals.median()):.1f}%")
+                col_b.metric("Best Caliber MAPE", f"{float(mape_vals.min()):.1f}%")
+                col_c.metric("Worst Caliber MAPE", f"{float(mape_vals.max()):.1f}%")
+
+            dark_dataframe(
+                eval_df[eval_cols],
+                fmt={k: "{:,.1f}" for k in ["MAPE", "MAE", "RMSE", "WMAPE", "COVERAGE"]
+                     if k in eval_cols},
+            )
+
+            if "MAPE" in eval_df.columns and "SERIES" in eval_df.columns:
+                top20 = eval_df.dropna(subset=["MAPE"]).head(20)
+                fig_mape = go.Figure(go.Bar(
+                    x=top20["SERIES"].tolist(),
+                    y=[float(v) for v in top20["MAPE"].tolist()],
+                    marker_color=ACCENT,
+                    text=[f"{float(v):.1f}%" for v in top20["MAPE"].tolist()],
+                    textposition="outside",
+                    textfont=dict(color=TEXT_PRIMARY, size=10),
+                ))
+                apply_theme(fig_mape, height=300, show_legend=False,
+                            margin=dict(l=0, r=0, t=30, b=0))
+                fig_mape.update_layout(
+                    title="Top 20 Calibers by MAPE (best → worst)",
+                    yaxis_title="MAPE %",
+                    xaxis=dict(tickangle=-45),
+                )
+                st.plotly_chart(fig_mape, use_container_width=True, key="mape_chart")
+
+    st.divider()
+    st.subheader("Prediction vs Actual (Historical)")
+    st.caption(
+        "Compares archived forecast predictions to actual sales. "
+        "Requires F_FORECAST_HISTORY — populates after the next weekly training run (Sunday 4am UTC)."
+    )
+
+    hist_df = load_forecast_vs_actual()
+    if hist_df.empty:
+        st.info(
+            "No historical comparison data yet. "
+            "F_FORECAST_HISTORY will be populated on the next weekly training run. "
+            "Check back after Sunday 4am UTC."
+        )
+    else:
+        h1, h2, h3, h4 = st.columns(4)
+        if not hist_df.empty:
+            h1.metric("Calibers tracked", len(hist_df))
+            if "MAPE" in hist_df.columns:
+                h2.metric("Median MAPE", f"{float(hist_df['MAPE'].median()):.1f}%")
+            if "BIAS" in hist_df.columns:
+                h3.metric("Avg Bias", f"{float(hist_df['BIAS'].mean()):+.0f} units/day")
+            if "COVERAGE_PCT" in hist_df.columns:
+                h4.metric("CI Coverage", f"{float(hist_df['COVERAGE_PCT'].mean()):.0f}%")
+
+        dark_dataframe(
+            hist_df,
+            fmt={
+                "MAE":          "{:,.1f}",
+                "MAPE":         "{:,.1f}",
+                "BIAS":         "{:+,.1f}",
+                "COVERAGE_PCT": "{:,.0f}",
+                "MATCHED_DAYS": "{:,.0f}",
+                "WITHIN_BAND":  "{:,.0f}",
+            },
+        )
