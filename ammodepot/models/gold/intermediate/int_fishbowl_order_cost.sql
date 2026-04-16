@@ -1,12 +1,17 @@
-with magento_identities as (
+with magento_identities_raw as (
     select
-        nullif(
-          {{ json_extract_text('a.custom_fields', ['Magento Order Identity 1']) }},
-          ''
-        ) as magento_order_item_identity,
-        a.sales_order_id as code
+        {{ json_extract_text('a.custom_fields', ['Magento Order Identity 1']) }}
+                                                        as identity_raw,
+        a.sales_order_id                                as code
     from {{ ref('fishbowl_so') }} as a
-    where {{ json_extract_text('a.custom_fields', ['Magento Order Identity 1']) }} is not null
+),
+
+magento_identities as (
+    select
+        nullif(identity_raw, '')                        as magento_order_item_identity,
+        code
+    from magento_identities_raw
+    where identity_raw is not null
 ),
 
 conversion_soitem as (
@@ -124,58 +129,27 @@ cost_fishbowl_base as (
     left join kit_cost_aggregation      as k     on s.so_item_id       = k.kitid
 ),
 
-last_day_cost_fishbowl as (
-    select
-        id_produto_fishbowl             as product_id,
-        max(scheduled_fulfillment_date) as last_scheduled_date
-    from cost_fishbowl_base
-    where cost is not null and cost > 0
-    group by id_produto_fishbowl
-),
-
-filtered_cost_fishbowl as (
-    select
-        f.id_produto_fishbowl         as product_id,
-        avg(f.cost / nullif(f.qty,0)) as cost
-    from cost_fishbowl_base as f
-    inner join last_day_cost_fishbowl     as ld
-      on f.id_produto_fishbowl         = ld.product_id
-     and f.scheduled_fulfillment_date = ld.last_scheduled_date
-    where f.cost is not null and f.cost > 0
-    group by f.id_produto_fishbowl
-),
-
 cost_fishbowl_final as (
+    -- References cost_fishbowl_base instead of re-scanning fishbowl_soitem.
+    -- Dead code removed: last_day_cost_fishbowl, filtered_cost_fishbowl, costfiltered
+    -- (costfiltered was computed but never selected in the model's output).
     select
-        coalesce(nullif(b.total_cost,0), nullif(k.cost,0)) as cost,
-        b.total_cost as totalcost,
-        k.cost                            as costbundle,
-        m.magento_order_item_identity     as magento_order,
-        fc.cost                           as costfiltered,
-        pr.produto_magento                as id_produto_magento,
-        child.mgntid                      as id_magento,
+        b.cost,
+        b.id_produto_magento,
+        b.id_magento,
         b.so_item_id,
         b.sales_order_id,
-        ca.count_of_id_magento,
-        b.product_id                                              as id_produto_fishbowl,
-        p.is_kit                                                  as bundle,
-        coalesce(k.costprocessing, a.averagecost)                 as averageweightedcost,
-        b.scheduled_fulfillment_date                              as scheduled_fulfillment_date,
-        b.quantity_fulfilled                                      as qty
-    from {{ ref('fishbowl_soitem') }}      as b
-    left join conversion_soitem         as child on b.so_item_id       = child.idfb
-    left join product_avg_cost          as a     on b.product_id       = a.id_produto
-    left join conversion_product        as pr    on b.product_id       = pr.produtofish
-    left join magento_identities        as m     on b.sales_order_id   = m.code
-    left join cost_aggregation          as ca    on child.mgntid       = ca.id
-    left join {{ ref('fishbowl_product') }}      as p     on b.product_id       = p.product_id
-    left join kit_cost_aggregation as k on b.so_item_id        = k.kitid
-    left join filtered_cost_fishbowl as fc on b.product_id = fc.product_id
-
+        b.count_of_id_magento,
+        b.id_produto_fishbowl,
+        b.averageweightedcost
+    from cost_fishbowl_base as b
 ),
 
 cost_unique_magento_id as (
-    select f.*
+    select
+        f.cost,
+        f.id_magento,
+        f.averageweightedcost
     from cost_fishbowl_final   as f
     inner join cost_aggregation      as ca on f.id_magento      = ca.id
     where ca.count_of_id_magento = 1
