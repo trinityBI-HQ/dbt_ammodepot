@@ -90,23 +90,36 @@ def load_segment_summary() -> pd.DataFrame:
 
 @st.cache_data(ttl="10m", show_spinner=False)
 def load_cohort_retention(months_back: int = 18, max_month: int = 11) -> pd.DataFrame:
-    """Monthly cohort retention rates — last N cohorts, first max_month+1 periods."""
+    """Monthly cohort retention rates — last N cohorts, first max_month+1 periods.
+
+    F_COHORT stores COHORT_SIZE only on month_number=0 rows; subsequent
+    months have COHORT_SIZE=0. Join to the M0 row to get the true cohort size.
+    """
     return run_query(f"""
+        with base as (
+            select cohort_month, month_number, purchasers
+            from f_cohort
+            where cohort_month >= dateadd('month', -{months_back},
+                                          date_trunc('month', current_date()))
+              and month_number <= {max_month}
+        ),
+        sizes as (
+            select cohort_month, purchasers as cohort_size
+            from base
+            where month_number = 0
+        )
         select
-            to_char(cohort_month, 'YYYY-MM')          as cohort_label,
-            month_number,
-            purchasers,
-            cohort_size,
-            case when cohort_size > 0
-                 then round(purchasers / cohort_size * 100, 1)
+            to_char(b.cohort_month, 'YYYY-MM')          as cohort_label,
+            b.month_number,
+            b.purchasers,
+            s.cohort_size,
+            case when s.cohort_size > 0
+                 then round(b.purchasers / s.cohort_size * 100, 1)
                  else null
-            end                                        as retention_rate
-        from f_cohort
-        where cohort_month >= dateadd('month', -{months_back},
-                                      date_trunc('month', current_date()))
-          and month_number <= {max_month}
-          and cohort_size > 0
-        order by cohort_month asc, month_number asc
+            end                                          as retention_rate
+        from base as b
+        join sizes as s on b.cohort_month = s.cohort_month
+        order by b.cohort_month asc, b.month_number asc
     """)
 
 
