@@ -82,14 +82,19 @@ SELECT SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', product_name) AS embedding
 FROM products;
 ```
 
-## LLM Models Available
+## LLM Models Available (AWS us-east-1 — validated 2026-04-16)
 
-| Model | Use Case | Speed |
-|---|---|---|
-| `mistral-large` | Complex reasoning, analysis | Slower |
-| `mistral-7b` | Simple generation, classification | Fast |
-| `llama3.1-70b` | General purpose | Medium |
-| `llama3.1-8b` | Simple tasks, high throughput | Fast |
+| Model | Native Region | Use Case | Input $/M tokens |
+|---|---|---|---|
+| `llama3.1-70b` | us-east-1 ✅ | General purpose, short narratives | $1.08 |
+| `llama3.1-8b` | us-east-1 ✅ | Simple tasks, high throughput | $0.33 |
+| `mistral-7b` | us-east-1 ✅ | Simple generation | $0.24 |
+| `gemini-2-5-flash` | Cross-region ❌ | Strong structured output | $0.45 |
+| `mistral-large` | us-east-1 ✅ | Complex reasoning | ~$5/M (legacy) |
+
+**Regional availability note**: `gemini-2-5-flash` returns 400 "Model unavailable" in AWS us-east-1 even though Snowflake routes it cross-region. Use `llama3.1-70b` as the reliable fallback for short-form narrative tasks in us-east-1.
+
+**RBAC requirement**: Viewer roles need `GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE <role>` to call CORTEX.COMPLETE. Without it, calls silently fail and return empty string.
 
 ## Pricing
 
@@ -108,3 +113,6 @@ FROM products;
 | Running LLM functions on large tables without LIMIT | Start with samples; LLM calls are per-row |
 | Not specifying SERIES_COLNAME for multi-series forecast | Each series gets its own model; omitting gives one global model |
 | Expecting real-time FORECAST results | Model training is batch; call FORECAST for predictions after training |
+| Calling `MODEL!EVALUATE()` on a multi-series FORECAST model | EVALUATE() is unsupported when `SERIES_COLNAME` is set — returns "Unknown UDF" error. Compare predictions to actuals manually by joining forecast output to a fact table. |
+| Using `ref('table')` to reference a Task-managed table in dbt | Task-managed tables (e.g., F_FORECAST, F_ANOMALIES) are not dbt nodes — `ref()` fails at parse time. Use the full path `database.schema.table` directly in the SQL. |
+| CORTEX.COMPLETE returning empty string silently | Viewer roles need `GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE <role>` — without it, calls return empty string (no exception). |

@@ -122,6 +122,42 @@ def live_kpis():
 live_kpis()
 ```
 
+## SiS (Streamlit in Snowflake) Compatibility
+
+Key differences when deploying to SiS container runtime vs local/Community Cloud:
+
+```python
+# ❌ WRONG: px.bar fails serialization in SiS
+fig = px.bar(df, x="category", y="revenue")
+
+# ✅ RIGHT: Use go.Figure with .tolist() for all data
+import plotly.graph_objects as go
+fig = go.Figure(go.Bar(
+    x=df["category"].tolist(),   # .tolist() converts numpy → plain Python
+    y=df["revenue"].tolist(),
+    orientation="v",
+))
+
+# ❌ WRONG: colorbar titlefont is invalid in SiS Plotly version
+go.Heatmap(colorbar=dict(title="Units", titlefont=dict(color="#FFF")))
+
+# ✅ RIGHT: use title=dict(text=..., font=dict(...))
+go.Heatmap(colorbar=dict(title=dict(text="Units", font=dict(color="#FFF"))))
+
+# ❌ WRONG: st.dataframe ignores CSS in SiS iframe
+st.dataframe(df, use_container_width=True)
+
+# ✅ RIGHT: render as dark HTML table for consistent dark theme
+def dark_dataframe(df):
+    st.markdown(df.to_html(index=False), unsafe_allow_html=True)
+```
+
+**Other SiS gotchas:**
+- `px.*` charts fail serialization — always use `go.Figure`
+- Numeric x-axes + `tickvals`/`ticktext` avoid Plotly category merging
+- `go.Scattermap` (not `go.Scattermapbox`) for MapLibre tiles
+- `st.get_option("theme.base")` unreliable — force dark backgrounds explicitly via CSS
+
 ## See Also
 
 - [Caching](../concepts/caching.md)

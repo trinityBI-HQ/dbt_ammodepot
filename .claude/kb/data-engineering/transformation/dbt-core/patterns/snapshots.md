@@ -179,6 +179,62 @@ dbt snapshot --select snp_customers
 dbt snapshot && dbt run
 ```
 
+## Snapshotting Gold Models for MoM Analytics
+
+A common pattern is snapshotting a downstream Gold dimension (not a source table) to enable period-over-period comparisons in BI tools:
+
+```sql
+-- snapshots/snap_customer_segmentation.sql
+{% snapshot snap_customer_segmentation %}
+{{
+    config(
+        target_schema='gold',
+        unique_key='rank_id',
+        strategy='check',
+        check_cols=['customer_classification', 'frequency', 'recency', 'value', 'margin_classification'],
+        invalidate_hard_deletes=true,
+    )
+}}
+select rank_id, customer_classification, frequency, recency, value,
+       margin_classification, monetary_value, total_revenue
+from {{ ref('d_customer_segmentation') }}
+{% endsnapshot %}
+```
+
+```sql
+-- Query: segment counts as of 30 days ago for MoM delta
+select customer_classification, count(distinct rank_id) as prior_count
+from ad_analytics.gold.snap_customer_segmentation
+where dbt_valid_from <= dateadd('day', -30, current_date())
+  and (dbt_valid_to > dateadd('day', -30, current_date()) or dbt_valid_to is null)
+group by customer_classification
+```
+
+**Key decisions:**
+- `check` strategy over `timestamp` when the source table has no reliable `updated_at`
+- `target_schema='gold'` writes directly to Gold (skips snapshots/ schema)
+- `invalidate_hard_deletes=true` auto-closes rows for records that fall out of the source query
+- First run seeds the history; comparisons require N days of history to accumulate
+
+## Running Snapshots After dbt build in CI/ECS
+
+```bash
+# entrypoint.sh pattern — snapshot is non-fatal
+if [ $EXIT_CODE -eq 0 ]; then
+    uv run dbt snapshot --profiles-dir . --target prod \
+        || echo "Warning: snapshot step failed, continuing"
+fi
+```
+
+**Why non-fatal:** snapshots fail silently on first run if source data has nulls in `check_cols`. Let the build succeed; investigate snapshot failures separately.
+
+**FinOps tagging** — add to `dbt_project.yml` to track snapshot cost:
+```yaml
+snapshots:
+  your_project:
+    +query_tag: 'dbt:snapshot'
+```
+
 ## See Also
 
 - [materializations.md](../concepts/materializations.md)
