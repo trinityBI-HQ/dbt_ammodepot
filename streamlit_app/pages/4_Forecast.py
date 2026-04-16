@@ -58,6 +58,7 @@ def load_forecast() -> pd.DataFrame:
         FROM F_FORECAST
         WHERE FORECAST_TYPE = 'caliber'
           AND FORECAST_DATE > CURRENT_DATE()
+          AND FORECAST_DATE <= DATEADD('DAY', 30, CURRENT_DATE())
         ORDER BY CALIBER, FORECAST_DATE
     """)
 
@@ -70,6 +71,7 @@ def load_revenue_forecast() -> pd.DataFrame:
         FROM F_FORECAST
         WHERE FORECAST_TYPE = 'revenue'
           AND FORECAST_DATE > CURRENT_DATE()
+          AND FORECAST_DATE <= DATEADD('DAY', 30, CURRENT_DATE())
         ORDER BY FORECAST_DATE
     """)
 
@@ -111,6 +113,7 @@ def load_stockout_risk() -> pd.DataFrame:
             FROM F_FORECAST
             WHERE FORECAST_TYPE = 'caliber'
               AND FORECAST_DATE > CURRENT_DATE()
+              AND FORECAST_DATE <= DATEADD('DAY', 30, CURRENT_DATE())
             GROUP BY CALIBER
         ),
         current_stock AS (
@@ -279,7 +282,7 @@ with tab_caliber:
 
         apply_theme(fig)
         fig.update_layout(
-            title=None,
+            title="",
             xaxis_title="Date",
             yaxis_title="Units",
             legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0),
@@ -326,7 +329,7 @@ with tab_revenue:
 
         apply_theme(fig_rev)
         fig_rev.update_layout(
-            title=None,
+            title="",
             xaxis_title="Date",
             yaxis_title="Revenue ($)",
             legend=dict(orientation="h", yanchor="bottom", y=1.0, xanchor="left", x=0),
