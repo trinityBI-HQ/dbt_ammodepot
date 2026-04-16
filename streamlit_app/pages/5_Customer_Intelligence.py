@@ -428,7 +428,7 @@ def render_cohort_chart(df_cohort: pd.DataFrame):
         return
 
     pivot = df_cohort.pivot(
-        index="cohort_label", columns="month_number", values="retention_rate"
+        index="COHORT_LABEL", columns="MONTH_NUMBER", values="RETENTION_RATE"
     ).sort_index(ascending=False)
 
     y_labels = pivot.index.tolist()
