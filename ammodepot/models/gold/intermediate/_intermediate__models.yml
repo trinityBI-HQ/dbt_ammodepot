@@ -126,6 +126,27 @@ models:
               arguments:
                 values: ['GunBroker']
 
+  - name: int_daily_sales_metrics
+    description: >
+      Daily aggregate sales metrics (revenue, orders, margin %) for
+      SNOWFLAKE.ML.ANOMALY_DETECTION training. Single row per date.
+    columns:
+      - name: SALE_DATE
+        description: "Date of sales."
+        tests:
+          - unique
+          - not_null
+      - name: DAILY_REVENUE
+        description: "Total revenue for the day."
+        tests:
+          - assert_non_negative_values
+      - name: DAILY_ORDERS
+        description: "Count of distinct orders for the day."
+        tests:
+          - assert_non_negative_values
+      - name: DAILY_MARGIN_PCT
+        description: "Gross margin percentage for the day."
+
   - name: int_daily_sales_by_caliber
     description: >
       Daily units sold aggregated by caliber for SNOWFLAKE.ML.FORECAST training.
