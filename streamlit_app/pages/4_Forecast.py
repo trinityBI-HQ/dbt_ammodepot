@@ -1,11 +1,15 @@
-"""Forecast — Demand prediction and stock-out risk alerts.
+"""Forecast — Demand prediction, stock-out risk, and reorder intelligence.
 
-Reads pre-computed predictions from F_FORECAST (populated daily by
+Reads pre-computed predictions from F_FORECAST (populated weekly by
 TASK_DAILY_FORECAST at 4am UTC via SNOWFLAKE.ML.FORECAST).
 Combines with F_INVENTORYVIEW (current stock) and F_POS (vendor lead times)
 to calculate stock-out risk and reorder-by dates.
 
-Source: AD_ANALYTICS.GOLD.F_FORECAST, F_INVENTORYVIEW, F_POS, INT_PRODUCT_ANALYST
+AI Roadmap Phase 5: Reorder Recommendations tab reads F_REORDER_RECOMMENDATIONS
+(pre-computed Gold table) and generates a CORTEX.COMPLETE purchasing brief.
+
+Source: AD_ANALYTICS.GOLD.F_FORECAST, F_INVENTORYVIEW, F_POS,
+        INT_PRODUCT_ANALYST, F_REORDER_RECOMMENDATIONS
 """
 
 import base64
@@ -171,6 +175,72 @@ def load_stockout_risk() -> pd.DataFrame:
     """)
 
 
+# ── Reorder Intelligence ─────────────────────────────────────────────────────
+
+LLM_MODEL_REORDER = "gemini-2-5-flash"
+LLM_CACHE_TTL_REORDER = 600  # seconds — matches dbt build cadence
+
+
+@st.cache_data(ttl="10m", show_spinner=False)
+def load_reorder_recommendations() -> pd.DataFrame:
+    """Load pre-computed reorder recommendations from Gold table."""
+    try:
+        return run_query("""
+            select
+                caliber, qty_available, qty_on_order,
+                demand_upper_30d, daily_avg_predicted,
+                reorder_qty, lead_time_days, days_of_supply,
+                reorder_by, urgency,
+                recommended_vendor, avg_unit_cost, estimated_order_cost,
+                refreshed_at
+            from f_reorder_recommendations
+            order by
+                case urgency
+                    when 'Critical'  then 1
+                    when 'Warning'   then 2
+                    when 'OK'        then 3
+                    when 'Overstock' then 4
+                    else 5
+                end,
+                days_of_supply asc nulls last
+        """)
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=LLM_CACHE_TTL_REORDER, show_spinner=False)
+def generate_reorder_summary(reorder_json: str) -> str | None:
+    """CORTEX.COMPLETE purchasing brief for top urgent calibers.
+
+    Returns None on any failure — caller renders fallback caption.
+    """
+    try:
+        prompt = (
+            "You are a data analyst writing a 3-4 sentence purchasing brief "
+            "for an ammunition retailer's operations manager. "
+            "Be direct and numbers-forward — no filler, no greetings. "
+            "Focus on Critical calibers: name the caliber, units to order, "
+            "recommended vendor, and days of supply remaining. "
+            "Mention the total estimated order cost at the end.\n\n"
+            f"Reorder data (Critical and Warning calibers):\n{reorder_json}"
+        )
+        safe_prompt = prompt.replace("'", "''")
+        df = run_query(f"""
+            select snowflake.cortex.complete(
+                '{LLM_MODEL_REORDER}',
+                '{safe_prompt}'
+            ) as summary
+        """)
+        if not df.empty and df.iloc[0]["SUMMARY"]:
+            raw = str(df.iloc[0]["SUMMARY"]).strip()
+            if raw.startswith('"') and raw.endswith('"'):
+                raw = raw[1:-1]
+            return raw
+        return None
+    except Exception:
+        return None
+
+
 # ── Check if forecast data exists ────────────────────────────────────────────
 
 fc_data = load_forecast()
@@ -186,8 +256,9 @@ st.caption(f"Last trained: {trained_at}")
 
 # ── Tabs ─────────────────────────────────────────────────────────────────────
 
-tab_risk, tab_caliber, tab_revenue = st.tabs(
-    ["Stock-Out Risk", "Caliber Forecast", "Revenue Forecast"]
+tab_risk, tab_caliber, tab_revenue, tab_reorder = st.tabs(
+    ["Stock-Out Risk", "Caliber Forecast", "Revenue Forecast",
+     "Reorder Recommendations"]
 )
 
 # ── Tab 1: Stock-Out Risk ────────────────────────────────────────────────────
@@ -340,3 +411,66 @@ with tab_revenue:
 
         total_predicted = sum(float(v) for v in rev_fc["PREDICTED_REVENUE"].tolist())
         st.metric("Predicted Revenue (Next 30 Days)", f"${total_predicted:,.0f}")
+
+# ── Tab 4: Reorder Recommendations ──────────────────────────────────────────
+
+with tab_reorder:
+    reorder = load_reorder_recommendations()
+
+    if reorder.empty:
+        st.info(
+            "Reorder recommendations not yet available. "
+            "The Gold table populates on the next dbt build (within 10 min)."
+        )
+    else:
+        urgent = reorder[reorder["URGENCY"].isin(["Critical", "Warning"])]
+        reorder_json = urgent.head(10).to_json(orient="records")
+        summary = generate_reorder_summary(reorder_json)
+
+        if summary:
+            st.markdown(
+                f'<div style="background:#1a2733; border-left:4px solid {ACCENT}; '
+                f'border-radius:8px; padding:16px 20px; margin-bottom:16px; '
+                f'color:{TEXT_PRIMARY}; font-size:14px; line-height:1.6;">'
+                f"{summary}</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("Purchasing summary unavailable.")
+
+        critical_count = int((reorder["URGENCY"] == "Critical").sum())
+        ok_count = int((reorder["URGENCY"] == "OK").sum())
+        total_cost = float(
+            reorder.loc[reorder["REORDER_QTY"] > 0, "ESTIMATED_ORDER_COST"].sum()
+        )
+
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Critical Calibers", critical_count)
+        k2.metric("Est. Order Cost", f"${total_cost:,.0f}")
+        k3.metric("OK / Healthy", ok_count)
+
+        urgency_filter = st.selectbox(
+            "Filter by urgency",
+            ["All", "Critical", "Warning", "OK", "Overstock"],
+            index=0,
+            key="reorder_urgency_filter",
+        )
+        display = (
+            reorder if urgency_filter == "All"
+            else reorder[reorder["URGENCY"] == urgency_filter]
+        )
+
+        dark_dataframe(
+            display[[
+                "CALIBER", "URGENCY", "REORDER_QTY", "DAYS_OF_SUPPLY",
+                "LEAD_TIME_DAYS", "REORDER_BY", "RECOMMENDED_VENDOR",
+                "AVG_UNIT_COST", "ESTIMATED_ORDER_COST",
+            ]],
+            fmt={
+                "REORDER_QTY":          "{:,.0f}",
+                "DAYS_OF_SUPPLY":       "{:,.1f}",
+                "LEAD_TIME_DAYS":       "{:,.0f}",
+                "AVG_UNIT_COST":        "${:,.3f}",
+                "ESTIMATED_ORDER_COST": "${:,.0f}",
+            },
+        )

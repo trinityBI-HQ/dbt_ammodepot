@@ -1,0 +1,64 @@
+
+models:
+  - name: f_reorder_recommendations
+    description: >
+      Per-caliber reorder recommendations. Combines F_FORECAST upper-bound
+      30-day demand with current inventory levels and historical vendor lead
+      times to produce system-generated reorder quantities, urgency levels,
+      and recommended vendor. Refreshed every 10 min by ECS Fargate dbt build.
+      Urgency thresholds are identical to Page 4 Stock-Out Risk.
+    columns:
+      - name: CALIBER
+        description: "Caliber identifier (primary key). One row per caliber with forecast data."
+        tests:
+          - unique
+          - not_null
+      - name: QTY_AVAILABLE
+        description: "Current available stock in default location group, caliber-aggregated from F_INVENTORYVIEW."
+        tests:
+          - assert_non_negative_values
+      - name: QTY_ON_ORDER
+        description: "Units already on open purchase orders, caliber-aggregated from F_INVENTORYVIEW."
+        tests:
+          - assert_non_negative_values
+      - name: DEMAND_UPPER_30D
+        description: "Sum of F_FORECAST UPPER_BOUND over next 30 days. Conservative demand estimate used as safety buffer."
+      - name: DAILY_AVG_PREDICTED
+        description: "Average daily predicted units (point forecast) over next 30 days."
+      - name: REORDER_QTY
+        description: >
+          Recommended units to order: GREATEST(0, DEMAND_UPPER_30D - QTY_AVAILABLE - QTY_ON_ORDER).
+          Always non-negative. Accounts for in-transit stock.
+        tests:
+          - assert_non_negative_values
+      - name: LEAD_TIME_DAYS
+        description: "Average lead time in days for the recommended vendor. Defaults to 14 if no PO history."
+      - name: DAYS_OF_SUPPLY
+        description: "QTY_AVAILABLE divided by DAILY_AVG_PREDICTED. NULL if no forecast demand."
+      - name: REORDER_BY
+        description: "Date by which reorder should be placed to avoid stock-out given lead time."
+      - name: URGENCY
+        description: >
+          Risk classification consistent with Page 4 Stock-Out Risk:
+          Critical (days_of_supply <= lead_time_days),
+          Warning (days_of_supply <= lead_time_days * 2),
+          Overstock (days_of_supply > 90),
+          OK (otherwise).
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['Critical', 'Warning', 'OK', 'Overstock']
+      - name: RECOMMENDED_VENDOR_ID
+        description: "Fishbowl vendor_id with lowest average PRECISE_LEADTIME for this caliber. NULL if no PO history."
+      - name: RECOMMENDED_VENDOR
+        description: "Vendor name from D_VENDOR. NULL if no PO history for this caliber."
+      - name: AVG_UNIT_COST
+        description: "Average unit cost from historical POs with recommended vendor. 0 if no PO history."
+      - name: ESTIMATED_ORDER_COST
+        description: "REORDER_QTY multiplied by AVG_UNIT_COST. 0 if REORDER_QTY = 0."
+        tests:
+          - assert_non_negative_values
+      - name: REFRESHED_AT
+        description: "Timestamp when this row was last computed by the dbt build."
+        tests:
+          - not_null
