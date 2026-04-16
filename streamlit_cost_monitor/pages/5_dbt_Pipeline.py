@@ -1,7 +1,6 @@
 """Page 5 — dbt pipeline health: build duration, build history, and docs."""
 
 import streamlit as st
-import streamlit.components.v1 as components
 import plotly.graph_objects as go
 
 from utils.chart_theme import ACCENT, DANGER, TEXT_SECONDARY, apply_theme, dark_dataframe, kpi_card
@@ -124,7 +123,12 @@ st.caption("Interactive model lineage, descriptions, column types, and test defi
 
 docs_url = dbt_docs_presigned_url()
 if docs_url:
-    components.iframe(docs_url, height=700, scrolling=True)
+    st.link_button(
+        "Open dbt Docs (new tab)",
+        docs_url,
+        use_container_width=True,
+    )
+    st.caption("Opens in a new tab — SiS Content Security Policy blocks embedded iframes to external URLs.")
 else:
     st.info(
         "dbt docs not available. Ensure the CI workflow has deployed "
