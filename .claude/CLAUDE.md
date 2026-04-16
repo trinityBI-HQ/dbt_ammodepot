@@ -17,7 +17,7 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 ### Warehouse Migration (Complete)
 
 Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
-- **Snowflake** (`ammodepot/`): Production — 103 models, ECS Fargate orchestration every 10 min
+- **Snowflake** (`ammodepot/`): Production — 104 models, ECS Fargate orchestration every 10 min
 - **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
 - **Adapter**: dbt-snowflake 1.11.2
 
@@ -29,7 +29,7 @@ S3 Iceberg (Glue catalog)          AD_ANALYTICS (TRANSFORMER_ROLE)
     ├── production2018/            │      ↑ Snowflake reads via External Volume
     └── ammuni_prod/               │        + Glue Catalog Integration
                                    ├── SILVER (69 views + 7 tables)
-                                   └── GOLD (13 tables + 14 views)
+                                   └── GOLD (14 tables + 14 views)
                                           ↑ Power BI reads here
 
 AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
@@ -87,6 +87,8 @@ Airbyte CDC (Fishbowl, Magento)
 | AI Analyst | Streamlit chatbot (`AD_ANALYTICS.OPS.ANALYST`, SiS container runtime) powered by Snowflake Cortex Analyst + Semantic View |
 | Demand Forecasting | Snowflake Cortex ML (FORECAST) — 115 calibers + revenue, weekly Task `TASK_DAILY_FORECAST` (Sunday 4am UTC), outputs to `F_FORECAST` |
 | Anomaly Detection | Snowflake Cortex ML (ANOMALY_DETECTION) — revenue, orders, margin; alert banner on Page 1, outputs to `F_ANOMALIES` |
+| Churn Narratives | Snowflake Cortex LLM (`gemini-2-5-flash`) — Page 5 RFM segment health + executive summary, reads `D_CUSTOMER_SEGMENTATION` |
+| Reorder Intelligence | dbt Gold table `F_REORDER_RECOMMENDATIONS` + CORTEX.COMPLETE — per-caliber reorder qty + vendor, Page 4 tab |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 | Archive | Decommissioned Redshift project + old artifacts |
 
@@ -113,7 +115,8 @@ streamlit_app/
 │   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering + anomaly alert banner (replaces PBI SALES OVERVIEW FASTER) ~1,355 lines
 │   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,505 lines
 │   ├── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,272 lines
-│   └── 4_Forecast.py             # Demand forecast + stock-out risk by caliber (~330 lines)
+│   ├── 4_Forecast.py             # Demand forecast + 4 tabs: Stock-Out Risk, Caliber Forecast, Revenue Forecast, Reorder Recommendations (~476 lines)
+│   └── 5_Customer_Intelligence.py # RFM segment health + CORTEX.COMPLETE executive summary (AI Phase 4) (~403 lines)
 └── utils/
     ├── __init__.py
     ├── chart_theme.py             # Unified dark theme for Plotly charts + HTML tables (~127 lines)
@@ -121,7 +124,7 @@ streamlit_app/
     └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps (~307 lines)
 ```
 
-**Total:** ~5,120 lines across 10 Python files
+**Total:** ~5,666 lines across 11 Python files
 
 ### Cross-Filtering (PBI-style)
 
@@ -202,7 +205,7 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 103 models (34 FB + 23 MG + 19 Inv + 13 Gold + 14 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 6 macros (3 root + 3 cross_db), 5 exposures
+**Snowflake Counts:** 104 models (34 FB + 23 MG + 19 Inv + 14 Gold + 14 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 6 macros (3 root + 3 cross_db), 5 exposures
 
 ### Lakehouse (Iceberg via Snowflake — CUTOVER COMPLETE 2026-04-07)
 
@@ -495,7 +498,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 ### Snowflake (Production — ECS Fargate, Iceberg-backed)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=12, WARN=5, ERROR=0 (f_sales full-refresh — 2026-04-14, GunBroker v2: freight + UOM + SKU exclusions)
+- **Last build**: Pending — 2026-04-16 push adding `f_reorder_recommendations` (104 models); awaiting first ECS run
 - **Previous full build**: PASS=363, WARN=11, ERROR=0 (103 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
 - **Build duration**: ~6 min steady state (was ~3 min pre-Iceberg). Refresh hook adds ~45-90s warm / ~3-5min cold. Headroom under 10-min schedule is the main watchpoint
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
@@ -506,7 +509,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 
 ### Streamlit Sales Dashboard (SiS container runtime)
 
-Migrated 2026-04-14 — `AD_ANALYTICS.OPS.SALES_DASHBOARD` (4 pages, container runtime):
+Updated 2026-04-16 — `AD_ANALYTICS.OPS.SALES_DASHBOARD` (5 pages, container runtime):
 - Deployed via GitHub Actions (`deploy-streamlit-dashboard.yml`)
 - Compute pool: `sales_dashboard_pool` (CPU_X64_XS, 1 node, auto-suspend 300s, ~$5/mo)
 - EAI: `sales_dashboard_integration` — CARTO tiles (`basemaps.cartocdn.com`) + PyPI egress
@@ -552,6 +555,25 @@ Built 2026-04-14 — automated sales anomaly detection:
 - **Output table**: `AD_ANALYTICS.GOLD.F_ANOMALIES` (managed by Snowflake Task, not dbt)
 - **Alert banner**: Page 1 (Today/Yesterday) shows active anomaly alerts inline
 - **Orchestration**: Runs within `TASK_DAILY_FORECAST` weekly cycle
+
+### Customer Churn Narratives (CORTEX.COMPLETE — Phase 4)
+
+Built + Shipped 2026-04-16 — RFM segment health dashboard with LLM executive summary:
+- **Page 5**: `5_Customer_Intelligence.py` in Sales Dashboard — segment KPI cards, all 17 classifications table, top at-risk customers, `gemini-2-5-flash` executive summary banner
+- **LLM**: `SNOWFLAKE.CORTEX.COMPLETE('gemini-2-5-flash')` — cached 10 min, graceful fallback
+- **Data**: `D_CUSTOMER_SEGMENTATION` (RFM) — no new dbt models
+- **Cost**: ~$0.15/mo (Cortex LLM credits)
+- **Archive**: `.claude/sdd/archive/CHURN_NARRATIVES/SHIPPED_2026-04-16.md`
+
+### Inventory Reorder Intelligence (AI Phase 5 — In Progress)
+
+Built 2026-04-16 — prescriptive purchasing recommendations per caliber:
+- **New Gold table**: `F_REORDER_RECOMMENDATIONS` — per-caliber REORDER_QTY, URGENCY, RECOMMENDED_VENDOR, ESTIMATED_ORDER_COST. Refreshed every 10 min by ECS dbt build.
+- **Formula**: `REORDER_QTY = GREATEST(0, DEMAND_UPPER_30D - QTY_AVAILABLE - QTY_ON_ORDER)` — UPPER_BOUND from F_FORECAST acts as ML-backed safety buffer
+- **Vendor**: Lowest avg `PRECISE_LEADTIME` from F_POS per caliber
+- **Page 4 tab**: New "Reorder Recommendations" tab in Sales Dashboard Page 4 — LLM brief, 3 KPI cards, urgency filter, reorder table
+- **Status**: Deployed to ECS + SiS. Awaiting first dbt build to populate table.
+- **Cost**: ~$0.15/mo (Cortex LLM credits, no new infra)
 
 ### Snowflake Cost Dashboard (Snowsight)
 
