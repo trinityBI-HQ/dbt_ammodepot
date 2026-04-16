@@ -572,7 +572,7 @@ Built 2026-04-16 — prescriptive purchasing recommendations per caliber:
 - **Formula**: `REORDER_QTY = GREATEST(0, DEMAND_UPPER_30D - QTY_AVAILABLE - QTY_ON_ORDER)` — UPPER_BOUND from F_FORECAST acts as ML-backed safety buffer
 - **Vendor**: Lowest avg `PRECISE_LEADTIME` from F_POS per caliber
 - **Page 4 tab**: New "Reorder Recommendations" tab in Sales Dashboard Page 4 — LLM brief, 3 KPI cards, urgency filter, reorder table
-- **Status**: Deployed to ECS + SiS. Awaiting first dbt build to populate table.
+- **Status**: Shipped 2026-04-16. Validated live: PASS=379, WARN=13, ERROR=0, 103 calibers, 30 Critical ($357K reorder value).
 - **Cost**: ~$0.15/mo (Cortex LLM credits, no new infra)
 
 ### Snowflake Cost Dashboard (Snowsight)

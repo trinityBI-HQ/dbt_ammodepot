@@ -229,7 +229,7 @@ flowchart LR
     P2["Phase 2 ✅<br/>Demand Forecasting<br/>ML.FORECAST<br/>2026-04-14"]
     P3["Phase 3 ✅<br/>Anomaly Alerts<br/>ML.ANOMALY_DETECTION<br/>2026-04-14"]
     P4["Phase 4 ✅<br/>Churn Narratives<br/>CORTEX.COMPLETE<br/>2026-04-16"]
-    P5["Phase 5 🔄<br/>Reorder Intelligence<br/>F_REORDER_RECOMMENDATIONS<br/>2026-04-16"]
+    P5["Phase 5 ✅<br/>Reorder Intelligence<br/>F_REORDER_RECOMMENDATIONS<br/>2026-04-16"]
 
     P1 -->|foundation proven| P2
     P2 -->|forecasts reliable| P3
@@ -240,7 +240,7 @@ flowchart LR
     style P2 fill:#2d6a4f,stroke:#40916c,color:#fff
     style P3 fill:#2d6a4f,stroke:#40916c,color:#fff
     style P4 fill:#2d6a4f,stroke:#40916c,color:#fff
-    style P5 fill:#1a3a4a,stroke:#2a9d8f,color:#fff
+    style P5 fill:#2d6a4f,stroke:#40916c,color:#fff
 ```
 
 All phases are Snowflake-native — no external LLM APIs.

@@ -408,6 +408,5 @@ Natural language query interface powered by Snowflake Cortex Analyst + Semantic 
 
 | Project | Last Build | Result |
 |---------|------------|--------|
-| Snowflake (ECS Fargate) | 2026-04-16 | Pending — 104 models (added f_reorder_recommendations) |
-| Previous full build | 2026-04-07 | PASS=363 WARN=11 ERROR=0 — 103 models, ~6 min |
+| Snowflake (ECS Fargate) | 2026-04-16 | PASS=379 WARN=13 ERROR=0 — 104 models, ~4 min |
 | Redshift | Archived | Decommissioned — see `archive/projects/ammodepot/` |
