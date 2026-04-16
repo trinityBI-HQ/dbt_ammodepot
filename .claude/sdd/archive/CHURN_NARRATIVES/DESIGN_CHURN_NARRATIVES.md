@@ -10,7 +10,7 @@
 | **Date** | 2026-04-15 |
 | **Author** | design-agent |
 | **DEFINE** | [DEFINE_CHURN_NARRATIVES.md](./DEFINE_CHURN_NARRATIVES.md) |
-| **Status** | Ready for Build |
+| **Status** | ✅ Shipped |
 
 ---
 

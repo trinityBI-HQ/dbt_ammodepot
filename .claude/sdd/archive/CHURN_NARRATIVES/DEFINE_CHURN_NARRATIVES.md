@@ -9,7 +9,7 @@
 | **Feature** | CHURN_NARRATIVES |
 | **Date** | 2026-04-15 |
 | **Author** | define-agent |
-| **Status** | Ready for Design |
+| **Status** | ✅ Shipped |
 | **Clarity Score** | 15/15 |
 | **Brainstorm** | `.claude/sdd/features/BRAINSTORM_CHURN_NARRATIVES.md` |
 | **AI Roadmap** | Phase 4 (follows Analyst, Forecasting, Anomaly Detection) |
