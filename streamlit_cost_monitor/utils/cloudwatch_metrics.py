@@ -153,11 +153,12 @@ def _extract(pattern: str, text: str) -> str | None:
 def dbt_docs_presigned_url() -> str | None:
     """Generate a 1-hour presigned URL for the dbt docs static HTML in S3.
 
-    Returns None if the object doesn't exist or creds lack s3:GetObject.
+    generate_presigned_url is a local signing operation — no network call.
+    The URL is valid as long as the IAM creds have s3:GetObject and the
+    object exists (CI uploads on every ammodepot/ push).
     """
     try:
         client = get_boto3_client("s3")
-        client.head_object(Bucket=DBT_DOCS_S3_BUCKET, Key=DBT_DOCS_S3_KEY)
         return client.generate_presigned_url(
             "get_object",
             Params={"Bucket": DBT_DOCS_S3_BUCKET, "Key": DBT_DOCS_S3_KEY},
