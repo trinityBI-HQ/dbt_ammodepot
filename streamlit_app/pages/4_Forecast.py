@@ -208,6 +208,32 @@ def load_reorder_recommendations() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+@st.cache_data(ttl="10m", show_spinner=False)
+def load_vendor_comparison(caliber: str) -> pd.DataFrame:
+    """Top 5 vendors for a caliber ranked by avg lead time from PO history."""
+    safe_caliber = caliber.replace("'", "''")
+    try:
+        return run_query(f"""
+            select
+                dv.vendor_name                              as VENDOR_NAME,
+                round(avg(po.precise_leadtime), 0)          as AVG_LEAD_TIME_DAYS,
+                round(avg(po.unit_cost), 3)                 as AVG_UNIT_COST,
+                count(distinct po.purchase_order_id)        as HISTORICAL_POS,
+                max(po.datereceived)                        as LAST_SUPPLIED
+            from f_pos as po
+            join int_product_analyst as p on po.part_number = p.sku
+            join d_vendor as dv on po.vendor_id = dv.vendor_id
+            where p.caliber = '{safe_caliber}'
+              and po.precise_leadtime is not null
+              and po.vendor_id is not null
+            group by dv.vendor_name
+            order by avg_lead_time_days asc nulls last
+            limit 5
+        """)
+    except Exception:
+        return pd.DataFrame()
+
+
 @st.cache_data(ttl=LLM_CACHE_TTL_REORDER, show_spinner=False)
 def generate_reorder_summary(reorder_json: str) -> str | None:
     """CORTEX.COMPLETE purchasing brief for top urgent calibers.
@@ -474,3 +500,50 @@ with tab_reorder:
                 "ESTIMATED_ORDER_COST": "${:,.0f}",
             },
         )
+
+        # ── Vendor Comparison ─────────────────────────────────────────────────
+        st.divider()
+        st.subheader("Vendor Comparison")
+
+        actionable = reorder.loc[
+            reorder["URGENCY"].isin(["Critical", "Warning"])
+            & (reorder["REORDER_QTY"] > 0)
+        ].reset_index(drop=True)
+
+        if actionable.empty:
+            st.info("No calibers require reordering at this time.")
+        else:
+            caliber_labels = [
+                f"{row.CALIBER}  ({row.URGENCY} · {int(row.REORDER_QTY):,} units)"
+                for row in actionable.itertuples()
+            ]
+            selected_idx = st.selectbox(
+                "Select caliber to compare vendors",
+                range(len(caliber_labels)),
+                format_func=lambda i: caliber_labels[i],
+                key="vendor_compare_caliber",
+            )
+            selected_caliber = actionable.iloc[selected_idx]["CALIBER"]
+            selected_reorder_qty = float(actionable.iloc[selected_idx]["REORDER_QTY"])
+
+            vendor_df = load_vendor_comparison(selected_caliber)
+            if vendor_df.empty:
+                st.info(f"No vendor history found for {selected_caliber}.")
+            else:
+                vendor_df = vendor_df.copy()
+                vendor_df["EST_ORDER_COST"] = vendor_df["AVG_UNIT_COST"].apply(
+                    lambda c: round(selected_reorder_qty * float(c), 0)
+                    if c is not None else None
+                )
+                dark_dataframe(
+                    vendor_df[[
+                        "VENDOR_NAME", "AVG_LEAD_TIME_DAYS", "AVG_UNIT_COST",
+                        "EST_ORDER_COST", "HISTORICAL_POS", "LAST_SUPPLIED",
+                    ]],
+                    fmt={
+                        "AVG_LEAD_TIME_DAYS": "{:,.0f}",
+                        "AVG_UNIT_COST":      "${:,.3f}",
+                        "EST_ORDER_COST":     "${:,.0f}",
+                        "HISTORICAL_POS":     "{:,.0f}",
+                    },
+                )
