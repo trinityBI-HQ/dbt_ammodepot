@@ -9,7 +9,7 @@
 | **Feature** | REORDER_INTELLIGENCE |
 | **Date** | 2026-04-16 |
 | **Author** | define-agent |
-| **Status** | Ready for Design |
+| **Status** | ✅ Shipped |
 | **Clarity Score** | 15/15 |
 | **Brainstorm** | `.claude/sdd/features/BRAINSTORM_REORDER_INTELLIGENCE.md` |
 | **AI Roadmap** | Phase 5 (first prescriptive phase) |

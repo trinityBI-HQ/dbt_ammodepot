@@ -10,7 +10,7 @@
 | **Date** | 2026-04-16 |
 | **Author** | design-agent |
 | **DEFINE** | [DEFINE_REORDER_INTELLIGENCE.md](./DEFINE_REORDER_INTELLIGENCE.md) |
-| **Status** | Ready for Build |
+| **Status** | ✅ Shipped |
 
 ---
 
