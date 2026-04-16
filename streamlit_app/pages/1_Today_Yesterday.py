@@ -351,6 +351,37 @@ def pct_delta(current, previous):
     return None
 
 
+# --- Anomaly Alert Banner ---
+@st.cache_data(ttl="10m", show_spinner=False)
+def load_recent_anomalies() -> pd.DataFrame:
+    try:
+        return run_query("""
+            SELECT ANOMALY_DATE, METRIC_NAME, ACTUAL_VALUE, EXPECTED_VALUE,
+                   ROUND((ACTUAL_VALUE - EXPECTED_VALUE) / NULLIF(EXPECTED_VALUE, 0) * 100, 1) AS DEVIATION_PCT
+            FROM F_ANOMALIES
+            WHERE IS_ANOMALY = TRUE
+              AND ANOMALY_DATE >= DATEADD('DAY', -7, CURRENT_DATE())
+            ORDER BY ANOMALY_DATE DESC, METRIC_NAME
+        """)
+    except Exception:
+        return pd.DataFrame()
+
+_anomalies = load_recent_anomalies()
+if not _anomalies.empty:
+    _metric_labels = {"revenue": "Revenue", "orders": "Orders", "margin": "Margin %"}
+    _metric_formats = {
+        "revenue": lambda a, e, d: f"${float(a):,.0f} (expected ${float(e):,.0f}, {float(d):+.1f}%)",
+        "orders": lambda a, e, d: f"{int(float(a)):,} (expected {int(float(e)):,}, {float(d):+.1f}%)",
+        "margin": lambda a, e, d: f"{float(a):.1f}% (expected {float(e):.1f}%, {float(d):+.1f}pp)",
+    }
+    for _, row in _anomalies.iterrows():
+        metric = row["METRIC_NAME"]
+        label = _metric_labels.get(metric, metric)
+        fmt = _metric_formats.get(metric, lambda a, e, d: f"{a} (expected {e})")
+        detail = fmt(row["ACTUAL_VALUE"], row["EXPECTED_VALUE"], row["DEVIATION_PCT"])
+        dt = str(row["ANOMALY_DATE"])[:10]
+        st.warning(f"**{label} anomaly on {dt}:** {detail}")
+
 # --- KPI Row ---
 st.divider()
 
