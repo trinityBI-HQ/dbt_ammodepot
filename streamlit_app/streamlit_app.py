@@ -23,9 +23,11 @@ st.markdown("Use the sidebar to navigate between dashboards.")
 st.markdown("""
 ### Dashboards
 
-- **Today / Yesterday** — Real-time daily KPIs, hourly sales, product performance
+- **Today / Yesterday** — Real-time daily KPIs, hourly sales, product performance + anomaly alerts
 - **Sales Overview** — Historical sales by category (TODAY / MTD / YTD)
 - **Inventory** — Stock levels, vendor analysis, open purchase orders
+- **Forecast** — 30-day demand forecast by caliber + reorder recommendations with vendor comparison
+- **Customer Intelligence** — RFM segment health, at-risk customers, cohort retention
 """)
 
 with st.sidebar:

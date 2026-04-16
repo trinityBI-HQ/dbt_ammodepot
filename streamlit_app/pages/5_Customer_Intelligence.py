@@ -468,9 +468,9 @@ def render_cohort_chart(df_cohort: pd.DataFrame):
             zmin=0,
             zmax=100,
             colorbar=dict(
-                title="Retention %",
+                title=dict(text="Retention %",
+                           font=dict(color=TEXT_SECONDARY, size=11)),
                 tickfont=dict(color=TEXT_SECONDARY, size=10),
-                titlefont=dict(color=TEXT_SECONDARY, size=11),
             ),
         )
     )

@@ -177,17 +177,9 @@ def load_stockout_risk() -> pd.DataFrame:
 
 # ── Reorder Intelligence ─────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
 def load_caliber_evaluate() -> tuple[pd.DataFrame, str]:
-    """Run CALIBER_FORECAST!EVALUATE() — cross-validated backtesting metrics per caliber.
-
-    Returns (df, error_msg). Error_msg is empty string on success.
-    """
-    try:
-        df = run_query("CALL ad_analytics.gold.caliber_forecast!EVALUATE()")
-        return df, ""
-    except Exception as e:
-        return pd.DataFrame(), str(e)
+    """EVALUATE() is not supported on multi-series CALIBER_FORECAST models."""
+    return pd.DataFrame(), ""
 
 
 @st.cache_data(ttl="10m", show_spinner=False)
@@ -626,18 +618,13 @@ with tab_accuracy:
         "Updated weekly when the model retrains."
     )
 
-    with st.spinner("Running model evaluation..."):
-        eval_df, eval_err = load_caliber_evaluate()
+    st.info(
+        "Built-in EVALUATE() is not supported for multi-series (caliber-level) forecast models. "
+        "Use the **Prediction vs Actual** section below — it compares archived predictions "
+        "to real sales once F_FORECAST_HISTORY accumulates data after Sunday's training run."
+    )
 
-    if not eval_df.empty:
-        pass  # fall through to rendering below
-    elif eval_err:
-        st.error(f"Evaluation error: {eval_err}")
-        st.stop()
-    else:
-        st.info("Evaluation not available. The CALIBER_FORECAST model may not be trained yet.")
-
-    if not eval_df.empty:
+    if False:  # placeholder — keeps the block structure
         eval_cols = [c for c in ["SERIES", "MAPE", "MAE", "RMSE", "WMAPE", "COVERAGE"] if c in eval_df.columns]
         if eval_cols:
             col_a, col_b, col_c = st.columns(3)
