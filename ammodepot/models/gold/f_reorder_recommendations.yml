@@ -3,9 +3,10 @@ models:
   - name: f_reorder_recommendations
     description: >
       Per-caliber reorder recommendations. Combines F_FORECAST upper-bound
-      30-day demand with current inventory levels and historical vendor lead
-      times to produce system-generated reorder quantities, urgency levels,
-      and recommended vendor. Refreshed every 10 min by ECS Fargate dbt build.
+      30-day demand (Snowflake Task-managed, referenced directly as
+      ad_analytics.gold.f_forecast) with current inventory levels and
+      historical vendor lead times to produce reorder quantities, urgency
+      levels, and recommended vendor. Refreshed every 10 min by ECS Fargate.
       Urgency thresholds are identical to Page 4 Stock-Out Risk.
     columns:
       - name: CALIBER

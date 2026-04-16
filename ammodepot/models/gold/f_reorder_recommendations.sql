@@ -3,7 +3,7 @@ with forecast_upper as (
         caliber,
         sum(upper_bound)         as demand_upper_30d,
         avg(predicted_units)     as daily_avg_predicted
-    from {{ ref('f_forecast') }}
+    from ad_analytics.gold.f_forecast
     where forecast_type = 'caliber'
       and forecast_date > current_date()
       and forecast_date <= dateadd('day', 30, current_date())
