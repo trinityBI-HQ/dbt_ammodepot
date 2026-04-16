@@ -115,8 +115,8 @@ streamlit_app/
 │   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering + anomaly alert banner (replaces PBI SALES OVERVIEW FASTER) ~1,355 lines
 │   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,505 lines
 │   ├── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,272 lines
-│   ├── 4_Forecast.py             # Demand forecast + 4 tabs: Stock-Out Risk, Caliber Forecast, Revenue Forecast, Reorder Recommendations (~476 lines)
-│   └── 5_Customer_Intelligence.py # RFM segment health + CORTEX.COMPLETE executive summary (AI Phase 4) (~403 lines)
+│   ├── 4_Forecast.py             # Demand forecast + 4 tabs incl. Reorder Recommendations + Vendor Comparison (~549 lines)
+│   └── 5_Customer_Intelligence.py # RFM segment health + CORTEX.COMPLETE executive summary + MoM deltas (AI Phase 4) (~420 lines)
 └── utils/
     ├── __init__.py
     ├── chart_theme.py             # Unified dark theme for Plotly charts + HTML tables (~127 lines)
@@ -202,10 +202,11 @@ ammodepot/
 ├── seeds/
 │   └── customer_groups.csv     # Customer group lookup (Law Enforcement, Wholesale, etc.)
 ├── snapshots/
+│   └── snap_customer_segmentation.sql  # check strategy on RFM classification fields; target: gold
 └── analyses/
 ```
 
-**Snowflake Counts:** 104 models (34 FB + 23 MG + 19 Inv + 14 Gold + 14 Int), 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 6 macros (3 root + 3 cross_db), 5 exposures
+**Snowflake Counts:** 104 models (34 FB + 23 MG + 19 Inv + 14 Gold + 14 Int), 1 snapshot, 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 6 macros (3 root + 3 cross_db), 5 exposures
 
 ### Lakehouse (Iceberg via Snowflake — CUTOVER COMPLETE 2026-04-07)
 
@@ -318,7 +319,7 @@ airbyte-ec2/
 ```
 ecs/
 ├── Dockerfile                 # Python 3.11-slim + uv + dbt-snowflake (~40s build)
-├── entrypoint.sh              # Writes RSA key, source freshness (JSON), dbt build --target prod
+├── entrypoint.sh              # Writes RSA key, source freshness (JSON), dbt build --target prod, dbt snapshot (non-fatal)
 ├── deploy.sh                  # Manual deploy fallback (build + push to ECR)
 ├── pyproject.toml             # Minimal deps: dbt-core + dbt-snowflake
 ├── task-definition.json       # 0.5 vCPU, 1 GB, Secrets Manager refs
@@ -498,9 +499,10 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 ### Snowflake (Production — ECS Fargate, Iceberg-backed)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: Pending — 2026-04-16 push adding `f_reorder_recommendations` (104 models); awaiting first ECS run
+- **Last build**: PASS=389, WARN=13, ERROR=0 (104 models + 1 snapshot, ~3.5 min — 2026-04-16)
 - **Previous full build**: PASS=363, WARN=11, ERROR=0 (103 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
-- **Build duration**: ~6 min steady state (was ~3 min pre-Iceberg). Refresh hook adds ~45-90s warm / ~3-5min cold. Headroom under 10-min schedule is the main watchpoint
+- **Build duration**: ~3.5 min steady state (209s). Was ~6 min post-Iceberg; EAV fix (2026-04-08) cut to ~3.2 min; `int_fishbowl_order_cost` Phase A (2026-04-16) saved another ~15s. Current headroom: ~65% of 10-min window.
+- **int_fishbowl_order_cost**: Phase A complete (54s → 46s) — eliminated 5th `fishbowl_soitem` scan, removed dead CTE chain, replaced `SELECT f.*`. Phase B (window function rewrite) deferred — monitor PBI cost columns for a few days first.
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
 - **Performance optimizations**: Silver dedup guards (QUALIFY), high-fan-out Silver tables, f_sales incremental merge, cross-db dispatch macros
@@ -559,7 +561,7 @@ Built 2026-04-14 — automated sales anomaly detection:
 ### Customer Churn Narratives (CORTEX.COMPLETE — Phase 4)
 
 Built + Shipped 2026-04-16 — RFM segment health dashboard with LLM executive summary:
-- **Page 5**: `5_Customer_Intelligence.py` in Sales Dashboard — segment KPI cards, all 17 classifications table, top at-risk customers, `gemini-2-5-flash` executive summary banner
+- **Page 5**: `5_Customer_Intelligence.py` in Sales Dashboard — segment KPI cards, all 17 classifications table + MoM delta column (from `SNAP_CUSTOMER_SEGMENTATION`), top at-risk customers, `gemini-2-5-flash` executive summary banner
 - **LLM**: `SNOWFLAKE.CORTEX.COMPLETE('gemini-2-5-flash')` — cached 10 min, graceful fallback
 - **Data**: `D_CUSTOMER_SEGMENTATION` (RFM) — no new dbt models
 - **Cost**: ~$0.15/mo (Cortex LLM credits)
@@ -572,8 +574,17 @@ Built 2026-04-16 — prescriptive purchasing recommendations per caliber:
 - **Formula**: `REORDER_QTY = GREATEST(0, DEMAND_UPPER_30D - QTY_AVAILABLE - QTY_ON_ORDER)` — UPPER_BOUND from F_FORECAST acts as ML-backed safety buffer
 - **Vendor**: Lowest avg `PRECISE_LEADTIME` from F_POS per caliber
 - **Page 4 tab**: New "Reorder Recommendations" tab in Sales Dashboard Page 4 — LLM brief, 3 KPI cards, urgency filter, reorder table
-- **Status**: Shipped 2026-04-16. Validated live: PASS=379, WARN=13, ERROR=0, 103 calibers, 30 Critical ($357K reorder value).
+- **Status**: Shipped 2026-04-16. Validated live: PASS=389, WARN=13, ERROR=0, 103 calibers, 30 Critical ($357K reorder value). Vendor comparison added same day.
+- **Vendor Comparison**: Page 4 tab — caliber selector (Critical/Warning only), top 5 vendors by lead time with unit cost + estimated order cost at recommended qty
 - **Cost**: ~$0.15/mo (Cortex LLM credits, no new infra)
+
+### Customer Segmentation Snapshot (2026-04-16)
+
+- **Snapshot**: `SNAP_CUSTOMER_SEGMENTATION` in `AD_ANALYTICS.GOLD` — check strategy on `customer_classification`, `frequency`, `recency`, `value`, `margin_classification`
+- **Purpose**: Enables MoM segment deltas on Page 5 (Customer Intelligence). First 30 days builds history; MoM column shows `+N`/`-N` per segment after 2026-05-16.
+- **Cadence**: Runs after every `dbt build` (every 10 min, non-fatal). `check` strategy means rows only written when classifications change — idempotent.
+- **`invalidate_hard_deletes=true`**: Customers dropping out of the 12-month window get `dbt_valid_to` set automatically.
+- **Initial population**: 951,760 rows on first run (2026-04-16).
 
 ### Snowflake Cost Dashboard (Snowsight)
 
