@@ -659,16 +659,16 @@ Airbyte CDC → S3 Iceberg (Glue catalog) → Snowflake LAKEHOUSE_LANDING → db
 
 ---
 
-## Knowledge Base (616 files / 47 technologies in 6 categories)
+## Knowledge Base (616 files / 46 technologies in 6 categories)
 
 | Category | Files | Technologies | Key Technologies |
 |---|---|---|---|
-| data-engineering | 224 | 19 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
-| cloud | 133 | 12 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
-| devops-sre | 124 | 13 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
+| data-engineering | 224 | 16 | dbt-core, dbt-cloud, dagster, snowflake, apache-iceberg, airbyte, duckdb, onehouse, great-expectations, soda, elementary, data-vault, data-contracts, openmetadata, finops, flake8 |
+| cloud | 133 | 11 | S3, S3-tables, IAM, Glue, Athena, CloudWatch, KMS, Secrets Manager, Fargate, EMR, GCP |
+| devops-sre | 124 | 9 | terraform, terragrunt, kubernetes, docker-compose, grafana, prometheus, uv, github, railway |
 | ai-ml | 81 | 6 | pydantic, crewai, langfuse, langflow, gemini, openrouter |
-| automation | 38 | 4 | streamlit, n8n, mermaid |
-| document-processing | 15 | 2 | docling |
+| automation | 38 | 3 | streamlit, n8n, mermaid |
+| document-processing | 15 | 1 | docling |
 
 Organized hierarchically under `.claude/kb/`. Snowflake KB includes Cortex Analyst, Semantic Views, Cortex ML Functions, Cortex Code, Interactive Tables, and OpenFlow.
 
