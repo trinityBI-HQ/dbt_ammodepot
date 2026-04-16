@@ -1,10 +1,13 @@
-# Snowflake + AWS Cost Monitor
+# Infra Monitor (`AD_ANALYTICS.OPS.INFRA_MONITOR`)
 
 Streamlit-in-Snowflake app that unifies Snowflake compute/storage spend with
 AWS infrastructure cost from the analytics pipeline (ECS Fargate, EC2 Airbyte,
-S3 Iceberg, CloudWatch, Secrets Manager).
+S3 Iceberg, CloudWatch, Secrets Manager) and dbt pipeline health monitoring.
 
-Runtime target: **SiS container runtime** (Streamlit 1.50+, full PyPI via
+> **Note:** Directory is named `streamlit_cost_monitor/` (kept to avoid CI churn from renaming).
+> The deployed app was renamed to `INFRA_MONITOR` on 2026-04-15.
+
+Runtime target: **SiS container runtime** (Streamlit 1.55+, full PyPI via
 `requirements.txt`, network egress via External Access Integration).
 
 ## Layout
@@ -18,14 +21,16 @@ streamlit_cost_monitor/
 ├── .streamlit/config.toml    # dark theme
 ├── pages/
 │   ├── 1_Snowflake_Compute.py   # KPIs + 90d trend + breakdowns + anomaly detector
-│   ├── 2_Snowflake_Storage.py
-│   ├── 3_AWS_Infrastructure.py  # MTD, daily 90d, monthly 6M
-│   └── 4_Combined.py            # SF + AWS + explicit allow-list
+│   ├── 2_Snowflake_Storage.py   # DB snapshot + 30d growth stacked area
+│   ├── 3_AWS_Infrastructure.py  # MTD, daily 90d, monthly 6M (boto3 via EAI)
+│   ├── 4_Combined.py            # 6M monthly SF+AWS trend, MTD totals
+│   └── 5_dbt_Pipeline.py        # Build duration chart, build health table, dbt docs link
 ├── utils/
 │   ├── config.py             # CREDIT_PRICE_USD, relevant AWS services, TTLs
 │   ├── db.py                 # Snowpark session (dual-mode)
 │   ├── snowflake_queries.py  # ACCOUNT_USAGE SQL
 │   ├── aws_costs.py          # boto3 Cost Explorer wrapper
+│   ├── cloudwatch_metrics.py # CloudWatch Metrics + Logs + S3 presigned URL
 │   └── chart_theme.py        # Plotly dark theme + dark_dataframe
 └── setup/
     ├── 01_bootstrap.sql           # ACCOUNTADMIN: schema, EAI, grants
@@ -90,7 +95,8 @@ Push to `main` with any change under `streamlit_cost_monitor/`. The workflow
 1. Fetches `SVC_DBT`'s private key from AWS Secrets Manager (`ammodepot/dbt/snowflake`)
 2. Writes a `snow` CLI config for `SVC_DBT` + `STREAMLIT_ROLE`
 3. Runs `snow streamlit deploy --replace` from `streamlit_cost_monitor/`
-4. Smoke-tests with `describe streamlit ad_analytics.ops.cost_monitor`
+4. Re-attaches EAI + secret via `snow sql` (deploy strips them)
+5. Smoke-tests with `describe streamlit ad_analytics.ops.infra_monitor`
 
 No new GitHub secrets needed — it reuses the `AWS_ACCESS_KEY_ID` and
 `AWS_SECRET_ACCESS_KEY` secrets that already back the dbt→ECS workflow.

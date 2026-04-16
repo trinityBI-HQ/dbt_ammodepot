@@ -196,7 +196,7 @@ aws events put-targets \
 ### Step 11: Verify and Cutover
 
 1. Watch 3-5 scheduled runs in CloudWatch
-2. Confirm all 99 models pass
+2. Confirm all 104 models pass
 3. Remove local crontab: `crontab -r`
 4. Pause/cancel dbt Cloud job
 

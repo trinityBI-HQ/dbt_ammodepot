@@ -21,11 +21,12 @@ flowchart TD
 
     LL --> SV[(Silver<br/>AD_ANALYTICS.SILVER<br/>69 views + 7 tables)]
 
-    SV --> GD[(Gold<br/>AD_ANALYTICS.GOLD<br/>13 tables + 10 views)]
+    SV --> GD[(Gold<br/>AD_ANALYTICS.GOLD<br/>14 tables + 14 views)]
 
     GD --> PBI[Power BI<br/>POWERBI_ROLE]
     GD --> ST[Streamlit<br/>Dashboard]
-    GD --> CM[Cost Monitor<br/>SiS App]
+    GD --> CM[Infra Monitor<br/>SiS App]
+    GD --> AI[AI Apps<br/>Analyst + Churn + Reorder]
 
     style S3 fill:#2e7d32,color:#fff
     style LL fill:#cd7f32,color:#fff
@@ -37,6 +38,7 @@ flowchart TD
     style PBI fill:#f2c811,color:#000
     style ST fill:#ff4b4b,color:#fff
     style CM fill:#ff4b4b,color:#fff
+    style AI fill:#6c4fb8,color:#fff
 ```
 
 ### Orchestration
@@ -81,8 +83,8 @@ flowchart LR
     subgraph AD_ANALYTICS["AD_ANALYTICS (TRANSFORMER_ROLE)"]
         LL[LAKEHOUSE_LANDING<br/>55 UNMANAGED Iceberg tables]
         SIL[SILVER<br/>69 views + 7 tables]
-        GOL[GOLD<br/>13 tables + 10 views]
-        OPS[OPS<br/>COST_MONITOR app]
+        GOL[GOLD<br/>14 tables + 14 views]
+        OPS[OPS<br/>INFRA_MONITOR + SALES_DASHBOARD + ANALYST]
     end
 
     AWS -->|External Volume<br/>+ Catalog Integration| LL
@@ -122,7 +124,12 @@ flowchart LR
 | Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (local + Streamlit in Snowflake) + Power BI |
-| Cost Monitoring | Snowsight dashboard (8 tiles) + Streamlit SiS app (`AD_ANALYTICS.OPS.COST_MONITOR`) |
+| Infra Monitoring | Snowsight dashboard (8 tiles) + Streamlit SiS app (`AD_ANALYTICS.OPS.INFRA_MONITOR`, 5 pages) |
+| AI Analyst | Cortex Analyst chatbot (`AD_ANALYTICS.OPS.ANALYST`) — text-to-SQL over Gold layer |
+| Demand Forecasting | Cortex ML FORECAST — 115 calibers + revenue, weekly Task, Page 4 |
+| Anomaly Detection | Cortex ML ANOMALY_DETECTION — revenue/orders/margin, Page 1 alerts |
+| Churn Narratives | CORTEX.COMPLETE (`gemini-2-5-flash`) — RFM segment health, Page 5 |
+| Reorder Intelligence | `F_REORDER_RECOMMENDATIONS` + CORTEX.COMPLETE — per-caliber reorder qty + vendor, Page 4 tab |
 | Secrets | AWS Secrets Manager (`ammodepot/dbt/snowflake`) |
 
 ---
@@ -150,34 +157,37 @@ dbt_ammodepot/
 │       │   ├── fishbowl/              # 34 ERP models
 │       │   ├── magento/               # 23 e-commerce models
 │       │   └── inventory/             # 19 quantity calculation models
-│       └── gold/                      # 13 table models + 10 intermediate views
-│           ├── intermediate/          # 10 reusable view models (3 override to table)
+│       └── gold/                      # 14 table models + 14 intermediate views
+│           ├── intermediate/          # 14 reusable view models (3 override to table)
 │           ├── d_customer.sql, d_customer_segmentation.sql, d_product.sql
 │           ├── d_product_bundle.sql, d_store.sql, d_vendor.sql
 │           ├── f_inventoryview.sql, f_pos.sql, f_sales.sql, f_shippment.sql
-│           ├── f_cohort.sql, f_cohort_detailed.sql
-│           └── f_sales_realtime.sql
-├── streamlit_app/                     # BI dashboard (local + SiS)
+│           ├── f_cohort.sql, f_cohort_detailed.sql, f_sales_realtime.sql
+│           └── f_reorder_recommendations.sql  # AI Phase 5: per-caliber reorder intelligence
+├── streamlit_app/                     # BI dashboard (local + SiS) — 5 pages
 │   ├── app.py                         # Local entry point
 │   ├── streamlit_app.py               # Streamlit in Snowflake entry point
 │   ├── pages/
-│   │   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering
+│   │   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering + anomaly alerts
 │   │   ├── 2_Sales_Overview.py        # Historical sales with category drilldown
-│   │   └── 3_Inventory.py             # Inventory, vendor analysis, open POs
+│   │   ├── 3_Inventory.py             # Inventory, vendor analysis, open POs
+│   │   ├── 4_Forecast.py             # Demand forecast + 4 tabs incl. Reorder Recommendations
+│   │   └── 5_Customer_Intelligence.py # RFM segment health + CORTEX.COMPLETE summary
 │   └── utils/
 │       ├── chart_theme.py             # Unified dark theme (Plotly + HTML tables)
 │       ├── db.py                      # Query runner with local/SiS dual-mode
 │       └── zip3_coords.py             # ZIP3 centroid lookup for geographic maps
-├── streamlit_cost_monitor/            # Cost monitoring app (SiS container runtime)
+├── streamlit_cost_monitor/            # Infra Monitor app (SiS container runtime) — dir kept to avoid CI churn
 │   ├── streamlit_app.py               # Entry point (SiS + local)
 │   ├── snowflake.yml                  # SiS definition v2 — container runtime
 │   ├── pages/
 │   │   ├── 1_Snowflake_Compute.py     # MTD KPIs, daily trend, anomaly detection
 │   │   ├── 2_Snowflake_Storage.py     # DB snapshot + 30d growth
 │   │   ├── 3_AWS_Infrastructure.py    # MTD KPIs, daily/monthly service spend (boto3)
-│   │   └── 4_Combined.py             # 6M monthly SF+AWS trend, MTD totals
+│   │   ├── 4_Combined.py             # 6M monthly SF+AWS trend, MTD totals
+│   │   └── 5_dbt_Pipeline.py          # Build duration chart, health table, dbt docs link
 │   └── utils/
-│       ├── config.py, db.py, snowflake_queries.py, aws_costs.py
+│       ├── config.py, db.py, snowflake_queries.py, aws_costs.py, cloudwatch_metrics.py
 │       └── setup/                     # SQL bootstrap scripts
 ├── ecs/                               # ECS Fargate deployment artifacts
 │   ├── Dockerfile
@@ -243,10 +253,11 @@ Consumption-ready facts and dimensions. All columns use `UPPER_CASE` aliases for
 | `f_cohort` | Fact | Customer cohort analysis |
 | `f_cohort_detailed` | Fact | Detailed cohort metrics |
 | `f_sales_realtime` | View | Real-time sales feed (filtered view of f_sales) |
+| `f_reorder_recommendations` | Fact | Per-caliber reorder qty + vendor (AI Phase 5) |
 
 ### Intermediate Views
 
-10 reusable pre-computations in the `gold` schema. Three high-cost nodes override to `table`: `int_fishbowl_order_cost`, `int_magento_product_eav_lookups`, `int_sales_cost_fallback`.
+14 reusable pre-computations in the `gold` schema. Three high-cost nodes override to `table`: `int_fishbowl_order_cost`, `int_magento_product_eav_lookups`, `int_sales_cost_fallback`.
 
 ---
 
@@ -314,7 +325,7 @@ The Snowflake project runs on ECS Fargate Spot, triggered by EventBridge every 1
 | Cluster | `ammodepot-dbt` (us-east-1, Fargate Spot) |
 | Task | `ammodepot-dbt-build` (0.5 vCPU, 1 GB) |
 | Schedule | `rate(10 minutes)` via EventBridge |
-| Runtime | ~6 min per run (99 models + Iceberg refresh x55) |
+| Runtime | ~6 min per run (104 models + Iceberg refresh x55) |
 | Secrets | `ammodepot/dbt/snowflake` in Secrets Manager |
 | Logs | CloudWatch `/ecs/ammodepot-dbt` (14-day retention) |
 | Image | ECR `746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/dbt` |
@@ -324,15 +335,19 @@ Push to `main` — GitHub Actions builds and pushes to ECR automatically. The ne
 
 ---
 
-## Streamlit Dashboard
+## Streamlit Apps
 
-Replacement for Power BI dashboards. Runs locally against Snowflake and deploys to Streamlit in Snowflake (SiS).
+### Sales Dashboard (`AD_ANALYTICS.OPS.SALES_DASHBOARD`)
+
+5-page replacement for Power BI dashboards. Runs locally and deploys to SiS.
 
 | Page | Description |
 |------|-------------|
-| Today / Yesterday | Real-time sales with cross-filtering by category, manufacturer, vendor, SKU |
-| Sales Overview | Historical sales with category drilldown and trend charts |
-| Inventory | Inventory quantities, vendor analysis, open purchase orders |
+| 1 — Today / Yesterday | Real-time sales with cross-filtering + anomaly alert banner |
+| 2 — Sales Overview | Historical sales with category drilldown and trend charts |
+| 3 — Inventory | Inventory quantities, vendor analysis, open purchase orders |
+| 4 — Forecast | Demand forecast + 4 tabs: Stock-Out Risk, Caliber Forecast, Revenue Forecast, **Reorder Recommendations** |
+| 5 — Customer Intelligence | RFM segment health + CORTEX.COMPLETE executive summary |
 
 Run locally:
 
@@ -341,18 +356,26 @@ cd streamlit_app
 uv run streamlit run app.py
 ```
 
-The `utils/db.py` module detects SiS via the `_is_sis` flag and switches rendering paths (maps, clickable charts, and `st.dataframe` all have SiS-safe fallbacks).
+### Infra Monitor (`AD_ANALYTICS.OPS.INFRA_MONITOR`)
 
-## Streamlit Cost Monitor
-
-Deployed at `AD_ANALYTICS.OPS.COST_MONITOR` on SiS container runtime. Tracks Snowflake compute/storage and AWS infrastructure costs across 4 pages.
+Deployed at `AD_ANALYTICS.OPS.INFRA_MONITOR` on SiS container runtime. Tracks Snowflake compute/storage, AWS infrastructure costs, and dbt pipeline health across 5 pages.
 
 | Resource | Detail |
 |----------|--------|
 | Runtime | SiS container runtime (Streamlit 1.55+) |
 | Compute pool | `cost_monitor_pool` (CPU_X64_XS, ~$5/mo) |
-| Deployment | GitHub Actions (`deploy-streamlit-cost-monitor.yml`) on push |
+| Deployment | GitHub Actions (`deploy-streamlit-cost-monitor.yml`) on push to `streamlit_cost_monitor/` |
 | Viewers | `DASHBOARD_VIEWER_ROLE`, `POWERBI_READONLY_ROLE` |
+
+### Cortex Analyst Chatbot (`AD_ANALYTICS.OPS.ANALYST`)
+
+Natural language query interface powered by Snowflake Cortex Analyst + Semantic View. Covers 6 Gold tables with 20 verified golden queries.
+
+| Resource | Detail |
+|----------|--------|
+| Semantic View | `AD_ANALYTICS.GOLD.AMMODEPOT_ANALYST` |
+| Compute pool | `sales_dashboard_pool` (shared, ~$0 incremental) |
+| Deployment | GitHub Actions (`deploy-streamlit-analyst.yml`) on push to `streamlit_analyst/` |
 
 ---
 
@@ -385,5 +408,6 @@ Deployed at `AD_ANALYTICS.OPS.COST_MONITOR` on SiS container runtime. Tracks Sno
 
 | Project | Last Build | Result |
 |---------|------------|--------|
-| Snowflake (ECS Fargate) | 2026-04-07 | PASS=363 WARN=11 ERROR=0 — 99 models, ~6 min |
+| Snowflake (ECS Fargate) | 2026-04-16 | Pending — 104 models (added f_reorder_recommendations) |
+| Previous full build | 2026-04-07 | PASS=363 WARN=11 ERROR=0 — 103 models, ~6 min |
 | Redshift | Archived | Decommissioned — see `archive/projects/ammodepot/` |
