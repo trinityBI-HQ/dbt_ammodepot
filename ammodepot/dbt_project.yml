@@ -135,6 +135,10 @@ vars:
   ammodepot_shotgun_sporting_shot: "'7.5 Shot','8 Shot','9 Shot','7 Shot','6 Shot','5 Shot','4 Shot'"
   ammodepot_shotgun_defense_slug: "'00 Buck','Slug','OO Buck','000 Buck','4 Buck','Buckshot','1 Buck','2 Buck','3 Buck'"
 
+seeds:
+  ammodepot:
+    +query_tag: 'dbt:seed'
+
 tests:
   ammodepot:
     # Default warn severity: Airbyte CDC source data naturally has duplicate
@@ -146,9 +150,11 @@ models:
     silver:
       +schema: silver
       +materialized: view
+      +query_tag: 'dbt:silver'
       # High-fan-out Silver views materialized as tables to avoid
       # repeated QUALIFY ROW_NUMBER scans across Gold models
       fishbowl:
+        +query_tag: 'dbt:silver:fishbowl'
         fishbowl_soitem:
           +materialized: table
         fishbowl_product:
@@ -158,6 +164,7 @@ models:
         fishbowl_part:
           +materialized: table
       magento:
+        +query_tag: 'dbt:silver:magento'
         magento_sales_order_item:
           +materialized: table
         magento_sales_order:
@@ -173,6 +180,7 @@ models:
         magento_catalog_product_entity_text:
           +materialized: table
       inventory:
+        +query_tag: 'dbt:silver:inventory'
         inventory_qtyinventorytotals:
           +materialized: table
     gold:
