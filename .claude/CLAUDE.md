@@ -83,7 +83,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Linting | SQLFluff (Snowflake dialect) |
 | Python | uv (package manager) |
 | BI Dashboard | Streamlit (`AD_ANALYTICS.OPS.SALES_DASHBOARD`, SiS container runtime) + Snowsight dashboards |
-| Cost Monitoring | Snowsight dashboard (8 tiles) + Streamlit cost monitor app (`AD_ANALYTICS.OPS.COST_MONITOR`, SiS container runtime, GA) |
+| Infra Monitoring | Snowsight dashboard (8 tiles) + Streamlit infra monitor app (`AD_ANALYTICS.OPS.INFRA_MONITOR`, SiS container runtime, 5 pages: SF Compute, SF Storage, AWS Infra, Combined, dbt Pipeline) |
 | AI Analyst | Streamlit chatbot (`AD_ANALYTICS.OPS.ANALYST`, SiS container runtime) powered by Snowflake Cortex Analyst + Semantic View |
 | EC2 Maintenance | Bash scripts (cron-scheduled cleanup + disk alerts) |
 | Archive | Decommissioned Redshift project + old artifacts |
@@ -217,37 +217,44 @@ The standalone `ammodepot_lakehouse/` dbt-duckdb project was removed during cuto
 streamlit_app/                          # See "Streamlit Dashboard App" section above
 ```
 
-### Streamlit Cost Monitor App
+### Streamlit Infra Monitor App (renamed from Cost Monitor, 2026-04-15)
 
 ```
-streamlit_cost_monitor/
-├── streamlit_app.py               # Entry point (SiS + local)
+streamlit_cost_monitor/                    # Directory name kept to avoid CI churn
+├── streamlit_app.py               # Entry point (SiS)
+├── app.py                         # Entry point (local)
 ├── snowflake.yml                  # SiS definition v2 — container runtime, cost_monitor_pool
 ├── requirements.txt               # streamlit>=1.55, pandas, plotly, boto3, snowflake-snowpark-python
 ├── pages/
 │   ├── 1_Snowflake_Compute.py     # MTD KPIs, daily trend by warehouse + user, anomaly detector
 │   ├── 2_Snowflake_Storage.py     # DB snapshot + 30d growth stacked area
 │   ├── 3_AWS_Infrastructure.py    # MTD KPIs, daily/monthly service spend, boto3 via EAI
-│   └── 4_Combined.py              # 6M monthly SF+AWS trend, MTD totals
+│   ├── 4_Combined.py              # 6M monthly SF+AWS trend, MTD totals
+│   └── 5_dbt_Pipeline.py          # Build duration chart, build health table, dbt docs link
 ├── utils/
-│   ├── config.py                  # CREDIT_PRICE_USD, lookback windows, allow-list
+│   ├── config.py                  # CREDIT_PRICE_USD, lookback windows, CW constants, S3 docs config
 │   ├── db.py                      # Snowpark session (active session in SiS, key-pair local)
 │   ├── snowflake_queries.py       # All ACCOUNT_USAGE SQL (mtd_summary, daily_cost_*, anomalies)
-│   └── aws_costs.py               # boto3 Cost Explorer wrapper, dual-mode creds
+│   ├── aws_costs.py               # boto3 client factory (get_boto3_client), Cost Explorer queries
+│   └── cloudwatch_metrics.py      # CloudWatch Metrics + Logs queries, S3 presigned URL
 └── setup/
     ├── 01_bootstrap.sql           # ACCOUNTADMIN one-time: schema, stage, compute pool, EAI
     ├── 02_create_secret.sql       # Write real AWS key to Snowflake secret
     ├── 03_post_deploy.sql         # Attach EAI + viewer grants (now superseded by CI step)
-    └── 04_fix_pypi_access.sql     # Add PyPI egress to EAI (one-time fix, 2026-04-09)
+    ├── 04_fix_pypi_access.sql     # Add PyPI egress to EAI (one-time fix, 2026-04-09)
+    ├── 05_add_cloudwatch_egress.sql  # Add CloudWatch + Logs + S3 egress to EAI
+    └── 06_rename_and_grant.sql    # Drop old COST_MONITOR, re-grant viewers on INFRA_MONITOR
 ```
 
-- **Deployed to**: `AD_ANALYTICS.OPS.COST_MONITOR` (SiS container runtime, Streamlit 1.55+)
+- **Deployed to**: `AD_ANALYTICS.OPS.INFRA_MONITOR` (SiS container runtime, Streamlit 1.55+)
 - **Compute pool**: `cost_monitor_pool` (CPU_X64_XS, 1 node, auto-suspend 300s, ~$5/mo)
-- **EAI**: `aws_cost_explorer_integration` — egress to `ce.us-east-1.amazonaws.com` + `pypi.org` + `files.pythonhosted.org`
+- **EAI**: `aws_cost_explorer_integration` — egress to CE + PyPI + CloudWatch + Logs + S3
 - **Secret**: `AD_ANALYTICS.OPS.AWS_COST_EXPLORER_CREDS` — generic-string `{"access_key":...,"secret_key":...}` for IAM user `svc_snowflake_costs`
+- **IAM**: `svc_snowflake_costs` policy `InfraMonitorReadOnly` — CE + CloudWatch + Logs + S3 (dbt-docs prefix)
 - **CI/CD**: `.github/workflows/deploy-streamlit-cost-monitor.yml` — triggers on push to `streamlit_cost_monitor/`; re-attaches EAI + secret after every `snow streamlit deploy --replace`
-- **Container runtime secret access**: `_snowflake` module not available in container runtime; secret NOT exposed as env var `AWS_COST_EXPLORER_CREDS` (env var name TBD — diagnostic error added to log all env-var keys when secret load fails)
-- **ACCOUNT_USAGE queries**: All wrapped in `st.cache_data(ttl="1h")`; credit allocation by user uses proportional `execution_time` per warehouse-hour
+- **dbt Docs CI**: `.github/workflows/deploy-dbt-docs.yml` — triggers on push to `ammodepot/`; runs `dbt docs generate --static`, uploads `static_index.html` to `s3://ammodepot-lakehouse/dbt-docs/index.html`
+- **dbt Docs access**: Page 5 generates 1-hour presigned S3 URL via `st.link_button` (SiS CSP blocks iframes to external URLs)
+- **ACCOUNT_USAGE queries**: All wrapped in `st.cache_data(ttl="1h")`; CloudWatch queries cached 5 min
 - **Viewers**: `DASHBOARD_VIEWER_ROLE` + `POWERBI_READONLY_ROLE` granted USAGE on Streamlit object
 
 ### Streamlit Analyst App (Cortex Analyst Chatbot)
@@ -504,9 +511,9 @@ Migrated 2026-04-14 — `AD_ANALYTICS.OPS.SALES_DASHBOARD` (3 pages, container r
 - Migrated from `go.Scattermapbox` to `go.Scattermap` (Plotly MapLibre migration)
 - Viewers: `DASHBOARD_VIEWER_ROLE` + `POWERBI_READONLY_ROLE` granted USAGE on Streamlit object
 
-### Streamlit Cost Monitor (SiS container runtime)
+### Streamlit Infra Monitor (SiS container runtime)
 
-Built 2026-04-09 — `AD_ANALYTICS.OPS.COST_MONITOR` (4 pages, container runtime):
+Renamed 2026-04-15 — `AD_ANALYTICS.OPS.INFRA_MONITOR` (5 pages, container runtime):
 - Deployed via GitHub Actions (`deploy-streamlit-cost-monitor.yml`)
 - PyPI access: requires `pypi_rule` in EAI (added `04_fix_pypi_access.sql`)
 - `--replace` strips EAI on every deploy: CI step re-attaches via `ALTER STREAMLIT SET`
