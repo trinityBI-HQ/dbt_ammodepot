@@ -178,16 +178,16 @@ def load_stockout_risk() -> pd.DataFrame:
 # ── Reorder Intelligence ─────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def load_caliber_evaluate() -> pd.DataFrame:
-    """Run CALIBER_FORECAST!EVALUATE() — cross-validated backtesting metrics per caliber."""
+def load_caliber_evaluate() -> tuple[pd.DataFrame, str]:
+    """Run CALIBER_FORECAST!EVALUATE() — cross-validated backtesting metrics per caliber.
+
+    Returns (df, error_msg). Error_msg is empty string on success.
+    """
     try:
-        return run_query("""
-            select *
-            from table(ad_analytics.gold.caliber_forecast!evaluate())
-            order by mape asc nulls last
-        """)
-    except Exception:
-        return pd.DataFrame()
+        df = run_query("CALL ad_analytics.gold.caliber_forecast!EVALUATE()")
+        return df, ""
+    except Exception as e:
+        return pd.DataFrame(), str(e)
 
 
 @st.cache_data(ttl="10m", show_spinner=False)
@@ -627,11 +627,17 @@ with tab_accuracy:
     )
 
     with st.spinner("Running model evaluation..."):
-        eval_df = load_caliber_evaluate()
+        eval_df, eval_err = load_caliber_evaluate()
 
-    if eval_df.empty:
-        st.info("Evaluation not available. The CALIBER_FORECAST model may not be trained yet.")
+    if not eval_df.empty:
+        pass  # fall through to rendering below
+    elif eval_err:
+        st.error(f"Evaluation error: {eval_err}")
+        st.stop()
     else:
+        st.info("Evaluation not available. The CALIBER_FORECAST model may not be trained yet.")
+
+    if not eval_df.empty:
         eval_cols = [c for c in ["SERIES", "MAPE", "MAE", "RMSE", "WMAPE", "COVERAGE"] if c in eval_df.columns]
         if eval_cols:
             col_a, col_b, col_c = st.columns(3)
