@@ -46,7 +46,7 @@ st.markdown(
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
-LLM_MODEL = "gemini-2-5-flash"
+LLM_MODEL = "llama3.1-70b"
 LLM_CACHE_TTL = 600  # seconds — matches dbt build cadence
 
 CONCERNING_SEGMENTS = {

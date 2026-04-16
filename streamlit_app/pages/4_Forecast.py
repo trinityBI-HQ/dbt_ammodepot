@@ -237,7 +237,7 @@ def load_forecast_vs_actual(lookback_days: int = 30) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-LLM_MODEL_REORDER = "gemini-2-5-flash"
+LLM_MODEL_REORDER = "llama3.1-70b"
 LLM_CACHE_TTL_REORDER = 600  # seconds — matches dbt build cadence
 
 
