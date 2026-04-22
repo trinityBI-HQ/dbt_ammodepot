@@ -3,7 +3,7 @@
 {{
     config(
         target_schema='gold',
-        unique_key='rank_id',
+        unique_key='customer_email',
         strategy='check',
         check_cols=[
             'customer_classification',

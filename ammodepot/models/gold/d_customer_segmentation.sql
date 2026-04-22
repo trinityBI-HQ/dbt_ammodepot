@@ -193,6 +193,10 @@ customer_entity_cte as (
       email           as customer_email,
       customer_group_id
     from {{ ref('magento_customer_entity') }}
+    qualify row_number() over (
+      partition by lower(email)
+      order by customer_id asc
+    ) = 1
 )
 
 select
