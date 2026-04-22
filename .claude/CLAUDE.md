@@ -499,7 +499,7 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 ### Snowflake (Production — ECS Fargate, Iceberg-backed)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
 - **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
-- **Last build**: PASS=389, WARN=13, ERROR=0 (104 models + 1 snapshot, ~3.5 min — 2026-04-16)
+- **Last build**: PASS=390, WARN=12, ERROR=0 (104 models + 1 snapshot, ~3.5 min — 2026-04-22). Snapshot fix (PR #18) cleared the persistent ERROR and dropped the `unique_d_customer_segmentation_RANK_ID` WARN permanently via a QUALIFY dedup on `customer_entity_cte`.
 - **Previous full build**: PASS=363, WARN=11, ERROR=0 (103 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
 - **Build duration**: ~3.5 min steady state (209s). Was ~6 min post-Iceberg; EAV fix (2026-04-08) cut to ~3.2 min; `int_fishbowl_order_cost` Phase A (2026-04-16) saved another ~15s. Current headroom: ~65% of 10-min window.
 - **int_fishbowl_order_cost**: Phase A complete (54s → 46s) — eliminated 5th `fishbowl_soitem` scan, removed dead CTE chain, replaced `SELECT f.*`. Phase B (window function rewrite) deferred — monitor PBI cost columns for a few days first.
