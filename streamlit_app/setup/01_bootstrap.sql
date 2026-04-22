@@ -82,13 +82,12 @@ create or replace external access integration sales_dashboard_integration
 grant usage on integration sales_dashboard_integration to role streamlit_role;
 
 -- ---------------------------------------------------------------------------
--- 5. FinOps tags (deferred — GOVERNANCE database not yet provisioned)
+-- 5. FinOps tags (GOVERNANCE.TAGS provisioned by snowflake_setup/01_governance_tags.sql)
 -- ---------------------------------------------------------------------------
--- Uncomment after creating GOVERNANCE.TAGS schema with service/client tags:
---
--- alter compute pool sales_dashboard_pool set tag
---     governance.tags.service = 'streamlit',
---     governance.tags.client  = 'ammodepot';
+
+alter compute pool sales_dashboard_pool set tag
+    governance.tags.service = 'streamlit',
+    governance.tags.client  = 'ammodepot';
 
 -- ---------------------------------------------------------------------------
 -- 6. Viewer grants

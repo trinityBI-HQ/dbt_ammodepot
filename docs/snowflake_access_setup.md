@@ -184,7 +184,11 @@ CREATE USER SVC_DBT
     COMMENT = 'Service account for dbt transformation';
 
 GRANT ROLE TRANSFORMER_ROLE TO USER SVC_DBT;
-ALTER USER SVC_DBT SET QUERY_TAG = 'dbt-transformation';
+ALTER USER SVC_DBT SET QUERY_TAG = 'dbt';
+-- Session default only — per-model `+query_tag` values in dbt_project.yml
+-- override this for every ref()-driven query (dbt:silver:*, dbt:gold:*, etc).
+-- The default surfaces only for on-run-start hooks, source freshness, and
+-- snapshot/metadata queries.
 ```
 
 > `TYPE = SERVICE` requires Snowflake 2023_07 behavior change bundle (enabled by default since late 2023).
@@ -208,21 +212,23 @@ openssl rsa -in projects/ammodepot/dbt_rsa_key.p8 -pubout -outform DER 2>/dev/nu
 ## 7. Security hardening
 
 
-### 7.1 Object tagging
+### 7.1 Object tagging (FinOps)
 
-Tag resources for governance and cost attribution:
+All governance tags live in `GOVERNANCE.TAGS` per `.claude/rules/snowflake-finops-tagging.md`. The full DDL (schema + tag objects + applications to users/warehouses/pools/databases) is in `snowflake_setup/01_governance_tags.sql`. Apply with:
 
-```sql
-USE ROLE ACCOUNTADMIN;
-
-CREATE TAG IF NOT EXISTS cost_center;
-CREATE TAG IF NOT EXISTS environment;
-
-ALTER WAREHOUSE ETL_WH SET TAG cost_center = 'data-engineering';
-ALTER DATABASE AD_AIRBYTE SET TAG environment = 'production';
-ALTER SCHEMA AD_AIRBYTE.SILVER SET TAG environment = 'production';
-ALTER SCHEMA AD_AIRBYTE.GOLD SET TAG environment = 'production';
+```bash
+snow sql -f snowflake_setup/01_governance_tags.sql  # as ACCOUNTADMIN
 ```
+
+Provides three independent cost-attribution dimensions at query time:
+
+| Dimension | Applied To | Values |
+|---|---|---|
+| `service` | Users, Warehouses, Compute Pools | `dbt`, `airbyte`, `powerbi`, `streamlit`, `shared-etl`, ... |
+| `environment` | Databases, Schemas | `dev`, `staging`, `prod` |
+| `client` | Warehouses, Databases, Pools | `ammodepot` (multi-tenant dimension) |
+
+The dbt project layer (`dbt:silver:fishbowl`, `dbt:gold`, etc.) is the fourth dimension, applied via `+query_tag` in `ammodepot/dbt_project.yml`.
 
 ## 8. Validate
 
@@ -362,7 +368,8 @@ ALTER USER <SVC_AIRBYTE or SVC_DBT> UNSET RSA_PUBLIC_KEY_2;
 | Warehouse | `ETL_WH` (shared) |
 | Access | OWNERSHIP on `SILVER` and `GOLD` schemas, SELECT on source schemas |
 | Auth Policy | KEYPAIR only (programmatic clients) |
-| Query Tag | `dbt-transformation` |
+| Query Tag (session default) | `dbt` — overridden per-query by model-level `+query_tag` (`dbt:silver:*`, `dbt:gold`, etc.) |
+| Governance Tag | `GOVERNANCE.TAGS.service = 'dbt'` on USER object (see `snowflake_setup/01_governance_tags.sql`) |
 
 ### Power BI (consumption)
 

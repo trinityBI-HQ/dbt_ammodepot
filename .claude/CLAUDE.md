@@ -36,7 +36,7 @@ AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
 ```
 
 - **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI), `POWERBI_READONLY_ROLE` (Gold + Streamlit viewer), `STREAMLIT_ROLE` (app owner), `DASHBOARD_VIEWER_ROLE` (SSO viewers)
-- **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `SVC_POWERBI` (password), `POWERBI_READER` (password, POWERBI_READONLY_ROLE)
+- **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `POWERBI_READER` (password, `POWERBI_READONLY_ROLE` — carries actual PBI credits), `POWERBI_AD` (AD-synced PBI account), `PC_FIVETRAN_USER` (legacy Fivetran, low usage). `SVC_POWERBI` was documented in `docs/snowflake_access_setup.md` §11 but never provisioned. Legacy `AIRBYTE` user (pre-SVC naming) also exists — verify before tagging.
 - **Warehouses**: `ETL_WH` (XSMALL, auto-suspend 60s, Airbyte + dbt), `COMPUTE_WH` (XSMALL, BI — used by Power BI, do NOT rename/drop/suspend)
 - **Legacy warehouse**: `PC_FIVETRAN_WH` (suspended, auto-resume OFF — was $540/mo)
 - **Query tags**: All users tagged via `QUERY_TAG` for cost attribution
