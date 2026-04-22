@@ -12,6 +12,7 @@ ammodepot:
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
       schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
       threads: 4
+      query_tag: 'dbt:source-freshness'
     dev:
       type: snowflake
       account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
@@ -23,3 +24,4 @@ ammodepot:
       warehouse: "{{ env_var('SNOWFLAKE_WAREHOUSE') }}"
       schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
       threads: 4
+      query_tag: 'dbt:source-freshness'
