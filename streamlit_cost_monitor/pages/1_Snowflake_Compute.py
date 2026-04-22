@@ -179,29 +179,71 @@ with col_user:
         apply_theme(fig, height=320, show_legend=False)
         st.plotly_chart(fig, width="stretch", theme=None)
 
-st.markdown("**By Query Tag**")
+st.markdown("**By Query Tag × Warehouse**")
 st.caption(
-    "All dbt runs are tagged via QUERY_TAG — use this to separate dbt spend "
-    "from Airbyte inserts, Streamlit sessions, and ad-hoc queries."
+    "Stacked by warehouse. Per-model `+query_tag` splits dbt by layer "
+    "(`dbt:silver:*`, `dbt:gold`, …); `<untagged>` rolls up Airbyte inserts, "
+    "Power BI reads, and ad-hoc queries."
 )
 tags = run_query(cost_by_query_tag_mtd())
 if tags.empty:
     st.info("No tagged queries MTD.")
 else:
-    fig = go.Figure(
-        go.Bar(
-            x=tags["DOLLARS"].astype(float).tolist(),
-            y=tags["QUERY_TAG"].tolist(),
-            orientation="h",
-            marker_color=WARNING,
-            text=[f"${v:,.0f}" for v in tags["DOLLARS"].astype(float)],
-            textposition="outside",
-            hovertemplate="%{y}: $%{x:,.2f}<extra></extra>",
+    tags = tags.copy()
+    tags["DOLLARS"] = tags["DOLLARS"].astype(float)
+
+    # Order tags by total dollars (largest bar on top after axis reverse).
+    tag_order = (
+        tags.groupby("QUERY_TAG")["DOLLARS"].sum().sort_values(ascending=False).index.tolist()
+    )
+
+    # Pivot to (tag × warehouse) matrix; NaN -> 0 so stacked bars align.
+    pivot = (
+        tags.pivot_table(
+            index="QUERY_TAG",
+            columns="WAREHOUSE_NAME",
+            values="DOLLARS",
+            aggfunc="sum",
+            fill_value=0.0,
+        )
+        .reindex(tag_order)
+    )
+
+    # Warehouse palette — ETL_WH and COMPUTE_WH are the two dominant ones;
+    # any others (e.g. suspended PC_FIVETRAN_WH) fall back to the default cycle.
+    palette = {"ETL_WH": ACCENT, "COMPUTE_WH": WARNING}
+    tag_totals = pivot.sum(axis=1)
+
+    fig = go.Figure()
+    for wh in pivot.columns:
+        fig.add_trace(
+            go.Bar(
+                name=wh,
+                y=pivot.index.tolist(),
+                x=pivot[wh].astype(float).tolist(),
+                orientation="h",
+                marker_color=palette.get(wh),
+                hovertemplate=f"{wh} — %{{y}}: $%{{x:,.2f}}<extra></extra>",
+            )
+        )
+
+    # Total-dollar labels on the outside of each stacked bar.
+    fig.add_trace(
+        go.Scatter(
+            x=tag_totals.values.tolist(),
+            y=tag_totals.index.tolist(),
+            mode="text",
+            text=[f"${v:,.0f}" for v in tag_totals.values],
+            textposition="middle right",
+            showlegend=False,
+            hoverinfo="skip",
         )
     )
+
+    fig.update_layout(barmode="stack")
     fig.update_yaxes(autorange="reversed")
     fig.update_xaxes(tickprefix="$", tickformat=",.0f")
-    apply_theme(fig, height=max(240, 28 * len(tags)), show_legend=False)
+    apply_theme(fig, height=max(280, 32 * len(pivot)), show_legend=True)
     st.plotly_chart(fig, width="stretch", theme=None)
 
 st.divider()

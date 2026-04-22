@@ -124,7 +124,6 @@ else:
                 y=pivot[col].tolist(),
                 mode="lines",
                 name=col,
-                stackgroup="one",
                 hovertemplate="%{x|%Y-%m-%d}<br>" + col + ": $%{y:,.2f}<extra></extra>",
             )
         )

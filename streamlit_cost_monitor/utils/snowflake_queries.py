@@ -253,13 +253,16 @@ order by dollars desc
 
 
 def cost_by_query_tag_mtd() -> str:
-    """Credit attribution by QUERY_TAG. Uses the same hourly-share allocation.
+    """Credit attribution by (QUERY_TAG, WAREHOUSE). Hourly-share allocation.
 
-    Relevant tags for this pipeline: ``dbt:gold``, ``dbt:silver``, Airbyte
-    inserts, Streamlit session tags. Untagged queries roll up to ``<untagged>``.
+    Two dimensions so the page can render a stacked bar: each tag bar is
+    split by warehouse, surfacing which tags run on shared vs. dedicated
+    warehouses. ETL_WH carries both Airbyte (untagged in query_tag) and
+    dbt layers; COMPUTE_WH carries Power BI.
 
-    Same HAVING gotcha as :func:`cost_by_user_mtd` — wraps the aggregation
-    in a subquery so ``credits`` resolves to the aggregated column.
+    Relevant tags: ``dbt``, ``dbt:silver:*``, ``dbt:gold[:intermediate]``,
+    ``dbt:snapshot``, ``dbt:seed``. Untagged queries (Airbyte inserts,
+    Power BI reads, ad-hoc) roll up to ``<untagged>``.
     """
     return f"""
 with wh_cost as (
@@ -289,19 +292,19 @@ tag_share as (
 allocated as (
     select
         t.query_tag,
+        t.warehouse_name,
         round(sum(w.credits * t.exec_ms / nullif(t.total_exec_ms, 0)), 2) as credits,
         round(sum(w.credits * t.exec_ms / nullif(t.total_exec_ms, 0)) * {_price()}, 2) as dollars
     from tag_share t
     join wh_cost w
         on t.warehouse_name = w.warehouse_name
        and t.hr            = w.hr
-    group by 1
+    group by 1, 2
 )
-select query_tag, credits, dollars
+select query_tag, warehouse_name, credits, dollars
 from allocated
 where credits > 0
 order by dollars desc
-limit 25
 """
 
 
