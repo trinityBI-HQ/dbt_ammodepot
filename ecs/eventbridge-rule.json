@@ -1,7 +1,7 @@
 {
   "Name": "ammodepot-dbt-build-schedule",
-  "Description": "Trigger dbt build every 10 minutes on ECS Fargate",
-  "ScheduleExpression": "rate(10 minutes)",
+  "Description": "Trigger dbt build at :05/:20/:35/:50 — synchronized 5 min before PBI's 15-min refresh windows (:00/:15/:30/:45)",
+  "ScheduleExpression": "cron(5,20,35,50 * * * ? *)",
   "State": "ENABLED",
   "Targets": [
     {
