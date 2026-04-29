@@ -112,19 +112,20 @@ streamlit_app/
 ├── setup/
 │   └── 01_bootstrap.sql           # ACCOUNTADMIN one-time: pool, EAI, network rules, grants
 ├── pages/
-│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering + anomaly alert banner (replaces PBI SALES OVERVIEW FASTER) ~1,355 lines
-│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,505 lines
+│   ├── 1_Today_Yesterday.py       # Real-time sales + cross-filtering + anomaly alert banner (replaces PBI SALES OVERVIEW FASTER) ~1,405 lines
+│   ├── 2_Sales_Overview.py        # Historical sales with category pages + cross-filtering (replaces PBI SALES OVERVIEW) ~1,527 lines
 │   ├── 3_Inventory.py             # Inventory + Vendor Analysis + Open POs (replaces PBI INVENTORY) ~1,272 lines
 │   ├── 4_Forecast.py             # Demand forecast + 5 tabs: Stock-Out Risk, Caliber Forecast, Revenue Forecast, Reorder Recommendations (+ Vendor Comparison), Forecast Accuracy (~697 lines)
 │   └── 5_Customer_Intelligence.py # RFM segment health + llama3.1-70b executive summary + MoM deltas (AI Phase 4) (~440 lines)
+├── test_forecast_backtest.py     # Forecast accuracy backtest harness
 └── utils/
     ├── __init__.py
     ├── chart_theme.py             # Unified dark theme for Plotly charts + HTML tables (~127 lines)
-    ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion (~155 lines)
-    └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps (~307 lines)
+    ├── db.py                      # Query runner, _is_sis flag, numeric/timestamp coercion (~158 lines)
+    └── zip3_coords.py             # 886-entry ZIP3→(lat,lon) centroid lookup for maps (~345 lines)
 ```
 
-**Total:** ~5,666 lines across 11 Python files
+**Total:** ~6,221 lines across 12 Python files
 
 ### Cross-Filtering (PBI-style)
 
@@ -206,7 +207,7 @@ ammodepot/
 └── analyses/
 ```
 
-**Snowflake Counts:** 104 models (34 FB + 23 MG + 19 Inv + 14 Gold + 14 Int), 1 snapshot, 1 seed, 60 source tables (34 FB + 25 MG + 1 UPS), 8 generic tests, 6 macros (3 root + 3 cross_db), 5 exposures
+**Snowflake Counts:** 104 models (34 FB + 23 MG + 19 Inv + 14 Gold + 14 Int), 1 snapshot, 1 seed, 56 source tables (34 FB + 21 MG + 1 UPS), 8 generic tests, 6 macros (3 root + 3 cross_db), 5 exposures
 
 ### Lakehouse (Iceberg via Snowflake — CUTOVER COMPLETE 2026-04-07)
 
@@ -410,7 +411,7 @@ archive/
 Inventory management / ERP system. Key tables: `so`, `soitem`, `product`, `part`, `vendor`, `ship`, `po`, `poitem`, `receipt`, `receiptitem`, `uomconversion`, `kititem`, `objecttoobject`
 - Redshift: `fishbowl` schema | Snowflake: `AD_AIRBYTE.AD_FISHBOWL`
 
-### Magento (25 tables both projects, 29 Airbyte streams)
+### Magento (21 tables in Snowflake project, 29 Airbyte streams)
 E-commerce platform. Key tables: `sales_order`, `sales_order_item`, `customer_entity`, `catalog_product_entity`, `quote`, `store`, EAV attribute tables (`eav_attribute`, `catalog_product_entity_varchar/int/text/decimal`)
 - Redshift: `magento` schema | Snowflake: `AD_AIRBYTE.AD_MAGENTO`
 
