@@ -17,7 +17,7 @@ Data is ingested via Airbyte CDC, then transformed through Bronze, Silver, and G
 ### Warehouse Migration (Complete)
 
 Migrated from **Amazon Redshift** to **Snowflake**. Redshift project archived.
-- **Snowflake** (`ammodepot/`): Production — 104 models, ECS Fargate orchestration every 10 min
+- **Snowflake** (`ammodepot/`): Production — 104 models, ECS Fargate orchestration every 15 min synced to PBI (cron at :05/:20/:35/:50)
 - **Redshift** (`archive/projects/ammodepot/`): Archived — no longer running
 - **Adapter**: dbt-snowflake 1.11.2
 
@@ -38,7 +38,7 @@ AD_AIRBYTE (legacy, no longer written to — kept readable for fallback)
 - **Roles**: `AIRBYTE_ROLE` (ingestion), `TRANSFORMER_ROLE` (dbt), `POWERBI_ROLE` (read-only BI), `POWERBI_READONLY_ROLE` (Gold + Streamlit viewer), `STREAMLIT_ROLE` (app owner), `DASHBOARD_VIEWER_ROLE` (SSO viewers)
 - **Service accounts**: `SVC_AIRBYTE` (key-pair), `SVC_DBT` (key-pair), `POWERBI_READER` (password, `POWERBI_READONLY_ROLE` — carries actual PBI credits), `POWERBI_AD` (AD-synced PBI account), `PC_FIVETRAN_USER` (legacy Fivetran, low usage). `SVC_POWERBI` was documented in `docs/snowflake_access_setup.md` §11 but never provisioned. Legacy `AIRBYTE` user (pre-SVC naming) also exists — verify before tagging.
 - **Warehouses**: `ETL_WH` (XSMALL, auto-suspend 60s, Airbyte + dbt), `COMPUTE_WH` (XSMALL, BI — used by Power BI, do NOT rename/drop/suspend)
-- **Legacy warehouse**: `PC_FIVETRAN_WH` (suspended, auto-resume OFF — was $540/mo)
+- **Legacy warehouse**: `PC_FIVETRAN_WH` (was $540/mo Fivetran). NOT fully dormant — `POWERBI_AD` still runs ~286 queries/week here (likely a stray dataflow refresh). Audit + kill or migrate to COMPUTE_WH as a follow-up.
 - **Query tags**: All users tagged via `QUERY_TAG` for cost attribution
 - **Cost monitoring**: Snowsight dashboard "Snowflake Cost & Usage Monitor" (8 tiles, see `docs/SNOWFLAKE_COST_DASHBOARD.md`)
 - **Pre-cutover credits (30d)**: ETL_WH ~2,053 ($6,159), COMPUTE_WH ~62 ($186), total ~2,464 credits ($7,392)
@@ -76,7 +76,7 @@ Airbyte CDC (Fishbowl, Magento)
 | Warehouse | Snowflake (production, reads Iceberg via External Volume) |
 | Ingestion | Airbyte CDC on EC2 c6a.2xlarge → S3 Iceberg (Glue catalog). Legacy → Snowflake connections inactive 2026-04-07 |
 | Bronze refresh | `on-run-start` hook: `ALTER ICEBERG TABLE ... REFRESH` for all 55 LAKEHOUSE_LANDING tables before each build |
-| Orchestration | ECS Fargate Spot (every 10 min) + EventBridge scheduler |
+| Orchestration | ECS Fargate Spot (every 15 min, synced to PBI: cron `5,20,35,50 * * * ? *` UTC — fires 5 min before each PBI :00/:15/:30/:45 refresh) + EventBridge scheduler |
 | CI/CD | GitHub Actions → ECR on push to main (path-filtered: ammodepot/, ecs/); Streamlit deploys via `snow streamlit deploy` (path-filtered: streamlit_app/, streamlit_cost_monitor/, streamlit_analyst/) |
 | Packages | dbt_utils |
 | Cross-db macros | `adapter.dispatch` for `json_extract_text`, `convert_tz`, `string_agg`, `format_timestamp` |
@@ -323,7 +323,7 @@ ecs/
 ├── deploy.sh                  # Manual deploy fallback (build + push to ECR)
 ├── pyproject.toml             # Minimal deps: dbt-core + dbt-snowflake
 ├── task-definition.json       # 0.5 vCPU, 1 GB, Secrets Manager refs
-├── eventbridge-rule.json      # rate(10 minutes) trigger
+├── eventbridge-rule.json      # cron(5,20,35,50 * * * ? *) — sync 5 min ahead of PBI
 ├── iam-policies/              # Least-privilege IAM role policies
 │   ├── task-execution-trust.json
 │   ├── task-execution-role.json
@@ -335,7 +335,7 @@ ecs/
 - **CI/CD**: GitHub Actions (`deploy-ecs.yml`) auto-builds + pushes to ECR on push to main (path-filtered: ammodepot/, ecs/)
 - **Cluster**: `ammodepot-dbt` (Fargate Spot, us-east-1)
 - **Task**: `ammodepot-dbt-build` (0.5 vCPU, 1 GB, ~3 min/run)
-- **Schedule**: EventBridge `rate(10 minutes)` — picks up new `:latest` image automatically
+- **Schedule**: EventBridge `cron(5,20,35,50 * * * ? *)` UTC — fires 5 min before each PBI :00/:15/:30/:45 refresh; picks up new `:latest` image automatically
 - **Network**: Private subnets in airbyte-project VPC
 - **Secrets**: `ammodepot/dbt/snowflake` (Secrets Manager — RSA key + passphrase)
 - **Logs**: CloudWatch `/ecs/ammodepot-dbt`
@@ -498,10 +498,10 @@ aws ecr describe-images --repository-name ammodepot/dbt --profile ammodepot
 
 ### Snowflake (Production — ECS Fargate, Iceberg-backed)
 - **dbt-core**: 1.11.6 with dbt-snowflake 1.11.2 (ECS image rebuilds may pull newer minor versions, currently 1.11.7 / 1.11.4)
-- **Orchestration**: ECS Fargate Spot, every 10 min via EventBridge (~$3.70/mo, replaces dbt Cloud at $663/mo)
+- **Orchestration**: ECS Fargate Spot, every 15 min synced to PBI via EventBridge cron (~$2.50/mo Fargate, replaces dbt Cloud at $663/mo). Cadence dropped from 10 min on 2026-04-28: 96 builds/day vs 144, saves ~$617/mo / ~$7.4K/yr on ETL_WH credits.
 - **Last build**: PASS=390, WARN=12, ERROR=0 (104 models + 1 snapshot, ~3.5 min — 2026-04-22). Snapshot fix (PR #18) cleared the persistent ERROR and dropped the `unique_d_customer_segmentation_RANK_ID` WARN permanently via a QUALIFY dedup on `customer_entity_cte`.
 - **Previous full build**: PASS=363, WARN=11, ERROR=0 (103 models + 277 tests, ~6 min — 2026-04-07, post-Iceberg-cutover)
-- **Build duration**: ~3.5 min steady state (209s). Was ~6 min post-Iceberg; EAV fix (2026-04-08) cut to ~3.2 min; `int_fishbowl_order_cost` Phase A (2026-04-16) saved another ~15s. Current headroom: ~65% of 10-min window.
+- **Build duration**: ~3.5 min steady state (209s). Was ~6 min post-Iceberg; EAV fix (2026-04-08) cut to ~3.2 min; `int_fishbowl_order_cost` Phase A (2026-04-16) saved another ~15s. Current headroom: ~75% of 15-min window (5 min runway before PBI hits).
 - **int_fishbowl_order_cost**: Phase A complete (54s → 46s) — eliminated 5th `fishbowl_soitem` scan, removed dead CTE chain, replaced `SELECT f.*`. Phase B (window function rewrite) deferred — monitor PBI cost columns for a few days first.
 - **Audit (2026-03-25)**: P0-P3 implemented — parameterized business logic (RFM thresholds, product classification), 40+ new tests, exposures, source freshness, dead code cleanup
 - **Dialect fixes applied**: CEILING->CEIL, IS FALSE->= false, varchar/numeric implicit cast, json_extract_text macro
@@ -570,7 +570,7 @@ Built + Shipped 2026-04-16 — RFM segment health dashboard with LLM executive s
 ### Inventory Reorder Intelligence (AI Phase 5 — In Progress)
 
 Built 2026-04-16 — prescriptive purchasing recommendations per caliber:
-- **New Gold table**: `F_REORDER_RECOMMENDATIONS` — per-caliber REORDER_QTY, URGENCY, RECOMMENDED_VENDOR, ESTIMATED_ORDER_COST. Refreshed every 10 min by ECS dbt build.
+- **New Gold table**: `F_REORDER_RECOMMENDATIONS` — per-caliber REORDER_QTY, URGENCY, RECOMMENDED_VENDOR, ESTIMATED_ORDER_COST. Refreshed every 15 min by ECS dbt build.
 - **Formula**: `REORDER_QTY = GREATEST(0, DEMAND_UPPER_30D - QTY_AVAILABLE - QTY_ON_ORDER)` — UPPER_BOUND from F_FORECAST acts as ML-backed safety buffer
 - **Vendor**: Lowest avg `PRECISE_LEADTIME` from F_POS per caliber
 - **Page 4 tab**: New "Reorder Recommendations" tab in Sales Dashboard Page 4 — LLM brief, 3 KPI cards, urgency filter, reorder table
@@ -585,7 +585,7 @@ Built 2026-04-16 — prescriptive purchasing recommendations per caliber:
 
 - **Snapshot**: `SNAP_CUSTOMER_SEGMENTATION` in `AD_ANALYTICS.GOLD` — check strategy on `customer_classification`, `frequency`, `recency`, `value`, `margin_classification`
 - **Purpose**: Enables MoM segment deltas on Page 5 (Customer Intelligence). First 30 days builds history; MoM column shows `+N`/`-N` per segment after 2026-05-16.
-- **Cadence**: Runs after every `dbt build` (every 10 min, non-fatal). `check` strategy means rows only written when classifications change — idempotent.
+- **Cadence**: Runs after every `dbt build` (every 15 min, non-fatal). `check` strategy means rows only written when classifications change — idempotent.
 - **`invalidate_hard_deletes=true`**: Customers dropping out of the 12-month window get `dbt_valid_to` set automatically.
 - **Initial population**: 951,760 rows on first run (2026-04-16).
 
@@ -618,7 +618,7 @@ Airbyte CDC → S3 Iceberg (Glue catalog) → Snowflake LAKEHOUSE_LANDING → db
 - **IAM**: `svc_airbyte-s3` (S3 + Glue write), `snowflake-lakehouse-role` (S3 + Glue read)
 - **Refresh**: dbt `on-run-start` hook calls `ALTER ICEBERG TABLE ... REFRESH` on all 55 (UNMANAGED tables — no auto-refresh)
 - **Why Option B over full DuckDB**: DuckDB saved ~$4,152/yr more but added 4 helper scripts, Iceberg write bugs, OOM, 3-4hr initial loads. Option B has near-zero complexity for 85% of the savings.
-- **Followups**: Build duration is at 60% of 10-min schedule (refresh hook is the main cost — parallelization planned). PBI dataflow refresh frequency separately owned by data@ammunitiondepot.com.
+- **Followups**: Build duration is at ~25% of 15-min schedule (5 min runway before PBI). PBI confirmed empirically as 15-min cadence at :00/:15/:30/:45 (RAFAELA on COMPUTE_WH); secondary low-volume PBI activity on PC_FIVETRAN_WH (POWERBI_AD, ~286 q/wk) — worth auditing whether that schedule should be killed.
 
 ---
 
