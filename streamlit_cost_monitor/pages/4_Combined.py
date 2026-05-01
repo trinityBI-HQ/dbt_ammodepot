@@ -94,9 +94,20 @@ st.divider()
 
 st.subheader(f"Monthly Cost ({AWS_MONTHLY_HISTORY_MONTHS}M)")
 st.caption(
-    "Calendar-month totals, Snowflake compute + AWS infrastructure (relevant "
-    "services only). The most recent bucket is **the current month so far** — "
+    "Calendar-month totals, Snowflake compute + AWS infrastructure. "
+    "The most recent bucket is **the current month so far** — "
     "compare it to prior **full** months with that caveat in mind."
+)
+
+show_all_monthly = st.checkbox(
+    "Show all services (not just pipeline-relevant)",
+    value=False,
+    key="combined_monthly_show_all",
+    help=(
+        "By default the AWS bar only counts services used by the analytics "
+        "pipeline (`AWS_RELEVANT_SERVICES` in `utils/config.py`). Toggle on to "
+        "include every AWS service billed in the window."
+    ),
 )
 
 # --- Snowflake monthly totals -------------------------------------------------
@@ -124,11 +135,11 @@ else:
     aws_monthly_raw = pd.DataFrame()
 
 if not aws_monthly_raw.empty:
+    aws_filtered = (
+        aws_monthly_raw if show_all_monthly else aws_monthly_raw[aws_monthly_raw["relevant"]]
+    )
     aws_monthly = (
-        aws_monthly_raw[aws_monthly_raw["relevant"]]
-        .groupby("month")["dollars"]
-        .sum()
-        .reset_index()
+        aws_filtered.groupby("month")["dollars"].sum().reset_index()
     )
 else:
     aws_monthly = pd.DataFrame(columns=["month", "dollars"])
