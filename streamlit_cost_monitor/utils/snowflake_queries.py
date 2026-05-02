@@ -12,9 +12,18 @@ Query numbering follows the dashboard layout:
   1.x — Top-line spend (daily trend, MTD scorecards)
   2.x — Dimensional breakdowns (warehouse, user, query_tag)
   3.x — Deep dives (top queries, anomalies, storage)
+  4.x — Airbyte freshness (OPS views — not ACCOUNT_USAGE)
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import streamlit as st
+
+if TYPE_CHECKING:
+    import pandas as pd
+    from snowflake.snowpark import Session
 
 from .config import (
     ANOMALY_MULTIPLIER,
@@ -388,3 +397,58 @@ where usage_date >= dateadd('day', -{STORAGE_HISTORY_DAYS}, current_date())
   and average_database_bytes > 0
 order by usage_date, database_name
 """
+
+
+# --------------------------------------------------------------------------- #
+# 4. Airbyte freshness (reads AD_ANALYTICS.OPS views, not ACCOUNT_USAGE)
+# --------------------------------------------------------------------------- #
+
+@st.cache_data(ttl="1m")
+def get_airbyte_freshness(_session: "Session") -> "pd.DataFrame":
+    """Per-connection freshness — one RAG-status row per active connection.
+
+    Cached for 1 minute (shorter than other tabs) because freshness is the
+    entire point of this page — stale dashboard data defeats the purpose.
+
+    Returns columns: connection_id, oldest_extracted_at, newest_extracted_at,
+    staleness_min, table_count, warn_minutes, alert_minutes, status.
+    staleness_min = age in minutes of the BUSIEST stream's last extract
+    (the connection-level health signal — see view comment in
+    setup/07_airbyte_observability.sql).
+    Rows are ordered ALERT first, then WARN, then OK.
+    """
+    return _session.sql("""
+        select
+            connection_id,
+            oldest_extracted_at,
+            newest_extracted_at,
+            staleness_min,
+            table_count,
+            warn_minutes,
+            alert_minutes,
+            status
+        from ad_analytics.ops.v_airbyte_freshness
+        order by
+            case status when 'ALERT' then 0 when 'WARN' then 1 else 2 end,
+            connection_id
+    """).to_pandas()
+
+
+@st.cache_data(ttl="1m")
+def get_airbyte_freshness_per_stream(_session: "Session") -> "pd.DataFrame":
+    """Per-stream detail for the expandable table on the Airbyte Health page.
+
+    Returns columns: connection_id, stream, last_extracted_at, staleness_min.
+    Sorted by staleness descending so the stalest stream is always at the top.
+
+    Cached for 1 minute — same reasoning as get_airbyte_freshness.
+    """
+    return _session.sql("""
+        select
+            connection_id,
+            stream,
+            last_extracted_at,
+            staleness_min
+        from ad_analytics.ops.v_airbyte_freshness_per_stream
+        order by staleness_min desc
+    """).to_pandas()
