@@ -28,8 +28,10 @@ use role accountadmin;
 -- ----------------------------------------------------------------------------
 -- 1. Threshold config table
 -- ----------------------------------------------------------------------------
--- Default thresholds assume ~15-min sync cadence (warn=30, alert=60).
--- If V-1 shows median gap > 30 min, change these to 90/180.
+-- Default thresholds assume ~15-min sync cadence (warn=15, alert=30).
+-- Tightened from 30/60 on 2026-05-03 to cap auto-remediation recovery
+-- under ~50 min worst case for the freshness-sensitive PBI consumers.
+-- If V-1 shows median gap > 15 min, raise these (e.g. 30/60 or 90/180).
 -- Tune post-deploy via UPDATE — no view recreation or redeploy needed.
 -- ----------------------------------------------------------------------------
 
@@ -45,11 +47,11 @@ create table if not exists ad_analytics.ops.airbyte_freshness_thresholds (
 merge into ad_analytics.ops.airbyte_freshness_thresholds as t
     using (
         select 'fishbowl_s3' as connection_id,
-               30            as warn_minutes,
-               60            as alert_minutes,
+               15            as warn_minutes,
+               30            as alert_minutes,
                'Fishbowl → S3 Iceberg (production2018 Glue db)' as comment
         union all
-        select 'magento_s3', 30, 60,
+        select 'magento_s3', 15, 30,
                'Magento → S3 Iceberg (ammuni_prod Glue db)'
     ) as s
     on t.connection_id = s.connection_id
@@ -624,5 +626,5 @@ grant usage on schema ad_analytics.ops to role powerbi_readonly_role;
 --    -- Wait for next :05/:20/:35/:50 UTC; confirm email arrives
 --    -- Then revert:
 --    UPDATE ad_analytics.ops.airbyte_freshness_thresholds
---        SET warn_minutes = 30 WHERE connection_id = 'fishbowl_s3';
+--        SET warn_minutes = 15 WHERE connection_id = 'fishbowl_s3';
 -- ============================================================================
