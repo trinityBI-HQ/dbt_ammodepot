@@ -1,0 +1,8 @@
+{
+  "Name": "airbyte-auto-remediate-schedule",
+  "ScheduleExpression": "cron(5,20,35,50 * * * ? *)",
+  "State": "ENABLED",
+  "Description": "Synced to dbt + Phase 1 alerts so Lambda's Snowflake query lands on a warm ETL_WH (zero cold-start surcharge). Detection-to-action latency: ≤16 min worst case.",
+  "TargetId": "airbyte-auto-remediate-lambda",
+  "TargetArn": "arn:aws:lambda:us-east-1:746669199691:function:airbyte-auto-remediate"
+}

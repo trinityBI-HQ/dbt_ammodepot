@@ -1,0 +1,76 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:746669199691:log-group:/aws/lambda/airbyte-auto-remediate:*"
+    },
+    {
+      "Sid": "SsmSendCommand",
+      "Effect": "Allow",
+      "Action": ["ssm:SendCommand"],
+      "Resource": [
+        "arn:aws:ec2:us-east-1:746669199691:instance/i-075043415ebad732f",
+        "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
+      ]
+    },
+    {
+      "Sid": "SsmGetCommandInvocation",
+      "Effect": "Allow",
+      "Action": ["ssm:GetCommandInvocation"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SsmParameter",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:us-east-1:746669199691:parameter/airbyte-auto-remediate/*"
+    },
+    {
+      "Sid": "SecretsManager",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:746669199691:secret:ammodepot/dbt/snowflake-*",
+        "arn:aws:secretsmanager:us-east-1:746669199691:secret:ammodepot/airbyte-auto-remediate/clickup-*"
+      ]
+    },
+    {
+      "Sid": "DynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:746669199691:table/airbyte-auto-remediate-state"
+    },
+    {
+      "Sid": "Sns",
+      "Effect": "Allow",
+      "Action": ["sns:Publish"],
+      "Resource": "arn:aws:sns:us-east-1:746669199691:airbyte-auto-remediate-events"
+    },
+    {
+      "Sid": "S3List",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::ammodepot-lakehouse",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "iceberg/production2018.db/*",
+            "iceberg/ammuni_prod.db/*"
+          ]
+        }
+      }
+    }
+  ]
+}
