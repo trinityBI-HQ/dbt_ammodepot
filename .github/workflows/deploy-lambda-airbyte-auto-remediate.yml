@@ -1,0 +1,80 @@
+name: Deploy Lambda — airbyte-auto-remediate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lambda/airbyte_auto_remediate/**'
+      - '.github/workflows/deploy-lambda-airbyte-auto-remediate.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: build
+        run: |
+          TAG="${GITHUB_SHA::7}"
+          REPO="746669199691.dkr.ecr.us-east-1.amazonaws.com/ammodepot/airbyte-auto-remediate"
+
+          echo "Building ${REPO}:${TAG}"
+          docker build \
+              -t "${REPO}:${TAG}" \
+              -t "${REPO}:latest" \
+              -f lambda/airbyte_auto_remediate/Dockerfile \
+              lambda/airbyte_auto_remediate/
+
+          docker push "${REPO}:${TAG}"
+          docker push "${REPO}:latest"
+
+          echo "image_uri=${REPO}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Pushed ${REPO}:${TAG} and :latest"
+
+      - name: Update Lambda function code
+        run: |
+          # Lambda may not exist on the very first push — deploy.sh provisions it.
+          # CI handles the steady-state path: function exists, just push new image.
+          if aws lambda get-function --function-name airbyte-auto-remediate >/dev/null 2>&1; then
+            aws lambda update-function-code \
+                --function-name airbyte-auto-remediate \
+                --image-uri "${{ steps.build.outputs.image_uri }}" \
+                --publish
+
+            aws lambda wait function-updated --function-name airbyte-auto-remediate
+            echo "Lambda code updated to ${{ steps.build.outputs.image_uri }}"
+          else
+            echo "::warning::Lambda function 'airbyte-auto-remediate' does not exist."
+            echo "::warning::Run lambda/airbyte_auto_remediate/deploy.sh manually for first-time provisioning."
+            exit 0
+          fi
+
+      - name: Sanity-invoke (dry-run)
+        run: |
+          # Verify the new image starts cleanly. We can't actually invoke without
+          # an EventBridge-shaped event, but we can check the function reports ACTIVE.
+          if aws lambda get-function --function-name airbyte-auto-remediate >/dev/null 2>&1; then
+            STATE=$(aws lambda get-function --function-name airbyte-auto-remediate \
+                --query 'Configuration.State' --output text)
+            LAST_UPDATE_STATUS=$(aws lambda get-function --function-name airbyte-auto-remediate \
+                --query 'Configuration.LastUpdateStatus' --output text)
+            echo "State: ${STATE}, LastUpdateStatus: ${LAST_UPDATE_STATUS}"
+            if [ "${STATE}" != "Active" ] || [ "${LAST_UPDATE_STATUS}" != "Successful" ]; then
+                echo "::error::Lambda not in healthy state after deploy."
+                exit 1
+            fi
+          fi
