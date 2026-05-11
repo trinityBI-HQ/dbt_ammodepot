@@ -417,7 +417,7 @@ def get_airbyte_freshness(_session: "Session") -> "pd.DataFrame":
     setup/07_airbyte_observability.sql).
     Rows are ordered ALERT first, then WARN, then OK.
     """
-    return _session.sql("""
+    df = _session.sql("""
         select
             connection_id,
             oldest_extracted_at,
@@ -432,6 +432,8 @@ def get_airbyte_freshness(_session: "Session") -> "pd.DataFrame":
             case status when 'ALERT' then 0 when 'WARN' then 1 else 2 end,
             connection_id
     """).to_pandas()
+    df.columns = df.columns.str.lower()
+    return df
 
 
 @st.cache_data(ttl="1m")
@@ -443,7 +445,7 @@ def get_airbyte_freshness_per_stream(_session: "Session") -> "pd.DataFrame":
 
     Cached for 1 minute — same reasoning as get_airbyte_freshness.
     """
-    return _session.sql("""
+    df = _session.sql("""
         select
             connection_id,
             stream,
@@ -452,3 +454,5 @@ def get_airbyte_freshness_per_stream(_session: "Session") -> "pd.DataFrame":
         from ad_analytics.ops.v_airbyte_freshness_per_stream
         order by staleness_min desc
     """).to_pandas()
+    df.columns = df.columns.str.lower()
+    return df
