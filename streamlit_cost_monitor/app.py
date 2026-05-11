@@ -34,6 +34,7 @@ st.markdown(
 - **AWS Infrastructure** — ECS Fargate, EC2, S3 Iceberg, CloudWatch, Secrets Manager (MTD, daily 90d, monthly 6M)
 - **Combined** — Total pipeline cost (Snowflake + AWS) with an explicit allow-list of what counts as AWS infrastructure
 - **dbt Pipeline** — Build duration, build health, and interactive dbt documentation
+- **Airbyte Health** — Destination-freshness monitor for Fishbowl → S3 and Magento → S3 Iceberg, with per-stream detail and live WARN/ALERT thresholds
 """
 )
 

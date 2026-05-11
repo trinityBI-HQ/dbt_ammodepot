@@ -18,9 +18,10 @@ st.markdown(
 st.title("Airbyte Health")
 st.caption(
     "Destination-freshness monitor for the live S3 Iceberg ingestion path "
-    "(Fishbowl → S3 and Magento → S3). Refreshes every 1 minute. "
-    "Email alerts fire at WARN (30 min) and ALERT (60 min) thresholds via "
-    "Snowflake ALERT objects."
+    "(Fishbowl → S3 and Magento → S3). Page cache refreshes every 1 minute; "
+    "underlying Iceberg metadata is refreshed by the dbt build at cron "
+    "5,20,35,50 UTC (every 15 min). Email alerts fire at WARN (25 min) and "
+    "ALERT (30 min) thresholds via Snowflake ALERT objects."
 )
 
 # --------------------------------------------------------------------------- #
