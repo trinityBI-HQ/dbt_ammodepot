@@ -9,9 +9,12 @@ Single-invocation orchestration:
      c. Tier 1: Cancel + restart via SSM SendCommand
      d. Sleep 300 s
      e. Verify: Snowflake re-query first; S3 LIST per-table fallback
-     f. Tier 2 (Phase 2.1, kind-bounce): if Tier 1 left post_staleness > 60
-        and gates clear, docker restart airbyte-abctl-control-plane via
-        SSM, sleep 180s, re-verify
+     f. Tier 2 (Phase 2.1, kind-bounce): fire if EITHER
+          - post_staleness > 60 (deep_stuck), OR
+          - ≥2 cancel_and_restart attempts on this connection in last
+            120 min (repeat_pattern — catches brief-recovery cycles)
+        and gates clear (cooldown, concurrent-sync). docker restart
+        airbyte-abctl-control-plane via SSM, sleep 180s, re-verify.
      g. Determine outcome
   4. Persist + notify (Snowflake audit row + ClickUp comment + SNS publish)
 
@@ -92,6 +95,8 @@ KIND_BOUNCE_OBSERVE_ONLY_PARAM = "/airbyte-auto-remediate/kind-bounce-observe-on
 KIND_BOUNCE_TRIGGER_POST_MIN = int(os.environ.get("KIND_BOUNCE_TRIGGER_POST_MIN", "60"))
 KIND_BOUNCE_VERIFY_WAIT_SECONDS = int(os.environ.get("KIND_BOUNCE_VERIFY_WAIT_SECONDS", "180"))
 KIND_BOUNCE_COOLDOWN_SECONDS = int(os.environ.get("KIND_BOUNCE_COOLDOWN_SECONDS", "21600"))
+KIND_BOUNCE_REPEAT_COUNT = int(os.environ.get("KIND_BOUNCE_REPEAT_COUNT", "2"))
+KIND_BOUNCE_REPEAT_WINDOW_MIN = int(os.environ.get("KIND_BOUNCE_REPEAT_WINDOW_MIN", "120"))
 GLOBAL_KIND_BOUNCE_KEY = "_GLOBAL_KIND_BOUNCE"
 
 KIND_BOUNCE_PAYLOAD_TEMPLATE_PATH = (
@@ -317,7 +322,8 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
     )
 
     if verification_method == "both_inconclusive_escalated":
-        bounce_decision, bounce_skip_reason = _evaluate_kind_bounce_eligibility(
+        bounce_decision, bounce_skip_reason, trigger_reason = _evaluate_kind_bounce_eligibility(
+            snowflake_conn=snowflake_conn,
             conn_id=conn_id,
             post_staleness=post_staleness,
         )
@@ -331,6 +337,7 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
                 post_cancel_restart_staleness=post_staleness,
                 cancelled_job=cancelled_job,
                 restart_job=restart_job,
+                trigger_reason=trigger_reason,
             )
             return
 
@@ -347,14 +354,19 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
                 "outcome": "OBSERVE_ONLY_WOULD_ACT",
                 "post_staleness_min": post_staleness,
                 "verification_method": verification_method,
+                "failure_reason": (
+                    f"trigger:{trigger_reason}" if trigger_reason else None
+                ),
             })
             _publish_sns(
-                f"[Airbyte KIND-BOUNCE OBSERVE] {conn_id} would bounce @ {post_staleness}m",
-                _build_kind_bounce_observe_email(conn_id, pre_staleness, post_staleness),
+                f"[Airbyte KIND-BOUNCE OBSERVE] {conn_id} would bounce @ {post_staleness}m ({trigger_reason})",
+                _build_kind_bounce_observe_email(
+                    conn_id, pre_staleness, post_staleness, trigger_reason
+                ),
             )
             _post_clickup_comment(
                 _build_clickup_kind_bounce_observe_comment(
-                    conn_id, pre_staleness, post_staleness
+                    conn_id, pre_staleness, post_staleness, trigger_reason
                 )
             )
 
@@ -617,44 +629,101 @@ def _open_global_kind_bounce_cooldown() -> datetime:
     return breaker_until_dt
 
 
+def _count_recent_cancel_restarts(snowflake_conn, conn_id: str) -> int:
+    """Count prior `cancel_and_restart` attempts on this connection in the
+    last KIND_BOUNCE_REPEAT_WINDOW_MIN minutes. Excludes the current attempt
+    (called before its audit row is written). Returns 0 on query failure
+    (fail open — don't block a real trigger because of a query glitch)."""
+    try:
+        cur = snowflake_conn.cursor(snowflake.connector.DictCursor)
+        cur.execute(f"""
+            select count(*) as n
+            from {SNOW_AUDIT_TABLE}
+            where connection_id = %(conn_id)s
+              and action_taken = 'cancel_and_restart'
+              and event_time >= dateadd(minute, %(window)s, current_timestamp())
+        """, {"conn_id": conn_id, "window": -KIND_BOUNCE_REPEAT_WINDOW_MIN})
+        rows = cur.fetchall()
+        return int(rows[0]["N"]) if rows else 0
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "repeat_count_query_failure",
+            "connection_id": conn_id,
+            "error": str(exc),
+        }))
+        return 0
+
+
 def _evaluate_kind_bounce_eligibility(
-    conn_id: str, post_staleness: int | None
-) -> tuple[str, str | None]:
-    """Returns (decision, skip_reason).
+    snowflake_conn, conn_id: str, post_staleness: int | None
+) -> tuple[str, str | None, str | None]:
+    """Returns (decision, skip_reason, trigger_reason).
 
     decision ∈ {'TRIGGER', 'OBSERVE', 'SKIP'}
     skip_reason populated only when the SKIP is due to a Tier 2 gate
-    (cooldown / concurrent sync); a plain "post not stale enough" returns
-    (SKIP, None) so the caller falls through to existing ESCALATE wording.
+    (cooldown / concurrent sync); a plain "neither trigger fired" returns
+    (SKIP, None, None) so the caller falls through to existing ESCALATE wording.
+    trigger_reason ∈ {'deep_stuck', 'repeat_pattern', None} — propagated to
+    audit log and notifications.
+
+    Two trigger paths:
+      1. deep_stuck:    post_staleness > KIND_BOUNCE_TRIGGER_POST_MIN (60 min)
+      2. repeat_pattern: prior cancel+restart count in last
+         KIND_BOUNCE_REPEAT_WINDOW_MIN minutes is >= KIND_BOUNCE_REPEAT_COUNT - 1
+         (i.e., this attempt makes the N-th in the window)
     """
-    if post_staleness is None or post_staleness <= KIND_BOUNCE_TRIGGER_POST_MIN:
-        return ("SKIP", None)
+    if post_staleness is None:
+        return ("SKIP", None, None)
+
+    deep_stuck = post_staleness > KIND_BOUNCE_TRIGGER_POST_MIN
+
+    repeat_pattern = False
+    repeat_count = 0
+    if not deep_stuck:
+        repeat_count = _count_recent_cancel_restarts(snowflake_conn, conn_id)
+        repeat_pattern = repeat_count >= (KIND_BOUNCE_REPEAT_COUNT - 1)
+
+    if not (deep_stuck or repeat_pattern):
+        return ("SKIP", None, None)
+
+    trigger_reason = "deep_stuck" if deep_stuck else "repeat_pattern"
 
     cooldown_until = _check_global_kind_bounce_cooldown()
     if cooldown_until is not None:
         LOGGER.info(json.dumps({
             "event": "kind_bounce_skipped_cooldown",
             "connection_id": conn_id,
+            "trigger_reason": trigger_reason,
             "cooldown_until": cooldown_until.isoformat(),
         }))
-        return ("SKIP", "kind_bounce_cooldown_open")
+        return ("SKIP", "kind_bounce_cooldown_open", trigger_reason)
 
     if _other_connection_actively_syncing(conn_id):
         LOGGER.info(json.dumps({
             "event": "kind_bounce_skipped_concurrent_sync",
             "connection_id": conn_id,
+            "trigger_reason": trigger_reason,
         }))
-        return ("SKIP", "kind_bounce_skipped_concurrent_sync")
+        return ("SKIP", "kind_bounce_skipped_concurrent_sync", trigger_reason)
 
     if _read_kind_bounce_observe_only_flag():
         LOGGER.info(json.dumps({
             "event": "kind_bounce_observe_only_decision",
             "connection_id": conn_id,
             "post_staleness_min": post_staleness,
+            "trigger_reason": trigger_reason,
+            "repeat_count_in_window": repeat_count,
         }))
-        return ("OBSERVE", None)
+        return ("OBSERVE", None, trigger_reason)
 
-    return ("TRIGGER", None)
+    LOGGER.info(json.dumps({
+        "event": "kind_bounce_trigger",
+        "connection_id": conn_id,
+        "post_staleness_min": post_staleness,
+        "trigger_reason": trigger_reason,
+        "repeat_count_in_window": repeat_count,
+    }))
+    return ("TRIGGER", None, trigger_reason)
 
 
 def _ssm_kind_bounce() -> str | None:
@@ -706,9 +775,11 @@ def _execute_kind_bounce_tier(
     post_cancel_restart_staleness: int,
     cancelled_job: str | None,
     restart_job: str | None,
+    trigger_reason: str | None = None,
 ) -> None:
     bounce_command_time = datetime.now(timezone.utc)
     ssm_failure = _ssm_kind_bounce()
+    trigger_tag = f"trigger:{trigger_reason}" if trigger_reason else "trigger:unknown"
 
     if ssm_failure:
         _open_global_kind_bounce_cooldown()
@@ -717,7 +788,7 @@ def _execute_kind_bounce_tier(
             **base_audit,
             "action_taken": "kind_bounce",
             "outcome": "ESCALATE",
-            "failure_reason": f"kind_bounce_ssm: {ssm_failure}"[:500],
+            "failure_reason": f"kind_bounce_ssm: {ssm_failure} ({trigger_tag})"[:500],
             "cancelled_job_id": cancelled_job,
             "restart_job_id": restart_job,
             "post_staleness_min": post_cancel_restart_staleness,
@@ -725,14 +796,16 @@ def _execute_kind_bounce_tier(
             "breaker_until_at": breaker_dt,
         })
         _publish_sns(
-            f"[Airbyte KIND-BOUNCE ESCALATE] {conn_id} bounce failed",
+            f"[Airbyte KIND-BOUNCE ESCALATE] {conn_id} bounce failed ({trigger_reason})",
             _build_kind_bounce_escalate_email(
-                conn_id, pre_staleness, post_cancel_restart_staleness, ssm_failure
+                conn_id, pre_staleness, post_cancel_restart_staleness, ssm_failure,
+                trigger_reason=trigger_reason,
             ),
         )
         _post_clickup_comment(
             _build_clickup_kind_bounce_escalate_comment(
-                conn_id, pre_staleness, post_cancel_restart_staleness, ssm_failure
+                conn_id, pre_staleness, post_cancel_restart_staleness, ssm_failure,
+                trigger_reason=trigger_reason,
             )
         )
         return
@@ -741,6 +814,7 @@ def _execute_kind_bounce_tier(
         "event": "kind_bounce_sleeping_for_verification",
         "connection_id": conn_id,
         "wait_seconds": KIND_BOUNCE_VERIFY_WAIT_SECONDS,
+        "trigger_reason": trigger_reason,
     }))
     time.sleep(KIND_BOUNCE_VERIFY_WAIT_SECONDS)
 
@@ -755,7 +829,7 @@ def _execute_kind_bounce_tier(
             **base_audit,
             "action_taken": "kind_bounce",
             "outcome": "ESCALATE",
-            "failure_reason": "kind_bounce_did_not_recover",
+            "failure_reason": f"kind_bounce_did_not_recover ({trigger_tag})",
             "cancelled_job_id": cancelled_job,
             "restart_job_id": restart_job,
             "post_staleness_min": post_bounce_staleness,
@@ -763,16 +837,18 @@ def _execute_kind_bounce_tier(
             "breaker_until_at": breaker_dt,
         })
         _publish_sns(
-            f"[Airbyte KIND-BOUNCE ESCALATE] {conn_id} did not recover after bounce",
+            f"[Airbyte KIND-BOUNCE ESCALATE] {conn_id} did not recover after bounce ({trigger_reason})",
             _build_kind_bounce_escalate_email(
                 conn_id, pre_staleness, post_cancel_restart_staleness,
                 "kind_bounce_did_not_recover", post_bounce_staleness,
+                trigger_reason=trigger_reason,
             ),
         )
         _post_clickup_comment(
             _build_clickup_kind_bounce_escalate_comment(
                 conn_id, pre_staleness, post_cancel_restart_staleness,
                 "kind_bounce_did_not_recover", post_bounce_staleness,
+                trigger_reason=trigger_reason,
             )
         )
     else:
@@ -781,6 +857,7 @@ def _execute_kind_bounce_tier(
             **base_audit,
             "action_taken": "kind_bounce",
             "outcome": "AUTO_FIX",
+            "failure_reason": trigger_tag,
             "cancelled_job_id": cancelled_job,
             "restart_job_id": restart_job,
             "post_staleness_min": post_bounce_staleness,
@@ -788,16 +865,16 @@ def _execute_kind_bounce_tier(
         })
         _publish_sns(
             f"[Airbyte KIND-BOUNCE AUTO-FIX] {conn_id} recovered "
-            f"({post_cancel_restart_staleness}m → {post_bounce_staleness}m)",
+            f"({post_cancel_restart_staleness}m → {post_bounce_staleness}m, {trigger_reason})",
             _build_kind_bounce_autofix_email(
                 conn_id, pre_staleness, post_cancel_restart_staleness,
-                post_bounce_staleness,
+                post_bounce_staleness, trigger_reason=trigger_reason,
             ),
         )
         _post_clickup_comment(
             _build_clickup_kind_bounce_autofix_comment(
                 conn_id, pre_staleness, post_cancel_restart_staleness,
-                post_bounce_staleness,
+                post_bounce_staleness, trigger_reason=trigger_reason,
             )
         )
 
@@ -990,11 +1067,27 @@ def _build_clickup_escalate_comment(conn_id: str, pre: int, failure: str,
 # Email + ClickUp body builders: Tier 2 (kind-bounce)
 # ----------------------------------------------------------------------------
 
+def _trigger_reason_explanation(trigger_reason: str | None) -> str:
+    if trigger_reason == "deep_stuck":
+        return (
+            f"deep_stuck (post-restart staleness > "
+            f"{KIND_BOUNCE_TRIGGER_POST_MIN} min)"
+        )
+    if trigger_reason == "repeat_pattern":
+        return (
+            f"repeat_pattern (≥{KIND_BOUNCE_REPEAT_COUNT} cancel+restart "
+            f"attempts in last {KIND_BOUNCE_REPEAT_WINDOW_MIN} min)"
+        )
+    return "unknown"
+
+
 def _build_kind_bounce_observe_email(conn_id: str, pre_staleness: int,
-                                     post_staleness: int) -> str:
+                                     post_staleness: int,
+                                     trigger_reason: str | None = None) -> str:
     return (
         f"Connection {conn_id} did not recover after cancel+restart "
         f"({pre_staleness}m → {post_staleness}m).\n\n"
+        f"Trigger: {_trigger_reason_explanation(trigger_reason)}\n"
         f"Lambda Tier 2 (kind-bounce) is in OBSERVE-ONLY mode — no action taken.\n"
         f"Would have: docker restart airbyte-abctl-control-plane, verify in 3 min.\n\n"
         f"To enable live Tier 2 action:\n"
@@ -1005,9 +1098,11 @@ def _build_kind_bounce_observe_email(conn_id: str, pre_staleness: int,
 
 
 def _build_kind_bounce_autofix_email(conn_id: str, pre: int, post_restart: int,
-                                     post_bounce: int) -> str:
+                                     post_bounce: int,
+                                     trigger_reason: str | None = None) -> str:
     return (
         f"Tier 2 kind-bounce SUCCEEDED for {conn_id}.\n\n"
+        f"  Trigger:                  {_trigger_reason_explanation(trigger_reason)}\n"
         f"  Pre-restart staleness:    {pre} min\n"
         f"  Post-restart staleness:   {post_restart} min  (cancel+restart insufficient)\n"
         f"  Post-bounce staleness:    {post_bounce} min  (control-plane restart fixed it)\n\n"
@@ -1022,9 +1117,11 @@ def _build_kind_bounce_autofix_email(conn_id: str, pre: int, post_restart: int,
 
 def _build_kind_bounce_escalate_email(conn_id: str, pre: int, post_restart: int,
                                       failure: str,
-                                      post_bounce: int | None = None) -> str:
+                                      post_bounce: int | None = None,
+                                      trigger_reason: str | None = None) -> str:
     return (
         f"Tier 2 kind-bounce FAILED for {conn_id} — manual intervention required.\n\n"
+        f"  Trigger:                  {_trigger_reason_explanation(trigger_reason)}\n"
         f"  Pre-restart staleness:    {pre} min\n"
         f"  Post-restart staleness:   {post_restart} min\n"
         f"  Post-bounce staleness:    "
@@ -1040,20 +1137,23 @@ def _build_kind_bounce_escalate_email(conn_id: str, pre: int, post_restart: int,
     )
 
 
-def _build_clickup_kind_bounce_observe_comment(conn_id: str, pre: int, post: int) -> str:
+def _build_clickup_kind_bounce_observe_comment(conn_id: str, pre: int, post: int,
+                                               trigger_reason: str | None = None) -> str:
     return (
         f"🟡 KIND-BOUNCE OBSERVE: **{conn_id}** would have control-plane-bounced "
         f"(pre={pre}m → post-restart={post}m, "
-        f"threshold={KIND_BOUNCE_TRIGGER_POST_MIN}m). "
+        f"trigger=`{trigger_reason or 'unknown'}`). "
         f"Lambda took no Tier 2 action."
     )
 
 
 def _build_clickup_kind_bounce_autofix_comment(conn_id: str, pre: int,
                                                post_restart: int,
-                                               post_bounce: int) -> str:
+                                               post_bounce: int,
+                                               trigger_reason: str | None = None) -> str:
     return (
         f"🔁 KIND-BOUNCE AUTO-FIX: **{conn_id}** recovered after control-plane bounce.\n"
+        f"- Trigger: `{trigger_reason or 'unknown'}`\n"
         f"- Pre-restart: {pre}m → Post-restart: {post_restart}m → "
         f"Post-bounce: {post_bounce}m\n"
         f"- `docker restart airbyte-abctl-control-plane` SUCCEEDED\n"
@@ -1064,9 +1164,11 @@ def _build_clickup_kind_bounce_autofix_comment(conn_id: str, pre: int,
 
 def _build_clickup_kind_bounce_escalate_comment(conn_id: str, pre: int,
                                                 post_restart: int, failure: str,
-                                                post_bounce: int | None = None) -> str:
+                                                post_bounce: int | None = None,
+                                                trigger_reason: str | None = None) -> str:
     return (
         f"🔴 KIND-BOUNCE ESCALATE: **{conn_id}** Tier 2 failed — manual action required.\n"
+        f"- Trigger: `{trigger_reason or 'unknown'}`\n"
         f"- Pre-restart: {pre}m → Post-restart: {post_restart}m → "
         f"Post-bounce: {post_bounce if post_bounce is not None else 'unknown'}m\n"
         f"- Failure: `{failure}`\n"

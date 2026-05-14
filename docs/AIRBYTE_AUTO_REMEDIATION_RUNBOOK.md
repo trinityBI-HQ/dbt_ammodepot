@@ -189,20 +189,45 @@ If `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG` ever needs a schema change:
 
 ## Tier 2: Kind-Bounce (Phase 2.1 enhancement — control-plane restart)
 
-When the Tier 1 cancel+restart leaves a connection at `post_staleness_min > 60`,
-the Lambda escalates to Tier 2: `docker restart airbyte-abctl-control-plane`
-via SSM. This recovers the kind/kube-scheduler stuck-state where the Airbyte
-API accepts cancel+restart but the scheduler never schedules the new job's pod
-(the failure signature behind the 0/13 magento_s3 restart success rate that
+The Lambda escalates to Tier 2 (`docker restart airbyte-abctl-control-plane`
+via SSM) on **either** of two trigger conditions, after Tier 1 cancel+restart
+fails to recover:
+
+1. **`deep_stuck`** — `post_staleness_min > 60` (Tier 1 didn't move the needle)
+2. **`repeat_pattern`** — ≥2 `cancel_and_restart` attempts on this connection
+   in the last 120 min (catches brief-recovery cycles where each individual
+   Tier 1 *looks* successful but the underlying scheduler is degrading)
+
+Both trigger paths are gated by the same safety checks: global 6h cooldown
+between bounces, concurrent-sync guard (skip if other connection mid-sync),
+and the `kind-bounce-observe-only` flag.
+
+Recovers the kind/kube-scheduler stuck-state where the Airbyte API accepts
+cancel+restart but the scheduler never schedules the new job's pod (the
+failure signature behind the 0/13 magento_s3 restart success rate that
 motivated this tier).
 
 ### Email subjects you may now see
 
+The trigger reason is appended to every Tier 2 SNS subject and email body:
+
 | Subject | Meaning |
 |---|---|
-| `[Airbyte KIND-BOUNCE OBSERVE] <conn> would bounce @ <N>m` | Tier 2 is in observe-only mode; Lambda logged the decision but did NOT bounce. Audit row: `action_taken='would_kind_bounce'`. Tier 1 cancel+restart already ran. |
-| `[Airbyte KIND-BOUNCE AUTO-FIX] <conn> recovered (<N>m → <M>m)` | `docker restart` succeeded; connection recovered after the bounce. Audit row: `action_taken='kind_bounce', outcome='AUTO_FIX'`. No human action needed. |
-| `[Airbyte KIND-BOUNCE ESCALATE] <conn> ...` | Bounce was attempted but didn't recover (or SSM failed). Audit row: `action_taken='kind_bounce', outcome='ESCALATE'`. **Manual recovery required** — see "Manual kind-bounce" below. |
+| `[Airbyte KIND-BOUNCE OBSERVE] <conn> would bounce @ <N>m (<trigger>)` | Tier 2 is in observe-only mode; Lambda logged the decision but did NOT bounce. Audit row: `action_taken='would_kind_bounce', failure_reason='trigger:<reason>'`. Tier 1 cancel+restart already ran. |
+| `[Airbyte KIND-BOUNCE AUTO-FIX] <conn> recovered (<N>m → <M>m, <trigger>)` | `docker restart` succeeded; connection recovered after the bounce. Audit row: `action_taken='kind_bounce', outcome='AUTO_FIX', failure_reason='trigger:<reason>'`. No human action needed. |
+| `[Airbyte KIND-BOUNCE ESCALATE] <conn> ... (<trigger>)` | Bounce was attempted but didn't recover (or SSM failed). Audit row: `action_taken='kind_bounce', outcome='ESCALATE'`. **Manual recovery required** — see "Manual kind-bounce" below. |
+
+### Inspect why a bounce fired
+
+```sql
+USE ROLE TRANSFORMER_ROLE;
+SELECT event_time, connection_id, outcome, post_staleness_min,
+       split_part(failure_reason, ':', 2) AS trigger_reason
+FROM AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG
+WHERE action_taken IN ('kind_bounce', 'would_kind_bounce')
+  AND event_time >= DATEADD('day', -7, CURRENT_TIMESTAMP())
+ORDER BY event_time DESC;
+```
 
 ### Tier 2 observe-only toggle
 
