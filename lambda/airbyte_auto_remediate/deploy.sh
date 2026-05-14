@@ -10,6 +10,7 @@
 #   3. SNS subscription:   email → recipient (operator confirms via email link)
 #   4. DynamoDB table:     airbyte-auto-remediate-state (PAY_PER_REQUEST + TTL)
 #   5. SSM Parameter:      /airbyte-auto-remediate/observe-only = "true"
+#   5a.SSM Parameter:      /airbyte-auto-remediate/kind-bounce-observe-only = "true" (Tier 2)
 #   6. IAM role:           svc_iac-lambda-airbyte-auto-remediate
 #   7. (Operator step)     Create ClickUp secret in Secrets Manager
 #   8. Lambda function:    airbyte-auto-remediate (container image)
@@ -41,6 +42,7 @@ SNS_RECIPIENT="${SNS_RECIPIENT:-victor@trinitybi.com}"
 DDB_TABLE="${LAMBDA_NAME}-state"
 
 OBSERVE_PARAM_NAME="/${LAMBDA_NAME}/observe-only"
+KIND_BOUNCE_OBSERVE_PARAM_NAME="/${LAMBDA_NAME}/kind-bounce-observe-only"
 
 LAMBDA_ROLE_NAME="svc_iac-lambda-${LAMBDA_NAME}"
 LAMBDA_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${LAMBDA_ROLE_NAME}"
@@ -49,7 +51,7 @@ LAMBDA_POLICY_NAME="${LAMBDA_ROLE_NAME}-policy"
 EVENTBRIDGE_RULE="${LAMBDA_NAME}-schedule"
 EVENTBRIDGE_CRON="cron(5,20,35,50 * * * ? *)"
 
-LAMBDA_TIMEOUT_SECONDS=600
+LAMBDA_TIMEOUT_SECONDS=900
 LAMBDA_MEMORY_MB=512
 
 CLICKUP_TASK_ID="${CLICKUP_TASK_ID:-86ah8bpmj}"
@@ -174,6 +176,23 @@ ensure_observe_only_param() {
             --value "true" \
             --description "When 'true', Lambda logs decisions but does not call SSM SendCommand. Toggle to 'false' AFTER ≥1 week of observe-only soak." >/dev/null
         ok "SSM: ${OBSERVE_PARAM_NAME} created with value 'true'"
+    fi
+}
+
+ensure_kind_bounce_observe_param() {
+    log "SSM: ensuring ${KIND_BOUNCE_OBSERVE_PARAM_NAME} = 'true' (Tier 2 observe-only on first deploy)"
+    if "${AWS[@]}" ssm get-parameter --name "${KIND_BOUNCE_OBSERVE_PARAM_NAME}" >/dev/null 2>&1; then
+        local cur
+        cur="$("${AWS[@]}" ssm get-parameter --name "${KIND_BOUNCE_OBSERVE_PARAM_NAME}" \
+            --query "Parameter.Value" --output text)"
+        ok "SSM: ${KIND_BOUNCE_OBSERVE_PARAM_NAME} already set to '${cur}' (NOT modifying — operator-controlled)"
+    else
+        "${AWS[@]}" ssm put-parameter \
+            --name "${KIND_BOUNCE_OBSERVE_PARAM_NAME}" \
+            --type String \
+            --value "true" \
+            --description "Tier 2 (kind-bounce) gate. 'true' = log only, 'false' = docker restart airbyte-abctl-control-plane live. Toggle to 'false' AFTER ≥3 days of observe-only soak." >/dev/null
+        ok "SSM: ${KIND_BOUNCE_OBSERVE_PARAM_NAME} created with value 'true'"
     fi
 }
 
@@ -338,6 +357,7 @@ case "${MODE}" in
         ensure_sns
         ensure_dynamodb
         ensure_observe_only_param
+        ensure_kind_bounce_observe_param
         ensure_iam_role
         guard_clickup_secret
         ensure_eventbridge
@@ -349,6 +369,7 @@ case "${MODE}" in
         ensure_sns
         ensure_dynamodb
         ensure_observe_only_param
+        ensure_kind_bounce_observe_param
         ensure_iam_role
         guard_clickup_secret
         ensure_lambda

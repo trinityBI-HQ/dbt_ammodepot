@@ -1,0 +1,5 @@
+{
+  "commands": [
+    "set -eu; echo KIND_BOUNCE_START; sudo docker restart airbyte-abctl-control-plane || { echo RESTART_FAILURE >&2; exit 52; }; echo RESTART_ISSUED; DEADLINE=$(($(date +%s) + 120)); while [ $(date +%s) -lt $DEADLINE ]; do if curl -fsS -m 3 http://localhost:8000/api/v1/health > /dev/null 2>&1; then echo READINESS_OK; exit 0; fi; sleep 5; done; echo READINESS_FAILURE >&2; exit 51"
+  ]
+}

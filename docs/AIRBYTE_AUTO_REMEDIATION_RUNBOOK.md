@@ -187,9 +187,87 @@ If `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG` ever needs a schema change:
 5. Push to main → CI deploys the new Lambda image.
 6. Flip `OBSERVE_ONLY=false`.
 
+## Tier 2: Kind-Bounce (Phase 2.1 enhancement — control-plane restart)
+
+When the Tier 1 cancel+restart leaves a connection at `post_staleness_min > 60`,
+the Lambda escalates to Tier 2: `docker restart airbyte-abctl-control-plane`
+via SSM. This recovers the kind/kube-scheduler stuck-state where the Airbyte
+API accepts cancel+restart but the scheduler never schedules the new job's pod
+(the failure signature behind the 0/13 magento_s3 restart success rate that
+motivated this tier).
+
+### Email subjects you may now see
+
+| Subject | Meaning |
+|---|---|
+| `[Airbyte KIND-BOUNCE OBSERVE] <conn> would bounce @ <N>m` | Tier 2 is in observe-only mode; Lambda logged the decision but did NOT bounce. Audit row: `action_taken='would_kind_bounce'`. Tier 1 cancel+restart already ran. |
+| `[Airbyte KIND-BOUNCE AUTO-FIX] <conn> recovered (<N>m → <M>m)` | `docker restart` succeeded; connection recovered after the bounce. Audit row: `action_taken='kind_bounce', outcome='AUTO_FIX'`. No human action needed. |
+| `[Airbyte KIND-BOUNCE ESCALATE] <conn> ...` | Bounce was attempted but didn't recover (or SSM failed). Audit row: `action_taken='kind_bounce', outcome='ESCALATE'`. **Manual recovery required** — see "Manual kind-bounce" below. |
+
+### Tier 2 observe-only toggle
+
+Independent of the existing `/airbyte-auto-remediate/observe-only` flag (which
+gates Tier 1 cancel+restart):
+
+```bash
+# Disable Tier 2 (kind-bounce stays in observe-only — log only, no bounce)
+aws ssm put-parameter \
+  --name /airbyte-auto-remediate/kind-bounce-observe-only \
+  --value true --overwrite --profile ammodepot
+
+# Enable live Tier 2 (after soak validates the trigger logic)
+aws ssm put-parameter \
+  --name /airbyte-auto-remediate/kind-bounce-observe-only \
+  --value false --overwrite --profile ammodepot
+```
+
+Tier 1 cancel+restart continues running regardless — this flag only gates the
+control-plane bounce.
+
+### Reset the global kind-bounce cooldown
+
+Tier 2 has a global 6h cooldown stored in DynamoDB under partition-key
+`_GLOBAL_KIND_BOUNCE`. Reset it to allow an immediate retry:
+
+```bash
+aws dynamodb delete-item \
+  --table-name airbyte-auto-remediate-state \
+  --key '{"connection_id": {"S": "_GLOBAL_KIND_BOUNCE"}}' \
+  --profile ammodepot
+```
+
+### Manual kind-bounce (when Tier 2 escalates)
+
+If `[Airbyte KIND-BOUNCE ESCALATE]` fires, the automated bounce either failed
+SSM execution or didn't recover the connection. Manual procedure:
+
+```bash
+# 1. Restart the control plane
+aws ssm send-command \
+  --instance-ids i-075043415ebad732f \
+  --document-name AWS-RunShellScript \
+  --parameters 'commands=["sudo docker restart airbyte-abctl-control-plane"]' \
+  --profile ammodepot
+
+# 2. Wait ~3 min for pods to reschedule, then verify API readiness
+aws ssm send-command \
+  --instance-ids i-075043415ebad732f \
+  --document-name AWS-RunShellScript \
+  --parameters 'commands=["curl -sS http://localhost:8000/api/v1/health"]' \
+  --profile ammodepot
+
+# 3. Check Snowflake freshness 5-10 min later (via dbt show or Snowsight)
+# SELECT * FROM AD_ANALYTICS.OPS.V_AIRBYTE_FRESHNESS;
+```
+
+If `docker restart` itself fails or the API doesn't come back, escalate to a
+full Airbyte restart (`sudo systemctl restart abctl` or EC2 reboot — see
+Phase 1 runbook).
+
 ## See also
 
 - Phase 1 (detection-only) runbook: [`AIRBYTE_INCIDENT_RUNBOOK.md`](AIRBYTE_INCIDENT_RUNBOOK.md)
 - Lambda README: [`../lambda/airbyte_auto_remediate/README.md`](../lambda/airbyte_auto_remediate/README.md)
-- DESIGN: [`.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md`](../.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md)
+- DESIGN (Phase 2): [`.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md`](../.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md)
+- DESIGN (Phase 2.1 kind-bounce): [`.claude/sdd/features/DESIGN_AIRBYTE_KIND_BOUNCE_TIER.md`](../.claude/sdd/features/DESIGN_AIRBYTE_KIND_BOUNCE_TIER.md)
 - ClickUp task: [86ah8bpmj](https://app.clickup.com/t/86ah8bpmj)
