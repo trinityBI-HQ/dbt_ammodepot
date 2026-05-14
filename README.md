@@ -521,7 +521,7 @@ When Tier 1 cancel+restart leaves a connection at `post_staleness_min > 60`, the
 
 - **Trigger** (either condition fires Tier 2, after Tier 1 cancel+restart fails):
   - `deep_stuck` — `post_staleness_min > KIND_BOUNCE_TRIGGER_POST_MIN` (60 min). Catches the kind-scheduler-frozen pattern.
-  - `repeat_pattern` — ≥`KIND_BOUNCE_REPEAT_COUNT` (default 2) cancel+restart attempts on this connection in last `KIND_BOUNCE_REPEAT_WINDOW_MIN` (default 120) minutes. Catches the brief-recovery cycle where each Tier 1 *looks* fine but the scheduler is silently degrading.
+  - `repeat_pattern` — ≥`KIND_BOUNCE_REPEAT_COUNT` (default 2) cancel+restart attempts on this connection in last `KIND_BOUNCE_REPEAT_WINDOW_MIN` (default 240) minutes. Catches recurring-incident clusters where each Tier 1 *looks* fine but the scheduler is degrading. Window must exceed the 2h per-connection breaker floor (which makes back-to-back attempts <135 min apart impossible in practice).
 - **Action**: `docker restart airbyte-abctl-control-plane` (~13s restart + ≤120s in-payload `/api/v1/health` readiness probe). PV state preserved.
 - **Toggle**: SSM Parameter `/airbyte-auto-remediate/kind-bounce-observe-only` — independent of Tier 1 flag. Default `true` on first deploy for ≥3-day soak.
 - **Global cooldown**: 6h between bounces (DynamoDB sentinel key `_GLOBAL_KIND_BOUNCE`) — prevents bounce-loops if the bounce itself doesn't recover.

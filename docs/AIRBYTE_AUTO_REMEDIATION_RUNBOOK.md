@@ -195,8 +195,10 @@ fails to recover:
 
 1. **`deep_stuck`** — `post_staleness_min > 60` (Tier 1 didn't move the needle)
 2. **`repeat_pattern`** — ≥2 `cancel_and_restart` attempts on this connection
-   in the last 120 min (catches brief-recovery cycles where each individual
-   Tier 1 *looks* successful but the underlying scheduler is degrading)
+   in the last 240 min (catches recurring-incident clusters where each
+   individual Tier 1 *looks* successful but the underlying scheduler is
+   degrading; the 240-min window must exceed the 2h per-connection breaker
+   floor, which prevents back-to-back attempts under 135 min in practice)
 
 Both trigger paths are gated by the same safety checks: global 6h cooldown
 between bounces, concurrent-sync guard (skip if other connection mid-sync),

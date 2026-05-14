@@ -12,7 +12,8 @@ Single-invocation orchestration:
      f. Tier 2 (Phase 2.1, kind-bounce): fire if EITHER
           - post_staleness > 60 (deep_stuck), OR
           - ≥2 cancel_and_restart attempts on this connection in last
-            120 min (repeat_pattern — catches brief-recovery cycles)
+            240 min (repeat_pattern — catches recurring-incident clusters;
+            window must exceed the 2h per-connection breaker floor)
         and gates clear (cooldown, concurrent-sync). docker restart
         airbyte-abctl-control-plane via SSM, sleep 180s, re-verify.
      g. Determine outcome
@@ -96,7 +97,13 @@ KIND_BOUNCE_TRIGGER_POST_MIN = int(os.environ.get("KIND_BOUNCE_TRIGGER_POST_MIN"
 KIND_BOUNCE_VERIFY_WAIT_SECONDS = int(os.environ.get("KIND_BOUNCE_VERIFY_WAIT_SECONDS", "180"))
 KIND_BOUNCE_COOLDOWN_SECONDS = int(os.environ.get("KIND_BOUNCE_COOLDOWN_SECONDS", "21600"))
 KIND_BOUNCE_REPEAT_COUNT = int(os.environ.get("KIND_BOUNCE_REPEAT_COUNT", "2"))
-KIND_BOUNCE_REPEAT_WINDOW_MIN = int(os.environ.get("KIND_BOUNCE_REPEAT_WINDOW_MIN", "120"))
+# Default 240 min (4h) — must exceed the 2h per-connection breaker floor.
+# Successive cancel_and_restart attempts cannot occur within 120 min on the
+# same connection (breaker = 2h + ~5-15 min Lambda cron jitter = 125-135 min
+# minimum observed gap in 7-day audit log). A 240-min window comfortably
+# clears that floor and captures the natural ESCALATE-cluster duration
+# (3-5 attempts over 4-5 hours per incident cluster).
+KIND_BOUNCE_REPEAT_WINDOW_MIN = int(os.environ.get("KIND_BOUNCE_REPEAT_WINDOW_MIN", "240"))
 GLOBAL_KIND_BOUNCE_KEY = "_GLOBAL_KIND_BOUNCE"
 
 KIND_BOUNCE_PAYLOAD_TEMPLATE_PATH = (
