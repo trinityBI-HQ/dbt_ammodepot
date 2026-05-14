@@ -8,14 +8,19 @@
 Every 15 min on `cron(5,20,35,50)` UTC, this Lambda:
 
 1. Reads `AD_ANALYTICS.OPS.V_AIRBYTE_FRESHNESS` (Phase 1's view).
-2. For every connection in `ALERT` tier (≥60 min stale by default):
-   - Checks the DynamoDB circuit breaker. Skips if open.
-   - If `OBSERVE_ONLY=true`: logs the would-be action and emails an `[Airbyte OBSERVE]` notification.
-   - Otherwise: cancels the running Airbyte job + triggers a fresh sync via SSM.
-   - Sleeps 5 min, then verifies recovery (Snowflake re-query → S3 LIST fallback).
+2. For every connection in `ALERT` tier (≥30 min stale by default):
+   - Checks the per-connection DynamoDB circuit breaker. Skips if open.
+   - **Tier 1 (cancel+restart):** if `OBSERVE_ONLY=true`, logs the would-be
+     action. Otherwise cancels the running Airbyte job + triggers a fresh
+     sync via SSM, sleeps 5 min, verifies recovery.
+   - **Tier 2 (kind-bounce, Phase 2.1):** if Tier 1 left `post_staleness_min > 60`,
+     and global cooldown is clear, and the *other* connection is idle, and
+     `kind-bounce-observe-only=false`, then issues
+     `docker restart airbyte-abctl-control-plane` via SSM and re-verifies
+     after 3 min. Opens a global 6h cooldown after any bounce.
    - Writes one row to `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG`.
-   - Publishes `[Airbyte AUTO-FIX]` or `[Airbyte ESCALATE]` to SNS → email.
-   - Posts a comment to ClickUp task `86ah8bpmj`.
+   - Publishes one of `[Airbyte AUTO-FIX]`, `[Airbyte ESCALATE]`,
+     `[Airbyte KIND-BOUNCE *]` to SNS → email; posts matching ClickUp comment.
 
 Phase 1's email layer (`[Airbyte WARN]` / `[Airbyte ALERT]`) is unchanged
 and continues to fire independently.
@@ -36,6 +41,7 @@ Detailed design: [`.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md`](../
 | `pyproject.toml` | Runtime deps (boto3, snowflake-connector, requests) |
 | `Dockerfile` | Container image — `public.ecr.aws/lambda/python:3.11` base |
 | `ssm-payloads/cancel_and_restart.json.tmpl` | SSM `SendCommand` payload — `__CONNECTION_ID__` substituted at runtime |
+| `ssm-payloads/kind_bounce.json.tmpl` | SSM `SendCommand` payload for Tier 2 — `docker restart airbyte-abctl-control-plane` + readiness probe |
 | `iam-policies/lambda-trust.json` | Trust policy for the Lambda role |
 | `iam-policies/lambda-execution-role.json` | Inline execution policy (least-privilege) |
 | `iam-policies/eventbridge-trust.json` | Trust policy for EventBridge → Lambda |
@@ -80,23 +86,41 @@ Manual fallback: `./deploy.sh --image-only` (skip infra provisioning).
 
 ### Toggle observe-only
 
+Two independent flags — Tier 1 (cancel+restart) and Tier 2 (kind-bounce) can be
+gated separately:
+
 ```bash
-# Pause Lambda action (force observe-only):
+# Tier 1: pause cancel+restart (force observe-only):
 aws ssm put-parameter --name /airbyte-auto-remediate/observe-only \
     --value true --overwrite --profile ammodepot
 
-# Enable live action:
+# Tier 1: enable live cancel+restart:
 aws ssm put-parameter --name /airbyte-auto-remediate/observe-only \
+    --value false --overwrite --profile ammodepot
+
+# Tier 2: pause kind-bounce (cancel+restart still runs live):
+aws ssm put-parameter --name /airbyte-auto-remediate/kind-bounce-observe-only \
+    --value true --overwrite --profile ammodepot
+
+# Tier 2: enable live kind-bounce (after ≥3-day soak):
+aws ssm put-parameter --name /airbyte-auto-remediate/kind-bounce-observe-only \
     --value false --overwrite --profile ammodepot
 ```
 
 ### Reset breaker for a connection
 
 ```bash
+# Per-connection breaker (2h after a failed cancel+restart):
 aws dynamodb delete-item \
     --profile ammodepot \
     --table-name airbyte-auto-remediate-state \
     --key '{"connection_id":{"S":"magento_s3"}}'
+
+# Global kind-bounce cooldown (6h after any kind-bounce attempt):
+aws dynamodb delete-item \
+    --profile ammodepot \
+    --table-name airbyte-auto-remediate-state \
+    --key '{"connection_id":{"S":"_GLOBAL_KIND_BOUNCE"}}'
 ```
 
 ### Disable Lambda (emergency)
@@ -160,6 +184,8 @@ Snowflake compute reuses the existing `ETL_WH` (warm at the cron's
 
 - Operator runbook: [`docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md`](../../docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md)
 - Phase 1 (manual) runbook: [`docs/AIRBYTE_INCIDENT_RUNBOOK.md`](../../docs/AIRBYTE_INCIDENT_RUNBOOK.md)
-- DEFINE: [`.claude/sdd/features/DEFINE_AIRBYTE_AUTO_REMEDIATION.md`](../../.claude/sdd/features/DEFINE_AIRBYTE_AUTO_REMEDIATION.md)
-- DESIGN: [`.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md`](../../.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md)
+- DEFINE (Phase 2): [`.claude/sdd/features/DEFINE_AIRBYTE_AUTO_REMEDIATION.md`](../../.claude/sdd/features/DEFINE_AIRBYTE_AUTO_REMEDIATION.md)
+- DESIGN (Phase 2): [`.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md`](../../.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md)
+- DEFINE (Phase 2.1 kind-bounce): [`.claude/sdd/features/DEFINE_AIRBYTE_KIND_BOUNCE_TIER.md`](../../.claude/sdd/features/DEFINE_AIRBYTE_KIND_BOUNCE_TIER.md)
+- DESIGN (Phase 2.1 kind-bounce): [`.claude/sdd/features/DESIGN_AIRBYTE_KIND_BOUNCE_TIER.md`](../../.claude/sdd/features/DESIGN_AIRBYTE_KIND_BOUNCE_TIER.md)
 - ClickUp task: [86ah8bpmj](https://app.clickup.com/t/86ah8bpmj)

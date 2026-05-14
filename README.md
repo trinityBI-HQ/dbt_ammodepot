@@ -130,7 +130,7 @@ flowchart LR
 | BI Dashboard | Streamlit Sales Dashboard (`AD_ANALYTICS.OPS.SALES_DASHBOARD`, SiS container runtime, 5 pages) + Power BI |
 | Infra Monitoring | Snowsight dashboard (8 tiles) + Streamlit Infra Monitor (`AD_ANALYTICS.OPS.INFRA_MONITOR`, SiS container runtime, 6 pages including Airbyte Health) |
 | Airbyte Observability | Snowflake-native edge-triggered alerts (Phase 1) — `V_AIRBYTE_FRESHNESS` view + 2 ALERT objects on `ETL_WH` (warn 25 min, alert 30 min) → `OPS_EMAIL_NOTIFICATIONS` |
-| Airbyte Auto-Remediation | AWS Lambda `airbyte-auto-remediate` (Phase 2) — autonomous cancel + restart of stuck Airbyte syncs via SSM, with DynamoDB circuit breaker, S3-LIST verification, and audit log in `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG` |
+| Airbyte Auto-Remediation | AWS Lambda `airbyte-auto-remediate` (Phase 2 + 2.1) — two-tier autonomous recovery of stuck Airbyte syncs via SSM: **Tier 1** cancel + restart, **Tier 2** `docker restart airbyte-abctl-control-plane` (kind-bounce) when Tier 1 leaves post-staleness > 60 min. DynamoDB circuit breaker + global 6h kind-bounce cooldown + S3-LIST verification, audit log in `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG` |
 | AI Analyst | Cortex Analyst chatbot (`AD_ANALYTICS.OPS.ANALYST`) — text-to-SQL over semantic view `AMMODEPOT_ANALYST` (6 Gold tables, 20 golden queries) |
 | Demand Forecasting | Cortex ML FORECAST — 115 calibers + revenue, weekly Task `TASK_DAILY_FORECAST` (Sunday 4am UTC), outputs to `F_FORECAST` |
 | Anomaly Detection | Cortex ML ANOMALY_DETECTION — revenue/orders/margin, Page 1 alerts, outputs to `F_ANOMALIES` |
@@ -460,12 +460,12 @@ flowchart LR
     end
 
     subgraph P2["Phase 2 — Auto-Remediation (Lambda)"]
-        EB[EventBridge<br/>cron 5,20,35,50] --> LM[Lambda<br/>airbyte-auto-remediate<br/>512 MB / 600s]
+        EB[EventBridge<br/>cron 5,20,35,50] --> LM[Lambda<br/>airbyte-auto-remediate<br/>512 MB / 900s]
         LM -->|query| VF
         LM -->|S3 LIST canary| S3
-        DB[(DynamoDB<br/>circuit breaker<br/>2h after fail)] <--> LM
-        SP[/SSM Param<br/>observe-only/] -.->|toggle| LM
-        LM -->|SendCommand| AB
+        DB[(DynamoDB<br/>per-conn 2h breaker<br/>+ global 6h<br/>kind-bounce cooldown)] <--> LM
+        SP[/SSM Params<br/>observe-only<br/>kind-bounce-observe-only/] -.->|toggle| LM
+        LM -->|Tier 1: cancel+restart<br/>Tier 2: docker restart<br/>airbyte-abctl-control-plane| AB
         LM --> AL[(AIRBYTE_<br/>REMEDIATION_LOG)]
         LM --> SNS[SNS Topic<br/>airbyte-auto-<br/>remediate-events]
         LM --> CU[ClickUp<br/>comment]
@@ -502,11 +502,11 @@ flowchart LR
 - **Config**: `AIRBYTE_FRESHNESS_THRESHOLDS` table — operator tunes `warn_minutes` / `alert_minutes` via `UPDATE` (no redeploy)
 - **Runbook**: `docs/AIRBYTE_INCIDENT_RUNBOOK.md` — manual cancel + restart via SSM (5-min playbook)
 
-### Phase 2 — Lambda Auto-Remediation (shipped 2026-05-03)
+### Phase 2 — Lambda Auto-Remediation Tier 1 (shipped 2026-05-03)
 
-- **Lambda**: `airbyte-auto-remediate` (container image, 512 MB, 600 s timeout). EventBridge `cron(5,20,35,50 * * * ? *)` UTC — same cadence as dbt + Phase 1
-- **Action**: Cancels stuck Airbyte job and restarts via `ssm:SendCommand` against EC2 `i-075043415ebad732f` (no VPC, no NAT gateway)
-- **State**: DynamoDB table `airbyte-auto-remediate-state` (PAY_PER_REQUEST + TTL on `breaker_until`) — circuit breaker = 2 h after a failed attempt
+- **Lambda**: `airbyte-auto-remediate` (container image, 512 MB, 900 s timeout — was 600s pre-Tier 2). EventBridge `cron(5,20,35,50 * * * ? *)` UTC — same cadence as dbt + Phase 1
+- **Tier 1 action**: Cancels stuck Airbyte job and restarts via `ssm:SendCommand` against EC2 `i-075043415ebad732f` (no VPC, no NAT gateway)
+- **State**: DynamoDB table `airbyte-auto-remediate-state` (PAY_PER_REQUEST + TTL on `breaker_until`) — per-connection circuit breaker = 2 h after a failed attempt
 - **Toggle**: SSM Parameter `/airbyte-auto-remediate/observe-only` — flip between `true` (log only) and `false` (live action) without redeploy
 - **Verification**: Snowflake re-query (`V_AIRBYTE_FRESHNESS`) primary; S3 LIST on canary tables fallback
 - **Audit log**: `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG` — one row per AUTO_FIX / ESCALATE / BREAKER_OPEN / OBSERVE_ONLY_WOULD_ACT event
@@ -514,6 +514,21 @@ flowchart LR
 - **Latency**: detection-to-action ≤16 min worst case, mean ~7.5 min
 - **Cost**: ≤$2/mo (CloudWatch billing alarm at $5/mo as hard cap)
 - **Runbook**: `docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md`
+
+### Phase 2.1 — Tier 2 Kind-Bounce (shipped 2026-05-14)
+
+When Tier 1 cancel+restart leaves a connection at `post_staleness_min > 60`, the Lambda escalates to Tier 2: `docker restart airbyte-abctl-control-plane` via SSM. Recovers the kind/kube-scheduler stuck state where Airbyte accepts cancel+restart but the new pod never schedules — the failure signature behind the 0/13 magento_s3 cancel+restart success rate seen in the audit log over 2026-05-07 → 2026-05-14.
+
+- **Trigger** (either condition fires Tier 2, after Tier 1 cancel+restart fails):
+  - `deep_stuck` — `post_staleness_min > KIND_BOUNCE_TRIGGER_POST_MIN` (60 min). Catches the kind-scheduler-frozen pattern.
+  - `repeat_pattern` — ≥`KIND_BOUNCE_REPEAT_COUNT` (default 2) cancel+restart attempts on this connection in last `KIND_BOUNCE_REPEAT_WINDOW_MIN` (default 240) minutes. Catches recurring-incident clusters where each Tier 1 *looks* fine but the scheduler is degrading. Window must exceed the 2h per-connection breaker floor (which makes back-to-back attempts <135 min apart impossible in practice).
+- **Action**: `docker restart airbyte-abctl-control-plane` (~13s restart + ≤120s in-payload `/api/v1/health` readiness probe). PV state preserved.
+- **Toggle**: SSM Parameter `/airbyte-auto-remediate/kind-bounce-observe-only` — independent of Tier 1 flag. Default `true` on first deploy for ≥3-day soak.
+- **Global cooldown**: 6h between bounces (DynamoDB sentinel key `_GLOBAL_KIND_BOUNCE`) — prevents bounce-loops if the bounce itself doesn't recover.
+- **Concurrent-sync guard**: Skip the bounce if the *other* connection's canary S3 prefix has objects modified within `VERIFY_WAIT_SECONDS` (mid-sync) — avoids killing healthy fishbowl to fix magento.
+- **Email subjects**: `[Airbyte KIND-BOUNCE AUTO-FIX]` (recovered), `[Airbyte KIND-BOUNCE ESCALATE]` (bounce attempted but didn't recover), `[Airbyte KIND-BOUNCE OBSERVE]` (would-act in observe-only mode).
+- **Audit log values**: `action_taken IN ('kind_bounce', 'would_kind_bounce')`.
+- **Live validation 2026-05-14**: `docker restart` cleared a stuck Magento job 10731 (`bytesSynced=0, status=running` → `status=succeeded` post-bounce). Subsequent cancel+restart on the healthy control plane started fresh job 10737 normally.
 
 ---
 
