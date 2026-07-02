@@ -15,15 +15,19 @@ Single-invocation orchestration:
             240 min (repeat_pattern — catches recurring-incident clusters;
             window must exceed the 2h per-connection breaker floor)
         and gates clear (cooldown, concurrent-sync). docker restart
-        airbyte-abctl-control-plane via SSM, sleep 180s, re-verify.
+        airbyte-abctl-control-plane via SSM (reconciled up to 240s), then on
+        SUCCESS auto cancel+restart to kick a fresh sync, sleep 180s, re-verify.
      g. Determine outcome
   4. Persist + notify (Snowflake audit row + ClickUp comment + SNS publish)
 
-Time budget per connection (worst case, with Tier 2 firing):
-  detect 2s + (cancel+restart up to 120s SSM) + sleep 300s + verify 10s
-  + eligibility 5s + (kind-bounce up to 120s SSM) + sleep 180s + verify 10s
-  + notify 5s = ~752s.
-Two connections in parallel: ~755s. Lambda timeout 900s, headroom ~145s.
+Time budget per connection (cap-based worst case, with Tier 2 firing):
+  detect 2s + (cancel+restart poll ≤120s SSM) + sleep 300s + verify 10s
+  + eligibility 5s + (kind-bounce reconcile ≤240s SSM) + (post-bounce
+  cancel+restart poll ≤45s) + sleep 180s + verify 10s + notify 5s ≈ 920s at the
+  caps. The KIND_BOUNCE_VERIFY_WAIT sleep + verify is GUARDED by _has_budget_for
+  against the 900s hard timeout: if the invocation lacks budget it writes a
+  "verify deferred" row (cooldown already open) and lets the next cron cycle's
+  freshness check confirm recovery, so an overrun can never hard-kill mid-tier.
 """
 
 from __future__ import annotations
@@ -89,6 +93,8 @@ VERIFY_WAIT_SECONDS = int(os.environ.get("VERIFY_WAIT_SECONDS", "300"))
 BREAKER_LOCK_SECONDS = int(os.environ.get("BREAKER_LOCK_SECONDS", "7200"))
 SSM_POLL_TIMEOUT_SECONDS = int(os.environ.get("SSM_POLL_TIMEOUT_SECONDS", "120"))
 SSM_POLL_INTERVAL_SECONDS = 5
+# Terminal SSM command-invocation statuses (poll target).
+_SSM_TERMINAL_STATUSES = ("Success", "Failed", "TimedOut", "Cancelled")
 
 SSM_PAYLOAD_TEMPLATE_PATH = Path(__file__).parent / "ssm-payloads" / "cancel_and_restart.json.tmpl"
 
@@ -96,6 +102,31 @@ KIND_BOUNCE_OBSERVE_ONLY_PARAM = "/airbyte-auto-remediate/kind-bounce-observe-on
 KIND_BOUNCE_TRIGGER_POST_MIN = int(os.environ.get("KIND_BOUNCE_TRIGGER_POST_MIN", "60"))
 KIND_BOUNCE_VERIFY_WAIT_SECONDS = int(os.environ.get("KIND_BOUNCE_VERIFY_WAIT_SECONDS", "180"))
 KIND_BOUNCE_COOLDOWN_SECONDS = int(os.environ.get("KIND_BOUNCE_COOLDOWN_SECONDS", "21600"))
+# A control-plane restart legitimately outlasts the 120s primary SSM poll
+# (the payload waits up to 120s for readiness on top of up to ~60s SSM delivery
+# latency). Reconcile by polling to this window before classifying the command,
+# so a still-running bounce is never mislabeled a failure. Worst-case tier
+# timing with 240s here stays under the 900s Lambda ceiling (budget noted in
+# _execute_kind_bounce_tier).
+KIND_BOUNCE_SSM_RECONCILE_SECONDS = int(os.environ.get("KIND_BOUNCE_SSM_RECONCILE_SECONDS", "240"))
+# Invariant: reconcile MUST exceed the primary poll, else Phase 2 collapses to a
+# zero-length no-op and every slow bounce is misclassified UNKNOWN (the SUCCESS
+# path — cooldown + fresh-sync kick — would never run). Clamp defensively.
+if KIND_BOUNCE_SSM_RECONCILE_SECONDS <= SSM_POLL_TIMEOUT_SECONDS:
+    KIND_BOUNCE_SSM_RECONCILE_SECONDS = SSM_POLL_TIMEOUT_SECONDS + 120
+# Post-bounce cancel+restart is non-fatal (only kicks a fresh sync + labels the
+# audit row), so poll it briefly rather than the full 120s — it runs against a
+# just-restarted, still-stabilizing control plane and would otherwise be the
+# largest avoidable contributor to the invocation's worst-case time.
+KIND_BOUNCE_POST_RESTART_POLL_SECONDS = int(os.environ.get("KIND_BOUNCE_POST_RESTART_POLL_SECONDS", "45"))
+# Safety margin over the KIND_BOUNCE_VERIFY_WAIT sleep before we risk the 900s
+# Lambda hard timeout; below this the in-line verify is deferred to next cycle.
+KIND_BOUNCE_VERIFY_BUDGET_MARGIN_SECONDS = 30
+
+# _ssm_kind_bounce outcome classification (see its docstring).
+KIND_BOUNCE_SSM_SUCCESS = "SUCCESS"
+KIND_BOUNCE_SSM_FAILED = "FAILED"
+KIND_BOUNCE_SSM_UNKNOWN = "UNKNOWN"
 KIND_BOUNCE_REPEAT_COUNT = int(os.environ.get("KIND_BOUNCE_REPEAT_COUNT", "2"))
 # Default 240 min (4h) — must exceed the 2h per-connection breaker floor.
 # Successive cancel_and_restart attempts cannot occur within 120 min on the
@@ -121,6 +152,20 @@ secrets_client = boto3.client("secretsmanager")
 ddb_client = boto3.client("dynamodb")
 s3_client = boto3.client("s3")
 
+# Wall-clock epoch by which the current invocation must finish (set per-invocation
+# from Lambda context). None outside a Lambda invocation (e.g. unit tests), in
+# which case _has_budget_for is a no-op that always returns True.
+_INVOCATION_DEADLINE: float | None = None
+
+
+def _has_budget_for(seconds: float) -> bool:
+    """True if the current invocation has at least `seconds` of runtime budget
+    left before the Lambda hard timeout. Returns True when the deadline is
+    unknown (direct/unit-test calls)."""
+    if _INVOCATION_DEADLINE is None:
+        return True
+    return (_INVOCATION_DEADLINE - time.time()) >= seconds
+
 
 # ----------------------------------------------------------------------------
 # Lambda entry point
@@ -128,6 +173,8 @@ s3_client = boto3.client("s3")
 
 def handler(event, context):
     """EventBridge invokes this every 15 min on cron(5,20,35,50)."""
+    global _INVOCATION_DEADLINE
+    _INVOCATION_DEADLINE = time.time() + (context.get_remaining_time_in_millis() / 1000.0)
     request_id = context.aws_request_id
     log_stream = context.log_stream_name
     LOGGER.info(json.dumps({"event": "invocation_start", "request_id": request_id}))
@@ -422,10 +469,36 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
 # Step 3 helpers: SSM cancel + restart
 # ----------------------------------------------------------------------------
 
-def _ssm_cancel_and_restart(conn_id: str) -> tuple[str | None, str | None, str | None]:
+def _poll_ssm_invocation(command_id: str, deadline: float) -> dict | None:
+    """Poll get_command_invocation until a terminal status or `deadline`.
+
+    Returns the last invocation dict seen — terminal, or (on timeout) the last
+    non-terminal snapshot — or None if the invocation never registered. Callers
+    check inv["Status"] against _SSM_TERMINAL_STATUSES to distinguish a confirmed
+    result from a poll timeout.
+    """
+    inv = None
+    while time.time() < deadline:
+        time.sleep(SSM_POLL_INTERVAL_SECONDS)
+        try:
+            inv = ssm_client.get_command_invocation(
+                CommandId=command_id, InstanceId=AIRBYTE_INSTANCE_ID
+            )
+        except ssm_client.exceptions.InvocationDoesNotExist:
+            continue
+        if inv["Status"] in _SSM_TERMINAL_STATUSES:
+            break
+    return inv
+
+
+def _ssm_cancel_and_restart(
+    conn_id: str, poll_timeout_seconds: int = SSM_POLL_TIMEOUT_SECONDS
+) -> tuple[str | None, str | None, str | None]:
     """Returns (cancelled_job_id, restart_job_id, failure_reason).
 
-    failure_reason is None on success.
+    failure_reason is None on success. `poll_timeout_seconds` caps how long we
+    wait for the command to reach a terminal status; callers whose result is
+    non-fatal (e.g. the post-bounce fresh-sync kick) pass a short value.
     """
     template = SSM_PAYLOAD_TEMPLATE_PATH.read_text()
     payload_str = template.replace("__CONNECTION_ID__", AIRBYTE_CONNECTION_IDS[conn_id])
@@ -444,18 +517,8 @@ def _ssm_cancel_and_restart(conn_id: str) -> tuple[str | None, str | None, str |
     command_id = send_resp["Command"]["CommandId"]
     LOGGER.info(json.dumps({"event": "ssm_command_sent", "connection_id": conn_id, "command_id": command_id}))
 
-    deadline = time.time() + SSM_POLL_TIMEOUT_SECONDS
-    inv = None
-    while time.time() < deadline:
-        time.sleep(SSM_POLL_INTERVAL_SECONDS)
-        try:
-            inv = ssm_client.get_command_invocation(CommandId=command_id, InstanceId=AIRBYTE_INSTANCE_ID)
-        except ssm_client.exceptions.InvocationDoesNotExist:
-            continue
-        if inv["Status"] in ("Success", "Failed", "TimedOut", "Cancelled"):
-            break
-
-    if inv is None or inv.get("Status") not in ("Success", "Failed", "TimedOut", "Cancelled"):
+    inv = _poll_ssm_invocation(command_id, time.time() + poll_timeout_seconds)
+    if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
         return None, None, "ssm_poll_deadline_exceeded"
 
     if inv["Status"] != "Success":
@@ -733,45 +796,75 @@ def _evaluate_kind_bounce_eligibility(
     return ("TRIGGER", None, trigger_reason)
 
 
-def _ssm_kind_bounce() -> str | None:
-    """Returns None on success, failure-reason string otherwise."""
+def _ssm_kind_bounce() -> tuple[str, str | None]:
+    """Restart the Airbyte control-plane container via SSM.
+
+    Returns (status, detail):
+      - (KIND_BOUNCE_SSM_SUCCESS, None)    command finished and the control plane
+                                           came back healthy (READINESS_OK).
+      - (KIND_BOUNCE_SSM_FAILED, reason)   command reached a terminal non-Success
+                                           status, or Success without READINESS_OK
+                                           (control plane did not become healthy)
+                                           — a CONFIRMED failure.
+      - (KIND_BOUNCE_SSM_UNKNOWN, reason)  no terminal status even after
+                                           reconciliation — the bounce may or may
+                                           not have run. Caller must NOT treat
+                                           this as a hard failure (in particular,
+                                           must NOT open the global cooldown).
+
+    The control-plane restart legitimately runs longer than the 120s primary
+    poll window (the payload waits up to 120s for readiness plus SSM delivery
+    latency), so a primary-poll timeout is RECONCILED by continuing to poll for
+    the command's true terminal status. Declaring failure at 120s (the old
+    behavior) armed the 6h global cooldown and deadlocked remediation while the
+    restart had actually succeeded.
+    """
     payload = json.loads(KIND_BOUNCE_PAYLOAD_TEMPLATE_PATH.read_text())
     try:
         send_resp = ssm_client.send_command(
             InstanceIds=[AIRBYTE_INSTANCE_ID],
             DocumentName="AWS-RunShellScript",
             Parameters={"commands": payload["commands"]},
-            TimeoutSeconds=SSM_POLL_TIMEOUT_SECONDS,
+            TimeoutSeconds=KIND_BOUNCE_SSM_RECONCILE_SECONDS,
         )
     except Exception as exc:
-        return f"ssm_send_command_exception: {exc}"
+        # Send never reached the instance — the control plane was NOT touched, so
+        # there is no "already bounced, don't re-bounce" reason to arm the 6h
+        # cooldown. Classify UNKNOWN (arms nothing) and let the next cycle retry;
+        # this is a strictly stronger "nothing happened" than a reconcile timeout.
+        return KIND_BOUNCE_SSM_UNKNOWN, f"ssm_send_command_exception: {exc}"
 
     command_id = send_resp["Command"]["CommandId"]
     LOGGER.info(json.dumps({"event": "kind_bounce_ssm_sent", "command_id": command_id}))
 
-    deadline = time.time() + SSM_POLL_TIMEOUT_SECONDS
-    inv = None
-    while time.time() < deadline:
-        time.sleep(SSM_POLL_INTERVAL_SECONDS)
-        try:
-            inv = ssm_client.get_command_invocation(
-                CommandId=command_id, InstanceId=AIRBYTE_INSTANCE_ID
-            )
-        except ssm_client.exceptions.InvocationDoesNotExist:
-            continue
-        if inv["Status"] in ("Success", "Failed", "TimedOut", "Cancelled"):
-            break
+    # Phase 1: primary poll (same window as cancel+restart).
+    inv = _poll_ssm_invocation(command_id, time.time() + SSM_POLL_TIMEOUT_SECONDS)
 
-    if inv is None or inv.get("Status") not in ("Success", "Failed", "TimedOut", "Cancelled"):
-        return "ssm_poll_deadline_exceeded"
-    if inv["Status"] != "Success":
+    # Phase 2: reconcile a still-running command rather than declaring failure.
+    if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
+        LOGGER.info(json.dumps({
+            "event": "kind_bounce_ssm_reconciling",
+            "command_id": command_id,
+            "reconcile_deadline_s": KIND_BOUNCE_SSM_RECONCILE_SECONDS,
+        }))
+        inv = _poll_ssm_invocation(
+            command_id,
+            time.time() + max(0, KIND_BOUNCE_SSM_RECONCILE_SECONDS - SSM_POLL_TIMEOUT_SECONDS),
+        )
+
+    if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
+        return KIND_BOUNCE_SSM_UNKNOWN, "ssm_poll_deadline_exceeded_unreconciled"
+
+    status = inv["Status"]
+    if status != "Success":
         stderr = (inv.get("StandardErrorContent") or "")[:400]
         stdout = (inv.get("StandardOutputContent") or "")[:200]
-        return f"ssm_command_status={inv['Status']}; stderr={stderr}; stdout={stdout}"
+        return KIND_BOUNCE_SSM_FAILED, f"ssm_command_status={status}; stderr={stderr}; stdout={stdout}"
+
     output = inv.get("StandardOutputContent", "") or ""
     if "READINESS_OK" not in output:
-        return f"readiness_marker_missing: {output[:300]}"
-    return None
+        return KIND_BOUNCE_SSM_FAILED, f"readiness_marker_missing: {output[:300]}"
+    return KIND_BOUNCE_SSM_SUCCESS, None
 
 
 def _execute_kind_bounce_tier(
@@ -785,17 +878,60 @@ def _execute_kind_bounce_tier(
     trigger_reason: str | None = None,
 ) -> None:
     bounce_command_time = datetime.now(timezone.utc)
-    ssm_failure = _ssm_kind_bounce()
+    bounce_status, bounce_detail = _ssm_kind_bounce()
     trigger_tag = f"trigger:{trigger_reason}" if trigger_reason else "trigger:unknown"
 
-    if ssm_failure:
+    # Tier timing (cap-based): detect ~2s + Tier-1 cancel/restart poll ≤120s +
+    # VERIFY_WAIT 300s + verify ~10s + eligibility ~5s + bounce reconcile ≤240s +
+    # post-bounce cancel/restart poll ≤45s + KIND_BOUNCE verify 180s can reach
+    # ~900s at the caps, so the 180s verify sleep below is gated by
+    # _has_budget_for — an overrun defers verification instead of hard-killing.
+
+    if bounce_status == KIND_BOUNCE_SSM_UNKNOWN:
+        # Reconciliation could not confirm the command's terminal status, so we
+        # cannot say the bounce failed. Do NOT open the global cooldown (arming
+        # it on an unconfirmed timeout was the root cause of the deadlock) and do
+        # NOT arm the per-connection breaker. Notify a human and let the next
+        # invocation re-detect — the freshness check is the real verifier, and if
+        # the bounce completed out-of-band the next cycle simply sees recovery.
+        LOGGER.warning(json.dumps({
+            "event": "kind_bounce_ssm_unknown",
+            "connection_id": conn_id,
+            "detail": bounce_detail,
+        }))
+        _write_audit_row(snowflake_conn, {
+            **base_audit,
+            "action_taken": "kind_bounce",
+            "outcome": "ESCALATE",
+            "failure_reason": f"kind_bounce_ssm_unknown: {bounce_detail} ({trigger_tag})"[:500],
+            "cancelled_job_id": cancelled_job,
+            "restart_job_id": restart_job,
+            "post_staleness_min": post_cancel_restart_staleness,
+            "verification_method": "kind_bounce_ssm_unknown",
+        })
+        _publish_sns(
+            f"[Airbyte KIND-BOUNCE UNKNOWN] {conn_id} bounce status unconfirmed ({trigger_reason})",
+            _build_kind_bounce_unknown_email(
+                conn_id, pre_staleness, post_cancel_restart_staleness,
+                bounce_detail, trigger_reason=trigger_reason,
+            ),
+        )
+        _post_clickup_comment(
+            _build_clickup_kind_bounce_unknown_comment(
+                conn_id, pre_staleness, post_cancel_restart_staleness,
+                bounce_detail, trigger_reason=trigger_reason,
+            )
+        )
+        return
+
+    if bounce_status == KIND_BOUNCE_SSM_FAILED:
         _open_global_kind_bounce_cooldown()
         breaker_dt = _open_breaker(conn_id)
         _write_audit_row(snowflake_conn, {
             **base_audit,
             "action_taken": "kind_bounce",
             "outcome": "ESCALATE",
-            "failure_reason": f"kind_bounce_ssm: {ssm_failure} ({trigger_tag})"[:500],
+            "failure_reason": f"kind_bounce_ssm: {bounce_detail} ({trigger_tag})"[:500],
             "cancelled_job_id": cancelled_job,
             "restart_job_id": restart_job,
             "post_staleness_min": post_cancel_restart_staleness,
@@ -805,15 +941,84 @@ def _execute_kind_bounce_tier(
         _publish_sns(
             f"[Airbyte KIND-BOUNCE ESCALATE] {conn_id} bounce failed ({trigger_reason})",
             _build_kind_bounce_escalate_email(
-                conn_id, pre_staleness, post_cancel_restart_staleness, ssm_failure,
+                conn_id, pre_staleness, post_cancel_restart_staleness, bounce_detail,
                 trigger_reason=trigger_reason,
             ),
         )
         _post_clickup_comment(
             _build_clickup_kind_bounce_escalate_comment(
-                conn_id, pre_staleness, post_cancel_restart_staleness, ssm_failure,
+                conn_id, pre_staleness, post_cancel_restart_staleness, bounce_detail,
                 trigger_reason=trigger_reason,
             )
+        )
+        return
+
+    # bounce_status == KIND_BOUNCE_SSM_SUCCESS: control plane restarted + healthy.
+    # The bounce reclassifies the stuck zero-byte job as succeeded but does NOT
+    # auto-retry, and the S3 Iceberg connections are manual-trigger — so kick a
+    # fresh sync explicitly before verifying. Open the global cooldown now: a
+    # real bounce happened, so we must not re-bounce the shared control plane
+    # for KIND_BOUNCE_COOLDOWN_SECONDS regardless of the sync outcome below.
+    _open_global_kind_bounce_cooldown()
+    LOGGER.info(json.dumps({
+        "event": "kind_bounce_post_restart_cancel_restart",
+        "connection_id": conn_id,
+    }))
+    try:
+        pb_cancelled_job, pb_restart_job, pb_failure = _ssm_cancel_and_restart(
+            conn_id, poll_timeout_seconds=KIND_BOUNCE_POST_RESTART_POLL_SECONDS
+        )
+    except Exception as exc:  # non-fatal: the fresh sync may still have been kicked
+        pb_cancelled_job = pb_restart_job = None
+        pb_failure = f"post_restart_exception: {exc}"
+    if pb_failure:
+        LOGGER.warning(json.dumps({
+            "event": "kind_bounce_post_restart_cancel_restart_failed",
+            "connection_id": conn_id,
+            "error": pb_failure,
+        }))
+    else:
+        # Surface the fresh sync's job ids in the audit trail.
+        cancelled_job = pb_cancelled_job or cancelled_job
+        restart_job = pb_restart_job or restart_job
+
+    # Guard the in-line verify against the 900s Lambda hard timeout. A slow-but-
+    # successful bounce (reconciled up to 240s) can leave < KIND_BOUNCE_VERIFY_WAIT
+    # of budget. The global cooldown is already open (a real bounce ran) and the
+    # fresh sync is already kicked, so defer verification to the next invocation's
+    # freshness check rather than risk a hard kill that would drop the audit row.
+    if not _has_budget_for(KIND_BOUNCE_VERIFY_WAIT_SECONDS + KIND_BOUNCE_VERIFY_BUDGET_MARGIN_SECONDS):
+        LOGGER.warning(json.dumps({
+            "event": "kind_bounce_verify_deferred_low_budget",
+            "connection_id": conn_id,
+        }))
+        _write_audit_row(snowflake_conn, {
+            **base_audit,
+            "action_taken": "kind_bounce",
+            "outcome": "ESCALATE",
+            "failure_reason": f"kind_bounce_verify_deferred_low_budget ({trigger_tag})",
+            "cancelled_job_id": cancelled_job,
+            "restart_job_id": restart_job,
+            "post_staleness_min": post_cancel_restart_staleness,
+            "verification_method": "deferred_to_next_cycle",
+        })
+        _publish_sns(
+            f"[Airbyte KIND-BOUNCE PENDING] {conn_id} bounced; verify deferred to next cycle ({trigger_reason})",
+            (
+                f"Tier 2 kind-bounce for {conn_id} SUCCEEDED and a fresh sync was "
+                f"kicked, but in-line verification was deferred to the next cron "
+                f"invocation to stay under the Lambda time budget.\n\n"
+                f"  Pre-restart staleness:  {pre_staleness} min\n"
+                f"  Post-restart staleness: {post_cancel_restart_staleness} min\n\n"
+                f"Global bounce cooldown is OPEN "
+                f"({KIND_BOUNCE_COOLDOWN_SECONDS // 3600}h); no per-connection "
+                f"breaker was set. The next cycle's freshness check confirms recovery.\n"
+            ),
+        )
+        _post_clickup_comment(
+            f"🟠 KIND-BOUNCE PENDING: **{conn_id}** bounced + fresh sync kicked; "
+            f"in-line verify deferred to next cycle (time budget). Global cooldown "
+            f"open ({KIND_BOUNCE_COOLDOWN_SECONDS // 3600}h), no breaker."
         )
         return
 
@@ -830,7 +1035,6 @@ def _execute_kind_bounce_tier(
     )
 
     if verification_method == "both_inconclusive_escalated":
-        _open_global_kind_bounce_cooldown()
         breaker_dt = _open_breaker(conn_id)
         _write_audit_row(snowflake_conn, {
             **base_audit,
@@ -859,7 +1063,6 @@ def _execute_kind_bounce_tier(
             )
         )
     else:
-        _open_global_kind_bounce_cooldown()
         _write_audit_row(snowflake_conn, {
             **base_audit,
             "action_taken": "kind_bounce",
@@ -1182,5 +1385,37 @@ def _build_clickup_kind_bounce_escalate_comment(conn_id: str, pre: int,
         f"- Both cooldowns engaged "
         f"(global {KIND_BOUNCE_COOLDOWN_SECONDS // 3600}h + "
         f"per-connection {BREAKER_LOCK_SECONDS // 60}m)\n"
+        f"- See [runbook]({_runbook_url()}) Tier 2 section"
+    )
+
+
+def _build_kind_bounce_unknown_email(conn_id: str, pre: int, post_restart: int,
+                                     detail: str,
+                                     trigger_reason: str | None = None) -> str:
+    return (
+        f"Tier 2 kind-bounce status UNCONFIRMED for {conn_id}.\n\n"
+        f"  Trigger:                  {_trigger_reason_explanation(trigger_reason)}\n"
+        f"  Pre-restart staleness:    {pre} min\n"
+        f"  Post-restart staleness:   {post_restart} min\n"
+        f"  Detail:                   {detail}\n\n"
+        f"The bounce command's final status could not be confirmed within the "
+        f"reconcile window, so NO global cooldown and NO per-connection breaker "
+        f"were opened. The next cron invocation will re-detect and re-attempt if "
+        f"the connection is still stale.\n\n"
+        f"Manual recovery: see 'Tier 2: Kind-Bounce' section of "
+        f"docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md\n"
+        f"Phase 1 email layer is unaffected.\n"
+    )
+
+
+def _build_clickup_kind_bounce_unknown_comment(conn_id: str, pre: int,
+                                               post_restart: int, detail: str,
+                                               trigger_reason: str | None = None) -> str:
+    return (
+        f"🟠 KIND-BOUNCE UNKNOWN: **{conn_id}** bounce status unconfirmed.\n"
+        f"- Trigger: `{trigger_reason or 'unknown'}`\n"
+        f"- Pre-restart: {pre}m → Post-restart: {post_restart}m\n"
+        f"- Detail: `{detail}`\n"
+        f"- NO cooldown or breaker opened — next cycle re-detects and re-attempts.\n"
         f"- See [runbook]({_runbook_url()}) Tier 2 section"
     )
