@@ -85,6 +85,11 @@ grant ownership on table ad_analytics.ops.airbyte_freeze_evidence
 grant insert on table ad_analytics.ops.airbyte_freeze_evidence
     to role transformer_role;
 
+-- SELECT to transformer_role too, so the writing role (SVC_DBT) can read back /
+-- verify its own captures.
+grant select on table ad_analytics.ops.airbyte_freeze_evidence
+    to role transformer_role;
+
 grant select on table ad_analytics.ops.airbyte_freeze_evidence
     to role dashboard_viewer_role;
 grant select on table ad_analytics.ops.airbyte_freeze_evidence

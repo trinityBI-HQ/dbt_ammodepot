@@ -323,10 +323,12 @@ def _parse_kv(output: str) -> dict:
     return kv
 
 
-def _write_evidence_row(conn, row: dict) -> None:
+def _write_evidence_row(conn, row: dict) -> bool:
     """Append-only INSERT into the freeze-evidence table. JSON blobs go through
     PARSE_JSON; absent scalars/blobs stay NULL. Fully swallows errors (best-effort)
-    so a persistence failure can never affect remediation."""
+    so a persistence failure can never affect remediation. Returns True iff the row
+    actually landed — the caller folds this into the capture metric so a
+    write-vs-read regression is immediately visible."""
     json_cols = {
         "attempt_json": "attempt",
         "k8s_events_json": "k8s_events",
@@ -350,23 +352,35 @@ def _write_evidence_row(conn, row: dict) -> None:
     sql = f"insert into {SNOW_EVIDENCE_TABLE} ({', '.join(cols)}) select {', '.join(selects)}"
     try:
         conn.cursor().execute(sql, params)
+        return True
     except Exception as exc:
         LOGGER.warning(json.dumps({
             "event": "evidence_write_failed",
             "event_id": row.get("event_id"),
             "error": str(exc)[:300],
         }))
+        return False
 
 
-def _emit_capture_metric(conn_id: str, outcome: str, start_ts: float) -> None:
+def _emit_capture_metric(conn_id: str, outcome: str, start_ts: float,
+                         persisted: bool | None = None) -> None:
     """One structured metric line per capture attempt, on EVERY exit path, so
-    COLLECTOR health (attempted / ok / skipped_budget / degraded / duration) is
-    queryable in CloudWatch Logs Insights with zero PutMetricData cost. This is
-    about the collector behaving correctly — not about Airbyte."""
+    COLLECTOR health is queryable in CloudWatch Logs Insights at zero
+    PutMetricData cost. Two ORTHOGONAL fields keep capture-vs-persist explicit:
+      * outcome   — the CAPTURE result (ok / partial / empty / skipped_budget /
+                    ssm_send_failed / ssm_poll_error / ssm_poll_timeout);
+      * persisted — did the row actually LAND in Snowflake (true / false, or null
+                    when no write was attempted).
+    A capture is a TRUE success only when persisted is true. A read that succeeds
+    but fails to persist logs outcome='ok', persisted=false — so a write
+    regression surfaces immediately instead of hiding behind 'ok'. Insights
+    'succeeded' = count(persisted=1); real failures = persisted=0 AND
+    outcome != 'skipped_budget'."""
     LOGGER.info(json.dumps({
         "event": "capture_metric",
         "connection_id": conn_id,
         "outcome": outcome,
+        "persisted": persisted,
         "duration_ms": int((time.time() - start_ts) * 1000),
     }))
 
@@ -404,7 +418,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     start_ts = time.time()
 
     if not _has_budget_for(CAPTURE_TOTAL_BUDGET_SECONDS):
-        _emit_capture_metric(conn_id, "skipped_budget", start_ts)
+        _emit_capture_metric(conn_id, "skipped_budget", start_ts, persisted=False)
         return
 
     try:
@@ -417,30 +431,30 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
             TimeoutSeconds=CAPTURE_SSM_POLL_TIMEOUT_SECONDS,
         )
     except Exception as exc:
-        _write_evidence_row(snowflake_conn, {
+        persisted = _write_evidence_row(snowflake_conn, {
             "event_id": event_id, "connection_id": conn_id,
             "capture_status": "ssm_send_failed", "capture_detail": str(exc)[:500],
         })
-        _emit_capture_metric(conn_id, "ssm_send_failed", start_ts)
+        _emit_capture_metric(conn_id, "ssm_send_failed", start_ts, persisted=persisted)
         return
 
     command_id = send_resp["Command"]["CommandId"]
     try:
         inv = _poll_ssm_invocation(command_id, time.time() + CAPTURE_SSM_POLL_TIMEOUT_SECONDS)
     except Exception as exc:
-        _write_evidence_row(snowflake_conn, {
+        persisted = _write_evidence_row(snowflake_conn, {
             "event_id": event_id, "connection_id": conn_id,
             "capture_status": "ssm_poll_error", "capture_detail": str(exc)[:500],
         })
-        _emit_capture_metric(conn_id, "ssm_poll_error", start_ts)
+        _emit_capture_metric(conn_id, "ssm_poll_error", start_ts, persisted=persisted)
         return
 
     if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
-        _write_evidence_row(snowflake_conn, {
+        persisted = _write_evidence_row(snowflake_conn, {
             "event_id": event_id, "connection_id": conn_id,
             "capture_status": "ssm_poll_timeout",
         })
-        _emit_capture_metric(conn_id, "ssm_poll_timeout", start_ts)
+        _emit_capture_metric(conn_id, "ssm_poll_timeout", start_ts, persisted=persisted)
         return
 
     output = inv.get("StandardOutputContent", "") or ""
@@ -459,7 +473,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     except Exception:
         job_id = None
 
-    _write_evidence_row(snowflake_conn, {
+    persisted = _write_evidence_row(snowflake_conn, {
         "event_id": event_id,
         "connection_id": conn_id,
         "job_id": job_id,
@@ -470,7 +484,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
         "pods_json": kv.get("PODS_JSON"),
         "node_conditions_json": kv.get("NODE_CONDITIONS_JSON"),
     })
-    _emit_capture_metric(conn_id, status, start_ts)
+    _emit_capture_metric(conn_id, status, start_ts, persisted=persisted)
 
 
 # ----------------------------------------------------------------------------
