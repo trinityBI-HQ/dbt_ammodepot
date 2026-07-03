@@ -47,17 +47,28 @@ downstream link should disappear — not just the visible freeze.
 
 ## 4. Success criteria
 
+This is a **stabilization experiment, not a deployment.** Passing the propagation
+gate is necessary; the first healthy sync is encouraging; **neither proves the
+mechanism is fixed.** The failure is intermittent (global OOMs ~1.3/h before), so
+success is judged on a *new steady state* over an observation window — never on "did
+the next sync succeed?"
+
 **Gate (propagation — must pass FIRST, per [AIRBYTE_INSTALL.md](./AIRBYTE_INSTALL.md) §Verify Step 1):**
 rendered pod spec + cgroup-v2 `memory.max` = 2 GiB on **both** source and dest, for
 **both** connections (fishbowl + magento). If this fails, the experiment ends here
 (no-op) → roll back; do not evaluate behavior.
 
-**Primary (mechanism):** in an AFTER window ≥ the BEFORE window (≥ ~24 h / ~96 sync
-cycles), **all 7 cascade signals collapse to ≈ 0** (Section 6). This is the
-mechanism-fixed result.
+**Observation window (defines "AFTER"):** once the gate passes, let the system run
+**unattended ≥ 24 h**, crossing **≥ ~140 sync cycles per connection** (10-min cadence)
+and **≥ several 2-connection overlaps** (worst-case concurrent memory pressure). At the
+BEFORE rate (~1.3 global OOMs/h) a clean 24 h window would have had **~31 chances to
+fail** — so passing by luck is near-impossible. Measure every signal over the **full
+window** (rates, not a snapshot), and confirm the **tail** (last ~6 h) is as clean as
+the head — a genuine steady state, not a transient post-reinstall calm.
 
-**Secondary (JVM bound):** source RSS plateaus < 2 GiB through full syncs of both
-connections (was climbing to ~4 GB).
+**Primary (mechanism):** all 8 closure signals (Section 7) hold across the entire
+window. **Secondary (JVM bound, S8):** source-JVM **peak RSS reaches a stable plateau
+below 2 GiB** (validating the JVM now sizes off the cgroup limit, not the host).
 
 ## 5. Rollback criteria
 
@@ -76,8 +87,9 @@ windows or as per-hour rates; S4 as restart-count **delta** over the window; S5
 qualitative + `OOMKilled` count.
 
 **Pre-registered prediction (falsifiable):** if H₁ is correct, every "Predicted
-AFTER" below is ≈ 0. If S6/S7 fall but S1–S3 persist → symptom reduced, mechanism
-NOT fixed → H₁ incomplete.
+AFTER" below holds **across the full observation window** (§4), not just at the start.
+If S6/S7 fall but S1–S3 persist → symptom reduced, mechanism NOT fixed → H₁ incomplete.
+AFTER values are the window aggregate (rate), with the tail confirmed as clean as the head.
 
 | # | Signal | Metric | **BEFORE** (2026-07-03, ~19–24 h window) | Predicted AFTER (H₁) | **AFTER** (measured) | Verdict |
 |---|---|---|---|---|---|---|
@@ -88,22 +100,56 @@ NOT fixed → H₁ incomplete.
 | S5 | **replication pod lifecycle** | stuck-`NotReady` freezes / `OOMKilled` | **≥1 stuck NotReady now** (job 23631, 17 m); launcher last exit `Error:1` (DNS crash) | **0 stuck-freeze**; contained `OOMKilled` acceptable | _tbd_ | _tbd_ |
 | S6 | **freeze frequency** | `airbyte_freeze_evidence` captures / day | **23** | **0** | _tbd_ | _tbd_ |
 | S7 | **remediation frequency** | `airbyte_remediation_log` events / 24 h | **91** (72 BREAKER_OPEN, 6 AUTO_FIX, 13 ESCALATE, 4 kind-bounce) | **≈0** | _tbd_ | _tbd_ |
+| S8 | **source-JVM peak RSS** | cgroup-v2 `memory.peak` per source, vs 2 GiB limit | **3.3–4.7 GiB** (host-OOM-truncated, no plateau — grew until the kernel killed it) | **stable plateau < 2 GiB** (~1.5 GiB heap + off-heap) | _tbd_ | _tbd_ |
 
 Host at capture: node Ready, mem 6.6 GB used / 8.6 GB avail (between OOM spikes).
 
+**S8 is the direct mechanism validation.** If H₁ holds we should see, per source pod:
+(a) `memory.max` = 2 GiB (limit bound), (b) the JVM sizing off *that* limit not the host,
+(c) `memory.peak` reaching a **stable plateau below 2 GiB** across many cycles, (d) zero
+new global OOMs (S1). Together that is the mechanism observed directly, not inferred.
+A contained per-container `OOMKilled` at exactly 2 GiB is acceptable (the intended safe
+failure) and still validates H₁ — it means the cap held and the host was protected.
+
 ## 7. Conclusion
 
-_To be completed after the AFTER window. Pre-registered decision rule:_
+_To be completed after the observation window (§4). Pre-registered decision rule:_
 
-- **MECHANISM FIXED → close Investigation B:** S1, S2, S3 → 0 **and** S4 delta ≈ 0
-  **and** S5 no stuck-freeze **and** S6, S7 → 0. The entire cascade disappeared, not
-  just the symptom. (Then revisit Investigation A: does its freeze-onset RCA still add
-  value, or has the controlled experiment already answered it?)
-- **SYMPTOM REDUCED ONLY → keep investigating:** S6/S7 drop but S1–S3 persist. The fix
+### Investigation B closure checklist (ALL must hold across the FULL window)
+
+Close B **with high confidence** only if every box is true over the whole steady-state
+window (not the first sync):
+
+- [ ] **1. Config propagated** — gate PASS: pod spec + `memory.max` = 2 GiB, both
+      containers, both connections (fishbowl + magento).
+- [ ] **2. JVM sizing as expected** — S8: source RSS plateaus stably **below 2 GiB**;
+      no unbounded growth toward a host-sized ceiling.
+- [ ] **3. Zero new global OOM** — S1 = 0 across the window.
+- [ ] **4. containerd healthy** — S2 ≈ 0 (no context-deadline / ttrpc-closed storms).
+- [ ] **5. kubelet stays Ready** — S3 = 0 NotReady transitions.
+- [ ] **6. launcher restarts stabilize** — S4 delta = 0 (count flat across the window).
+- [ ] **7. replication completes normally** — S5: jobs Complete; no stuck-`NotReady`
+      freezes (contained `OOMKilled` acceptable).
+- [ ] **8. freeze/remediation collapse** — S6 → 0 and S7 → ≈0.
+
+**All 8 → MECHANISM FIXED → formally close Investigation B.** The entire cascade
+disappeared, not just the symptom.
+
+**Other outcomes:**
+- **SYMPTOM REDUCED ONLY → keep investigating:** S6/S7 drop but S1–S4 persist. The fix
   helped but the cascade still fires by another path → H₁ incomplete; do not close B.
-- **NO EFFECT / PROPAGATION FAILED → roll back:** Step-1 gate fails or S1/pod-spec
-  unchanged → the limit did not bind (discussion#72436 pod-manifest path) → DB-level
-  fix required.
+- **NO EFFECT / PROPAGATION FAILED → roll back:** gate fails or S1/pod-spec unchanged →
+  the limit did not bind (discussion#72436 pod-manifest path) → DB-level fix required.
+
+### Then — revisit Investigation A (do not continue it by inertia)
+
+Once B is closed, ask A a single question: **does A still answer an *unanswered*
+question, or has the controlled experiment already provided sufficient evidence?**
+If the experiment explains **both** the mechanism (why the JVM OOMs) **and** the
+operational behavior (the whole cascade collapsing when bounded), then A's freeze-onset
+FAE adds nothing new — **stop.** We set out to explain and stop the freeze; if the
+evidence has done that, the project is complete. Only continue A if a closure box
+*failed* in a way that points to a second, independent cause A could still isolate.
 
 ---
 
@@ -124,6 +170,12 @@ sudo docker exec $CP kubectl get pods -n $NS --no-headers | grep -E 'workload-la
 # S5 replication lifecycle
 sudo docker exec $CP kubectl get pods -n $NS --no-headers | grep replication-job
 sudo docker exec $CP kubectl get pods -n $NS -o jsonpath='{range .items[*]}{.metadata.name}|{range .status.containerStatuses[*]}{.name}={.lastState.terminated.reason}:{.lastState.terminated.exitCode} {end}{"\n"}{end}' | grep -iE 'replication|OOM'
+# S8 source-JVM peak RSS vs limit (cgroup v2 high-water mark — no sampling needed)
+SRCID=$(sudo docker exec $CP crictl ps --name source --state Running -q | head -1)
+sudo docker exec $CP crictl exec $SRCID sh -c 'echo "max=$(cat /sys/fs/cgroup/memory.max) peak=$(cat /sys/fs/cgroup/memory.peak) current=$(cat /sys/fs/cgroup/memory.current)"'
+# PASS: max=2147483648 (2Gi); peak plateaus BELOW max across cycles (no OOMKilled at max).
+# Sample across several syncs of BOTH connections; memory.peak is per-container-lifetime,
+# so read it late in each sync. (Fallback if memory.peak absent: poll `crictl stats $SRCID`.)
 ```
 
 ```sql
