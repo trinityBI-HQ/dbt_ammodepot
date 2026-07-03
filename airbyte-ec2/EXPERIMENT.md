@@ -1,7 +1,12 @@
 # Experiment Record — Bounding Airbyte replication container memory
 
 **Type:** Controlled production experiment (not a deployment). **Status:** BEFORE
-baseline captured; awaiting execution. **Investigation:** B (operational root cause).
+baseline captured; **execution attempt 1 (2026-07-03) ABORTED at the apply step** by a
+deployment-tooling defect (unpinned `abctl` chart version → unintended 2.1.0 upgrade;
+see [`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md) §Incident log). **Never reached the
+propagation gate → no behavioral observations; the experiment remains NOT executed.**
+Platform recovered to a clean 2.0.19 baseline; re-armed from Step 0 with version-pinned
+install commands. **Investigation:** B (operational root cause).
 **Related:** [`airbyte-values.yaml`](./airbyte-values.yaml), [`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md).
 
 > Filled now: Objective, Hypothesis, Expected mechanism, Success criteria, Rollback
