@@ -74,19 +74,28 @@ key) it replaces, and the sizing/blast-radius math.
    pods and can collide with the 10-min sync cron / EIP. Budget for EIP re-attach.
 5. **Baseline captured** (see §Verify Step 0) so before/after is measurable.
 
-### Steps
+> 🔴 **MANDATORY: always pin `--chart-version 2.0.19`.** `abctl local install`
+> **without** a version pin fetches the **latest** chart (2.1.0+) and silently turns
+> a values change into a **platform upgrade** — which on 2026-07-03 partially applied,
+> failed on a Helm strategic-merge env-list bug, and could not be rolled back the same
+> way (see §Incident log). Both the apply and rollback commands below pin the version.
+> 🔴 **Do NOT stage large files in `/tmp`** — it is a **7.7 GB tmpfs**; a full `/tmp`
+> makes `runc` fail with `no space left on device` and abctl's cluster creation dies
+> *silently* (exit 1, zero output). Put backups on `/var` (root fs).
 
 ```bash
-# 1. Copy values to the instance (SSM; no SSH). Example via RunShellScript:
+CV=2.0.19   # <-- pin the chart version to match the running platform
+
+# 1. Stage values on the instance (SSM; no SSH), sha256-verified against the repo:
 aws ssm send-command --profile ammodepot --region us-east-1 \
-  --instance-ids i-075043415ebad732f \
-  --document-name AWS-RunShellScript \
+  --instance-ids i-075043415ebad732f --document-name AWS-RunShellScript \
   --parameters commands='cat > /tmp/airbyte-values.yaml << "EOF"
 <contents of airbyte-values.yaml>
 EOF'
 
-# 2. Apply (state-changing — gated on the preconditions above):
-sudo abctl local install --values /tmp/airbyte-values.yaml
+# 2. Apply — PINNED to the current chart version (state-changing; gated on preconditions).
+#    HOME=/usr/bin targets the existing abctl state dir (/usr/bin/.airbyte).
+sudo env HOME=/usr/bin abctl local install --chart-version "$CV" --values /tmp/airbyte-values.yaml
 
 # 3. Re-attach the EIP/ingress if abctl reset it (as needed for the deployment).
 ```
@@ -226,8 +235,8 @@ else (c) leave dest unbounded and cap source only via a connection-level API ove
 ### Rollback command
 
 ```bash
-# copy the COMMITTED prev artifact to the instance via SSM, then reinstall:
-sudo abctl local install --values /tmp/airbyte-values-prev.yaml   # = airbyte-values-prev.yaml
+# copy the COMMITTED prev artifact to the instance via SSM, then reinstall — PINNED:
+sudo env HOME=/usr/bin abctl local install --chart-version 2.0.19 --values /tmp/airbyte-values-prev.yaml
 # re-attach EIP/ingress if abctl reset it
 ```
 
@@ -238,6 +247,65 @@ that itself sits in the freeze blast zone and can interrupt up to 2 in-flight jo
 run it in the **same** paused-cron / `observe-only=true` window as the forward install
 (preconditions 3–4). Without the committed `airbyte-values-prev.yaml` there is nothing
 to roll back to.
+
+> ⚠️ **A same-version `abctl local install` rollback may NOT cleanly revert a drifted
+> release** (Helm 3-way env-list merge keeps upgraded env keys → pods `CreateContainerConfigError`).
+> If the release is already drifted (a failed upgrade), the reliable recovery is a
+> **data-preserving clean reinstall** (below), not another in-place install.
+
+### Clean uninstall/reinstall recovery (for a drifted/tangled release)
+
+Verified data-preserving (2026-07-03). `abctl local uninstall` **without** `--persisted`
+keeps the DB + storage host-side at `/usr/bin/.airbyte/abctl/data/` (PVs are `Retain`;
+`--persisted` is the DESTRUCTIVE flag that deletes them):
+
+```bash
+# 0. Safety backup to /var (NOT /tmp — tmpfs):
+sudo docker exec airbyte-abctl-control-plane tar czf - -C /var/local-path-provisioner \
+     airbyte-volume-db airbyte-local-pv > /var/airbyte-data-backup.tgz
+# 1. Kill any stuck install; 2. data-preserving uninstall (removes the kind cluster, KEEPS data):
+sudo env HOME=/usr/bin abctl local uninstall            # NO --persisted
+# 3. Fresh install, version-pinned (re-attaches persisted DB/storage):
+sudo env HOME=/usr/bin abctl local install --chart-version 2.0.19 --values /tmp/airbyte-values-prev.yaml
+# 4. Verify: single deployed helm rev, 0 pods on the wrong version, connections intact.
+```
+
+---
+
+## Incident log — 2026-07-03 execution attempt 1 (deployment-tooling failure)
+
+**Not an experimental result — the experiment never reached the propagation gate.** A
+deployment-tooling defect aborted it before any behavioral observation.
+
+**What happened:**
+1. `abctl local install --values` (no `--chart-version`) fetched the **latest** chart
+   (2.1.0) and attempted a 2.0.19→2.1.0 **platform upgrade**, not a values change.
+2. The upgrade **partially applied** (server/worker/api-server → 2.1.0) then **failed**
+   on a Helm strategic-merge env-list bug on the workload-launcher
+   (`failed to create patch: … doesn't match $setElementOrder`).
+3. **Rollback also failed**: a same-version `abctl local install --chart-version 2.0.19`
+   left the release drifted (Helm kept 2.1.0-only env `CONFIG_DATABASE_REPLICA_*` in
+   the deployments while the configmap reverted → pods `CreateContainerConfigError`).
+4. **Recovery** = data-preserving clean **uninstall/reinstall** pinned to 2.0.19
+   (§Clean uninstall/reinstall recovery). Data (4 connections, sources/dests, jobs) all
+   survived on the retained host-side PVs; a `/var` backup was taken as insurance.
+5. **Secondary self-inflicted block:** the 8 GB safety backup was first written to
+   `/tmp` (a 7.7 GB tmpfs), filling it → `runc: no space left on device` → kind cluster
+   creation failed **silently** (exit 1, no output). Moving the backup to `/var` fixed it.
+
+**Operational lessons (now baked into the procedure above):**
+- **Always pin `--chart-version`** — `abctl local install` is not reproducible over
+  time; without a pin a values-only op silently becomes a platform upgrade.
+- **A failed cross-version upgrade cannot be rolled back in-place** (Helm 3-way env
+  merge) — recover via data-preserving uninstall/reinstall.
+- **`abctl local uninstall` (no `--persisted`) preserves data**; `--persisted` deletes
+  it. PVs are `Retain`; data lives at `/usr/bin/.airbyte/abctl/data/`.
+- **`/tmp` is a small tmpfs** — never stage large files there; a full `/tmp` makes abctl
+  fail silently at cluster creation.
+
+**Verified after recovery:** a **version-pinned** `abctl local install` stays on 2.0.19
+(no upgrade attempt) — the corrected procedure works. The experiment is **re-armed from
+Step 0** with the pinned commands.
 
 ---
 
