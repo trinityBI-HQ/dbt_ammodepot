@@ -1,0 +1,141 @@
+# =============================================================================
+# Airbyte abctl (Helm chart V2) installation values
+# Instance: i-075043415ebad732f (c6a.2xlarge, 8 vCPU / 16 GB, AL2023, us-east-1)
+# abctl: v0.30.4  |  chart: airbyte 2.0.19  |  appVersion: 2.0.1
+# Release: airbyte-abctl  namespace: airbyte-abctl
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# Until 2026-07-03 the Airbyte installation config lived ONLY in the running
+# cluster (out-of-band, never in git). The 2026-04-07 Airbyte 2.0 + new-EC2
+# migration silently reset replication resource limits to unbounded — which
+# nobody could see because nothing was version-controlled. This file captures
+# the FULL install config so the next reinstall / instance swap is reproducible
+# and reviewable. Apply with:  abctl local install --values airbyte-values.yaml
+#
+# The values below are the live config as decoded from the deployed Helm
+# release (sh.helm.release.v1.airbyte-abctl.v1), with ONE change: the
+# replication memory-limit OOM fix (see the `global.workloads` block).
+# =============================================================================
+
+airbyte-bootloader:
+  env_vars:
+    PLATFORM_LOG_FORMAT: json
+
+connectorBuilderServer:
+  enabled: false
+
+postgresql:
+  image:
+    tag: 1.7.0-17
+
+server:
+  env_vars:
+    # Routes job resource resolution to the "lowresource" resource variant.
+    # SUSPECT #2 for override non-propagation: if the memory limit below does
+    # NOT show up in the rendered pod spec after install, this variant override
+    # is the next thing to investigate/remove (see AIRBYTE_INSTALL.md §Verify).
+    JOB_RESOURCE_VARIANT_OVERRIDE: lowresource
+    WEBAPP_URL: http://airbyte-abctl-airbyte-server-svc
+
+workloadLauncher:
+  env_vars:
+    # Requests pinned to 0 so the k8s scheduler never reserves for check/discover/
+    # spec/sidecar helper pods on the single node. (Limits are set separately below
+    # for the sync main containers, which is where the OOM originated.)
+    CHECK_JOB_MAIN_CONTAINER_CPU_REQUEST: "0"
+    CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST: "0"
+    DISCOVER_JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    SIDECAR_MAIN_CONTAINER_CPU_REQUEST: "0"
+    SIDECAR_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    SPEC_JOB_MAIN_CONTAINER_CPU_REQUEST: "0"
+    SPEC_JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+
+global:
+  airbyteUrl: http://localhost:8000
+  auth:
+    enabled: true
+  env_vars:
+    AIRBYTE_INSTALLATION_ID: 2f1bdd29-5808-43a2-8c19-ef330ef9ebdb
+  storage:
+    type: local
+
+  # ===========================================================================
+  # REPLICATION MEMORY-LIMIT OOM FIX  (2026-07-03, Investigation B)
+  # ===========================================================================
+  # ROOT CAUSE: source/dest replication containers ran Airbyte's stock
+  #   -XX:MaxRAMPercentage=75.0  with NO cgroup memory limit. With no container
+  #   limit, the Java 21 JVM sizes max heap at 75% of the *host's* 16 GB
+  #   (~11.4 GiB) and grows into it; at ~4 GB resident the 16 GB host is
+  #   exhausted -> kernel GLOBAL OOM (constraint=CONSTRAINT_NONE) -> containerd
+  #   instability -> node NotReady "container runtime is down" -> DNS breaks ->
+  #   workload-launcher UnknownHostException crash-loop -> replication jobs
+  #   never become Ready -> the sync "freeze" (bytesSynced=0, lastUpdatedAt=null).
+  #   Confirmed via host kernel OOM-killer log + crictl inspect (JAVA_OPTS +
+  #   cgroup memory:{}), 6 global OOMs on 2026-07-03 at 3.3-4.7 GiB RSS.
+  #
+  # PRE-FIX STATE (INEFFECTIVE — do not restore): the install set the chart-V1
+  #   key `global.jobs.resources` = 4Gi. Chart V2 resolves replication memory from
+  #   the env var JOB_MAIN_CONTAINER_MEMORY_LIMIT via the job-config variant map
+  #   (airbyte-server application.yml). `global.jobs.resources` is a V1 key that
+  #   NEVER populates that env var, so under JOB_RESOURCE_VARIANT_OVERRIDE=lowresource
+  #   the `lowresource--source*/--destination` blocks fell back to their `:0`
+  #   default -> sync pods ran limits.memory=0. Verified live (configmap
+  #   JOB_MAIN_CONTAINER_MEMORY_LIMIT=""). This is a V1-vs-V2 KEY MISMATCH — NOT a
+  #   connector-default / airbyte#68162 issue (that concerns actor-level DB rows).
+  #     global:
+  #       jobs:                    # <-- chart-V1 key: never sets the env var
+  #         resources:
+  #           limits:   { cpu: "3", memory: "4Gi" }
+  #           requests: { cpu: "0", memory: "0" }
+  #
+  # THE FIX: use the chart-V2 key `global.workloads.resources.mainContainer.memory`
+  #   which maps to JOB_MAIN_CONTAINER_MEMORY_LIMIT -> overrides the `:0` fallback
+  #   for BOTH the default and lowresource variant blocks (they interpolate the
+  #   same env var). MaxRAMPercentage=75.0 stays (correct — it auto-tracks the
+  #   cgroup limit; do NOT hardcode -Xmx). Heap then targets 75% of 2Gi = ~1.5 GiB
+  #   and the cgroup caps TOTAL RSS at 2Gi, so any overrun is a contained
+  #   per-container OOMKilled (one failed sync, auto-remediation retries) — never
+  #   a global host OOM.
+  #
+  #   NOTE: propagation is source-confirmed at the CONFIG layer, but discussion
+  #   #72436 reports the Workload-API pod-manifest path ignoring Helm overrides on
+  #   this exact stack (2.0.1 + source-mysql 3.51.5). So propagation is NOT assumed
+  #   — AIRBYTE_INSTALL.md Step 1 (rendered pod spec + cgroup memory.max) is the
+  #   gating success criterion, checked on a real new sync pod BEFORE stability.
+  #
+  # SIZING (blast-radius on this 16 GB single node):
+  #   2 concurrent jobs x (orchestrator 1Gi + source 2Gi + dest 2Gi) = 10 GiB
+  #   + ~2.4 GiB control plane = 12.4 GiB < 15.25 GiB usable -> safe. (Orchestrator
+  #   stays 1Gi — hardcoded, airbyte#72833; this fix does not change it.)
+  #   3Gi+ overcommits with 2 concurrent connections unless schedules are
+  #   serialized. Off-heap caveat: at 2Gi@75% only ~0.5 GiB is left for non-heap
+  #   (metaspace/code-cache/threads/dd-agent + Bulk-CDK SOCKET direct buffers) —
+  #   MARGINAL. PRE-DECIDED fallback if a contained OOMKilled appears (see
+  #   AIRBYTE_INSTALL.md rollback table): (1) lower connector MaxRAMPercentage to
+  #   ~50-60, else (2) raise to 3Gi AND serialize schedules, else (3) leave dest
+  #   unbounded + cap source only. Do not just keep bumping the cap on a 16 GB box.
+  # ===========================================================================
+  workloads:
+    resources:
+      mainContainer:
+        memory:
+          limit: "2Gi"
+          # request pinned to 0 (minimum surface): the limit alone caps RSS and
+          # delivers the whole OOM fix; the low-resource preset deliberately zeroes
+          # sync reservations so the single node is never over-reserved.
+          request: "0"
+        # CPU intentionally left UNBOUNDED. The pre-fix cpu:"3" (V1 key) never bound
+        # at runtime (live source/dest ran cpu:0). CPU is compressible — it throttles,
+        # it does NOT cause the global host OOM this fix targets. Re-adding a cap here
+        # would newly constrain the source's "Effective concurrency: 2" for no safety
+        # benefit, so it is deliberately omitted (not a regression: runtime is unchanged).
+      # DEFENSIVE (not the propagation mechanism). `false` nulls the connector-
+      # DEFINITION resourceRequirements for sync source+dest only (DefaultSyncJobFactory)
+      # so a future connector-level default can't shadow the flat limit. It does NOT
+      # clear actor-level DB overrides (that is what airbyte#68162 is about) and is NOT
+      # what makes the 2Gi bind — the env var / variant map (above) does that. For the
+      # current 2 connectors the connector-definition default is already empty, so this
+      # is a no-op today; kept as a guard. Verify the rendered pod spec regardless.
+      useConnectorResourceDefaults: false

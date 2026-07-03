@@ -1,0 +1,65 @@
+# =============================================================================
+# ROLLBACK VALUES — pre-fix Airbyte install config (2026-07-03)
+# Instance: i-075043415ebad732f  |  abctl v0.30.4  |  chart airbyte 2.0.19 / app 2.0.1
+#
+# This is the EXACT live config decoded from the deployed Helm release
+# (sh.helm.release.v1.airbyte-abctl.v1) BEFORE the replication memory-limit fix
+# — i.e. the abctl `--low-resource-mode` preset, with replication source/dest
+# UNBOUNDED (the OOM-prone state). It exists so rollback is a real, reviewable
+# artifact and not a mid-incident hand-reconstruction.
+#
+# ROLL BACK WITH:
+#   sudo abctl local install --values /tmp/airbyte-values-prev.yaml
+#   (re-attach EIP/ingress if abctl reset it)
+#
+# NOTE: reverting restores the unbounded source/dest JVM (global-OOM risk).
+# Only roll back if the fix (airbyte-values.yaml) triggers a rollback criterion
+# in AIRBYTE_INSTALL.md — the pre-fix state is NOT safe to run indefinitely.
+# =============================================================================
+
+airbyte-bootloader:
+  env_vars:
+    PLATFORM_LOG_FORMAT: json
+
+connectorBuilderServer:
+  enabled: false
+
+postgresql:
+  image:
+    tag: 1.7.0-17
+
+server:
+  env_vars:
+    JOB_RESOURCE_VARIANT_OVERRIDE: lowresource
+    WEBAPP_URL: http://airbyte-abctl-airbyte-server-svc
+
+workloadLauncher:
+  env_vars:
+    CHECK_JOB_MAIN_CONTAINER_CPU_REQUEST: "0"
+    CHECK_JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    DISCOVER_JOB_MAIN_CONTAINER_CPU_REQUEST: "0"
+    DISCOVER_JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    SIDECAR_MAIN_CONTAINER_CPU_REQUEST: "0"
+    SIDECAR_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    SPEC_JOB_MAIN_CONTAINER_CPU_REQUEST: "0"
+    SPEC_JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+
+global:
+  airbyteUrl: http://localhost:8000
+  auth:
+    enabled: true
+  env_vars:
+    AIRBYTE_INSTALLATION_ID: 2f1bdd29-5808-43a2-8c19-ef330ef9ebdb
+  storage:
+    type: local
+  # V1 key — inert for replication memory (never populates
+  # JOB_MAIN_CONTAINER_MEMORY_LIMIT); source/dest run UNBOUNDED under the
+  # lowresource variant's :0 fallback. This is the pre-fix (OOM-prone) state.
+  jobs:
+    resources:
+      limits:
+        cpu: "3"
+        memory: "4Gi"
+      requests:
+        cpu: "0"
+        memory: "0"
