@@ -141,6 +141,18 @@ KIND_BOUNCE_PAYLOAD_TEMPLATE_PATH = (
     Path(__file__).parent / "ssm-payloads" / "kind_bounce.json.tmpl"
 )
 
+# v1 freeze-evidence collector (capture-then-remediate). Append-only fact capture
+# that runs BEFORE any remediation touches the cluster, so it never removes the
+# safety net. Hard-gated so it can never delay or block the actor.
+CAPTURE_EVIDENCE_PAYLOAD_TEMPLATE_PATH = (
+    Path(__file__).parent / "ssm-payloads" / "capture_evidence.json.tmpl"
+)
+CAPTURE_SSM_POLL_TIMEOUT_SECONDS = int(os.environ.get("CAPTURE_SSM_POLL_TIMEOUT_SECONDS", "30"))
+# Total runtime the capture may consume; if the invocation has less budget than
+# this, capture self-skips and remediation proceeds untouched.
+CAPTURE_TOTAL_BUDGET_SECONDS = int(os.environ.get("CAPTURE_TOTAL_BUDGET_SECONDS", "45"))
+SNOW_EVIDENCE_TABLE = "ad_analytics.ops.airbyte_freeze_evidence"
+
 
 # ----------------------------------------------------------------------------
 # Module-scoped boto3 clients (re-used across warm invocations)
@@ -295,6 +307,136 @@ def _detect_breaches(conn) -> list[dict]:
 
 
 # ----------------------------------------------------------------------------
+# Step 2.5: freeze-evidence capture (v1 collector) — capture BEFORE remediate
+# ----------------------------------------------------------------------------
+
+def _parse_kv(output: str) -> dict:
+    """Lift all KEY=VALUE lines out of SSM stdout (first '=' splits). The capture
+    payload emits scalar markers and KEY_JSON=<compact json> blobs; JSON values
+    contain no '=' (projected to reason/timestamp/name fields only)."""
+    kv = {}
+    for line in output.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            kv[key.strip()] = value.strip()
+    return kv
+
+
+def _write_evidence_row(conn, row: dict) -> None:
+    """Append-only INSERT into the freeze-evidence table. JSON blobs go through
+    PARSE_JSON; absent scalars/blobs stay NULL. Fully swallows errors (best-effort)
+    so a persistence failure can never affect remediation."""
+    json_cols = {
+        "attempt_json": "attempt",
+        "k8s_events_json": "k8s_events",
+        "pods_json": "pods",
+        "node_conditions_json": "node_conditions",
+    }
+    scalar_cols = ["event_id", "connection_id", "capture_status", "capture_detail"]
+
+    cols, selects, params = [], [], {}
+    for c in scalar_cols:
+        if row.get(c) is not None:
+            cols.append(c)
+            selects.append(f"%({c})s")
+            params[c] = row[c]
+    for src, col in json_cols.items():
+        if row.get(src):
+            cols.append(col)
+            selects.append(f"parse_json(%({src})s)")
+            params[src] = row[src]
+
+    sql = f"insert into {SNOW_EVIDENCE_TABLE} ({', '.join(cols)}) select {', '.join(selects)}"
+    try:
+        conn.cursor().execute(sql, params)
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "evidence_write_failed",
+            "event_id": row.get("event_id"),
+            "error": str(exc)[:300],
+        }))
+
+
+def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
+    """v1 freeze-evidence collector — capture an unbiased, fact-only evidence
+    bundle BEFORE any remediation touches the cluster, then persist it append-only.
+
+    Sole objective: let a later query answer "what is the first authoritative
+    abnormal event that consistently precedes an organic freeze?" It assumes
+    NOTHING about the root cause — it records the master datum (recent pods +
+    phase/terminated), the self-timestamped k8s Warning events (sorted ASC — the
+    FAE bearer), the Airbyte attempt onset anchor, and node conditions, for all
+    hypotheses equally. It records facts only; hypothesis elimination happens in
+    analysis, never here.
+
+    HARD CONTRACT — must NEVER delay or block remediation:
+      * budget-gated: self-skips when the invocation lacks CAPTURE_TOTAL_BUDGET;
+      * hard-timeout-capped SSM poll (CAPTURE_SSM_POLL_TIMEOUT_SECONDS);
+      * every failure writes a capture_status marker (or logs) and returns.
+    The call site also wraps this in try/except, so an exception here is inert.
+    """
+    if not _has_budget_for(CAPTURE_TOTAL_BUDGET_SECONDS):
+        LOGGER.info(json.dumps({"event": "capture_skipped_low_budget", "connection_id": conn_id}))
+        return
+
+    try:
+        template = CAPTURE_EVIDENCE_PAYLOAD_TEMPLATE_PATH.read_text()
+        payload = json.loads(template.replace("__CONNECTION_ID__", AIRBYTE_CONNECTION_IDS[conn_id]))
+        send_resp = ssm_client.send_command(
+            InstanceIds=[AIRBYTE_INSTANCE_ID],
+            DocumentName="AWS-RunShellScript",
+            Parameters={"commands": payload["commands"]},
+            TimeoutSeconds=CAPTURE_SSM_POLL_TIMEOUT_SECONDS,
+        )
+    except Exception as exc:
+        _write_evidence_row(snowflake_conn, {
+            "event_id": event_id,
+            "connection_id": conn_id,
+            "capture_status": "ssm_send_failed",
+            "capture_detail": str(exc)[:500],
+        })
+        return
+
+    command_id = send_resp["Command"]["CommandId"]
+    inv = _poll_ssm_invocation(command_id, time.time() + CAPTURE_SSM_POLL_TIMEOUT_SECONDS)
+
+    if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
+        _write_evidence_row(snowflake_conn, {
+            "event_id": event_id,
+            "connection_id": conn_id,
+            "capture_status": "ssm_poll_timeout",
+        })
+        return
+
+    output = inv.get("StandardOutputContent", "") or ""
+    kv = _parse_kv(output)
+    if not output:
+        status, detail = "empty", f"ssm_status={inv.get('Status')}"
+    elif kv.get("CAPTURE_DONE") == "1" and "CAPTURE_TOKEN_FAILED" not in output:
+        status, detail = "ok", None
+    else:
+        status, detail = "partial", f"ssm_status={inv.get('Status')}"
+
+    _write_evidence_row(snowflake_conn, {
+        "event_id": event_id,
+        "connection_id": conn_id,
+        "capture_status": status,
+        "capture_detail": detail,
+        "attempt_json": kv.get("ATTEMPT_JSON"),
+        "k8s_events_json": kv.get("K8S_EVENTS_JSON"),
+        "pods_json": kv.get("PODS_JSON"),
+        "node_conditions_json": kv.get("NODE_CONDITIONS_JSON"),
+    })
+    LOGGER.info(json.dumps({
+        "event": "capture_persisted",
+        "connection_id": conn_id,
+        "event_id": event_id,
+        "capture_status": status,
+    }))
+
+
+# ----------------------------------------------------------------------------
 # Step 3: per-connection processing
 # ----------------------------------------------------------------------------
 
@@ -312,6 +454,18 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
         "lambda_request_id": request_id,
         "lambda_log_stream": log_stream,
     }
+
+    # Capture-then-remediate: snapshot the freeze evidence BEFORE any tier acts,
+    # so protection is never disabled. Double-wrapped + budget-gated internally so
+    # a capture fault can never delay, block, or fail remediation.
+    try:
+        _capture_evidence(snowflake_conn, conn_id, base_audit["event_id"])
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "capture_evidence_uncaught",
+            "connection_id": conn_id,
+            "error": str(exc),
+        }))
 
     breaker_until = _check_breaker(conn_id)
     if breaker_until is not None:
