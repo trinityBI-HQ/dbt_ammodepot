@@ -76,41 +76,66 @@ global:
   #   cgroup memory:{}), 6 global OOMs on 2026-07-03 at 3.3-4.7 GiB RSS.
   #
   # PRE-FIX STATE (INEFFECTIVE — do not restore): the install set the chart-V1
-  #   key `global.jobs.resources` = 4Gi, but chart V2 IGNORES it for replication
-  #   jobs while useConnectorResourceDefaults is true (the empty per-connector DB
-  #   default wins) — airbyte#68162 / discussion#72436. Verified live: sync pods
-  #   ran resources.limits.memory=0 despite the 4Gi value being present.
+  #   key `global.jobs.resources` = 4Gi. Chart V2 resolves replication memory from
+  #   the env var JOB_MAIN_CONTAINER_MEMORY_LIMIT via the job-config variant map
+  #   (airbyte-server application.yml). `global.jobs.resources` is a V1 key that
+  #   NEVER populates that env var, so under JOB_RESOURCE_VARIANT_OVERRIDE=lowresource
+  #   the `lowresource--source*/--destination` blocks fell back to their `:0`
+  #   default -> sync pods ran limits.memory=0. Verified live (configmap
+  #   JOB_MAIN_CONTAINER_MEMORY_LIMIT=""). This is a V1-vs-V2 KEY MISMATCH — NOT a
+  #   connector-default / airbyte#68162 issue (that concerns actor-level DB rows).
   #     global:
-  #       jobs:                    # <-- chart-V1 key, silently ignored in V2
+  #       jobs:                    # <-- chart-V1 key: never sets the env var
   #         resources:
   #           limits:   { cpu: "3", memory: "4Gi" }
   #           requests: { cpu: "0", memory: "0" }
   #
-  # THE FIX: correct chart-V2 key (`global.workloads.resources.mainContainer`)
-  #   AND disable the connector-default override so the limit actually binds.
-  #   MaxRAMPercentage=75.0 stays (it is correct — it auto-tracks the cgroup
-  #   limit; do NOT hardcode -Xmx). After this, heap targets 75% of 2Gi = ~1.5
-  #   GiB and the cgroup caps TOTAL RSS at 2Gi, so any overrun is a contained
-  #   per-container OOMKilled (one failed sync, auto-remediation retries) —
-  #   never a global host OOM.
+  # THE FIX: use the chart-V2 key `global.workloads.resources.mainContainer.memory`
+  #   which maps to JOB_MAIN_CONTAINER_MEMORY_LIMIT -> overrides the `:0` fallback
+  #   for BOTH the default and lowresource variant blocks (they interpolate the
+  #   same env var). MaxRAMPercentage=75.0 stays (correct — it auto-tracks the
+  #   cgroup limit; do NOT hardcode -Xmx). Heap then targets 75% of 2Gi = ~1.5 GiB
+  #   and the cgroup caps TOTAL RSS at 2Gi, so any overrun is a contained
+  #   per-container OOMKilled (one failed sync, auto-remediation retries) — never
+  #   a global host OOM.
+  #
+  #   NOTE: propagation is source-confirmed at the CONFIG layer, but discussion
+  #   #72436 reports the Workload-API pod-manifest path ignoring Helm overrides on
+  #   this exact stack (2.0.1 + source-mysql 3.51.5). So propagation is NOT assumed
+  #   — AIRBYTE_INSTALL.md Step 1 (rendered pod spec + cgroup memory.max) is the
+  #   gating success criterion, checked on a real new sync pod BEFORE stability.
   #
   # SIZING (blast-radius on this 16 GB single node):
   #   2 concurrent jobs x (orchestrator 1Gi + source 2Gi + dest 2Gi) = 10 GiB
-  #   + ~2.4 GiB control plane = 12.4 GiB < 15.25 GiB usable -> safe.
+  #   + ~2.4 GiB control plane = 12.4 GiB < 15.25 GiB usable -> safe. (Orchestrator
+  #   stays 1Gi — hardcoded, airbyte#72833; this fix does not change it.)
   #   3Gi+ overcommits with 2 concurrent connections unless schedules are
-  #   serialized. Off-heap caveat: at 2Gi@75% only ~0.5 GiB is left for
-  #   non-heap (metaspace/code-cache/threads/dd-agent + Bulk-CDK SOCKET direct
-  #   buffers) — MARGINAL. If per-container OOMKilled appears, either lower the
-  #   connector MaxRAMPercentage to ~50-60 or raise to 3Gi AND serialize.
+  #   serialized. Off-heap caveat: at 2Gi@75% only ~0.5 GiB is left for non-heap
+  #   (metaspace/code-cache/threads/dd-agent + Bulk-CDK SOCKET direct buffers) —
+  #   MARGINAL. PRE-DECIDED fallback if a contained OOMKilled appears (see
+  #   AIRBYTE_INSTALL.md rollback table): (1) lower connector MaxRAMPercentage to
+  #   ~50-60, else (2) raise to 3Gi AND serialize schedules, else (3) leave dest
+  #   unbounded + cap source only. Do not just keep bumping the cap on a 16 GB box.
   # ===========================================================================
   workloads:
     resources:
       mainContainer:
         memory:
           limit: "2Gi"
-          request: "1Gi"
-      # REQUIRED — without this the empty per-connector DB default overrides the
-      # limit above and it is silently ignored (airbyte#68162). This is the exact
-      # mechanism that made the pre-fix 4Gi inert. VERIFY the rendered pod spec
-      # after install (AIRBYTE_INSTALL.md §Verify) — do not assume it applied.
+          # request pinned to 0 (minimum surface): the limit alone caps RSS and
+          # delivers the whole OOM fix; the low-resource preset deliberately zeroes
+          # sync reservations so the single node is never over-reserved.
+          request: "0"
+        # CPU intentionally left UNBOUNDED. The pre-fix cpu:"3" (V1 key) never bound
+        # at runtime (live source/dest ran cpu:0). CPU is compressible — it throttles,
+        # it does NOT cause the global host OOM this fix targets. Re-adding a cap here
+        # would newly constrain the source's "Effective concurrency: 2" for no safety
+        # benefit, so it is deliberately omitted (not a regression: runtime is unchanged).
+      # DEFENSIVE (not the propagation mechanism). `false` nulls the connector-
+      # DEFINITION resourceRequirements for sync source+dest only (DefaultSyncJobFactory)
+      # so a future connector-level default can't shadow the flat limit. It does NOT
+      # clear actor-level DB overrides (that is what airbyte#68162 is about) and is NOT
+      # what makes the 2Gi bind — the env var / variant map (above) does that. For the
+      # current 2 connectors the connector-definition default is already empty, so this
+      # is a no-op today; kept as a guard. Verify the rendered pod spec regardless.
       useConnectorResourceDefaults: false
