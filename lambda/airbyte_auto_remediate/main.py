@@ -333,7 +333,7 @@ def _write_evidence_row(conn, row: dict) -> None:
         "pods_json": "pods",
         "node_conditions_json": "node_conditions",
     }
-    scalar_cols = ["event_id", "connection_id", "capture_status", "capture_detail"]
+    scalar_cols = ["event_id", "connection_id", "job_id", "capture_status", "capture_detail"]
 
     cols, selects, params = [], [], {}
     for c in scalar_cols:
@@ -358,6 +358,19 @@ def _write_evidence_row(conn, row: dict) -> None:
         }))
 
 
+def _emit_capture_metric(conn_id: str, outcome: str, start_ts: float) -> None:
+    """One structured metric line per capture attempt, on EVERY exit path, so
+    COLLECTOR health (attempted / ok / skipped_budget / degraded / duration) is
+    queryable in CloudWatch Logs Insights with zero PutMetricData cost. This is
+    about the collector behaving correctly — not about Airbyte."""
+    LOGGER.info(json.dumps({
+        "event": "capture_metric",
+        "connection_id": conn_id,
+        "outcome": outcome,
+        "duration_ms": int((time.time() - start_ts) * 1000),
+    }))
+
+
 def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     """v1 freeze-evidence collector — capture an unbiased, fact-only evidence
     bundle BEFORE any remediation touches the cluster, then persist it append-only.
@@ -373,11 +386,18 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     HARD CONTRACT — must NEVER delay or block remediation:
       * budget-gated: self-skips when the invocation lacks CAPTURE_TOTAL_BUDGET;
       * hard-timeout-capped SSM poll (CAPTURE_SSM_POLL_TIMEOUT_SECONDS);
-      * every failure writes a capture_status marker (or logs) and returns.
+      * EVERY failure mode writes a capture_status marker + a metric and returns.
     The call site also wraps this in try/except, so an exception here is inert.
+
+    IDENTITY: event_id (fresh UUID per invocation) is the row PK and identifies
+    this SNAPSHOT. job_id (the frozen Airbyte job) identifies the FREEZE — many
+    snapshots of one ongoing freeze share job_id, so analysis groups by job_id to
+    build per-freeze timelines and to count DISTINCT freezes for the >=4/5 bar.
     """
+    start_ts = time.time()
+
     if not _has_budget_for(CAPTURE_TOTAL_BUDGET_SECONDS):
-        LOGGER.info(json.dumps({"event": "capture_skipped_low_budget", "connection_id": conn_id}))
+        _emit_capture_metric(conn_id, "skipped_budget", start_ts)
         return
 
     try:
@@ -391,22 +411,29 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
         )
     except Exception as exc:
         _write_evidence_row(snowflake_conn, {
-            "event_id": event_id,
-            "connection_id": conn_id,
-            "capture_status": "ssm_send_failed",
-            "capture_detail": str(exc)[:500],
+            "event_id": event_id, "connection_id": conn_id,
+            "capture_status": "ssm_send_failed", "capture_detail": str(exc)[:500],
         })
+        _emit_capture_metric(conn_id, "ssm_send_failed", start_ts)
         return
 
     command_id = send_resp["Command"]["CommandId"]
-    inv = _poll_ssm_invocation(command_id, time.time() + CAPTURE_SSM_POLL_TIMEOUT_SECONDS)
+    try:
+        inv = _poll_ssm_invocation(command_id, time.time() + CAPTURE_SSM_POLL_TIMEOUT_SECONDS)
+    except Exception as exc:
+        _write_evidence_row(snowflake_conn, {
+            "event_id": event_id, "connection_id": conn_id,
+            "capture_status": "ssm_poll_error", "capture_detail": str(exc)[:500],
+        })
+        _emit_capture_metric(conn_id, "ssm_poll_error", start_ts)
+        return
 
     if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
         _write_evidence_row(snowflake_conn, {
-            "event_id": event_id,
-            "connection_id": conn_id,
+            "event_id": event_id, "connection_id": conn_id,
             "capture_status": "ssm_poll_timeout",
         })
+        _emit_capture_metric(conn_id, "ssm_poll_timeout", start_ts)
         return
 
     output = inv.get("StandardOutputContent", "") or ""
@@ -418,9 +445,17 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     else:
         status, detail = "partial", f"ssm_status={inv.get('Status')}"
 
+    job_id = None
+    try:
+        attempt = json.loads(kv.get("ATTEMPT_JSON") or "{}")
+        job_id = (str(attempt.get("jobId") or attempt.get("id") or "").strip() or None)
+    except Exception:
+        job_id = None
+
     _write_evidence_row(snowflake_conn, {
         "event_id": event_id,
         "connection_id": conn_id,
+        "job_id": job_id,
         "capture_status": status,
         "capture_detail": detail,
         "attempt_json": kv.get("ATTEMPT_JSON"),
@@ -428,12 +463,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
         "pods_json": kv.get("PODS_JSON"),
         "node_conditions_json": kv.get("NODE_CONDITIONS_JSON"),
     })
-    LOGGER.info(json.dumps({
-        "event": "capture_persisted",
-        "connection_id": conn_id,
-        "event_id": event_id,
-        "capture_status": status,
-    }))
+    _emit_capture_metric(conn_id, status, start_ts)
 
 
 # ----------------------------------------------------------------------------

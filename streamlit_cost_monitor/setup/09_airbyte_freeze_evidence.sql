@@ -41,7 +41,8 @@ create table if not exists ad_analytics.ops.airbyte_freeze_evidence (
     event_id         varchar(36)   not null,   -- FK to airbyte_remediation_log.event_id
     capture_time     timestamp_ntz not null default current_timestamp(),
     connection_id    varchar(64)   not null,   -- 'fishbowl_s3' | 'magento_s3'
-    capture_status   varchar(32)   not null,   -- ok | partial | empty | ssm_send_failed | ssm_poll_timeout
+    job_id           varchar(64),              -- Airbyte job id = FREEZE identity (distinct freezes = distinct job_id; many snapshots per freeze share it)
+    capture_status   varchar(32)   not null,   -- ok | partial | empty | ssm_send_failed | ssm_poll_timeout | ssm_poll_error
     capture_detail   varchar(512),             -- non-null on a degraded capture
     attempt          variant,                  -- Airbyte latest job/attempt = the ONSET ANCHOR
     k8s_events       variant,                  -- earliest-25 Warning events, sorted ASC = the FAE bearer
@@ -50,9 +51,29 @@ create table if not exists ad_analytics.ops.airbyte_freeze_evidence (
     constraint pk_airbyte_freeze_evidence primary key (event_id),
     constraint chk_fe_connection check (connection_id in ('fishbowl_s3', 'magento_s3')),
     constraint chk_fe_status check (
-        capture_status in ('ok', 'partial', 'empty', 'ssm_send_failed', 'ssm_poll_timeout')
+        capture_status in ('ok', 'partial', 'empty', 'ssm_send_failed', 'ssm_poll_timeout', 'ssm_poll_error')
     )
 );
+
+-- ----------------------------------------------------------------------------
+-- Retention decision (deliberately minimal for v1)
+-- ----------------------------------------------------------------------------
+-- RETAIN EVERYTHING during the investigation. Volume: capture fires only on an
+-- ALERT breach (no freezes => zero rows), up to ~8x/incident x <=2 connections;
+-- with VARIANT blobs capped (<=25 events, <=15 pods) this is a few KB/row and
+-- single-digit MB/month worst case. No partitioning, no S3 archival, no clustering
+-- is justified at this scale. Losing a capture mid-investigation is far costlier
+-- than the storage. Once the investigation closes, enable a 90-day prune (owned by
+-- the table owner so it has DELETE) — kept OUT of the active bootstrap to avoid a
+-- scheduled TASK we do not yet need:
+--
+--   USE ROLE streamlit_role;  -- table owner (has DELETE)
+--   CREATE OR REPLACE TASK ad_analytics.ops.tsk_airbyte_freeze_evidence_retention
+--       WAREHOUSE = etl_wh
+--       SCHEDULE  = 'USING CRON 0 6 * * * UTC'   -- 5-field UNIX cron, NOT Quartz
+--       AS DELETE FROM ad_analytics.ops.airbyte_freeze_evidence
+--          WHERE capture_time < DATEADD(day, -90, CURRENT_TIMESTAMP());
+--   ALTER TASK ad_analytics.ops.tsk_airbyte_freeze_evidence_retention RESUME;
 
 -- ----------------------------------------------------------------------------
 -- 2. Ownership + grants (mirrors 08_airbyte_remediation_log.sql)
