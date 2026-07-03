@@ -4,9 +4,10 @@
 baseline captured; awaiting execution. **Investigation:** B (operational root cause).
 **Related:** [`airbyte-values.yaml`](./airbyte-values.yaml), [`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md).
 
-> Filled sections: Objective, Hypothesis, Expected mechanism, Success criteria,
-> Rollback criteria, and the BEFORE column of Observed Results. AFTER + Conclusion
-> are completed during the validation window.
+> Filled now: Objective, Hypothesis, Expected mechanism, Success criteria, Rollback
+> criteria, the BEFORE column of Observed Results, and the Unexpected observations (§8)
+> + Retrospective (§9). Completed during/after the validation window: the AFTER column,
+> the Conclusion verdict, and the recorded **confidence** level (§7).
 
 ---
 
@@ -141,6 +142,27 @@ disappeared, not just the symptom.
 - **NO EFFECT / PROPAGATION FAILED → roll back:** gate fails or S1/pod-spec unchanged →
   the limit did not bind (discussion#72436 pod-manifest path) → DB-level fix required.
 
+### Confidence (record separately from outcome — do not conflate)
+
+State a confidence level with the conclusion, citing the evidence for it and what
+remains unexplained. **Evidence, interpretation, and confidence are three different
+things** and RCAs routinely blur them.
+
+- **HIGH** — all 8 closure criteria satisfied across the full window; **S8 shows the
+  sub-2 GiB plateau** (mechanism observed directly, not inferred); **no** contradictory
+  observation. → Close Investigation B; stop A unless it answers a new question.
+- **MEDIUM** — cascade collapsed and mechanism strongly supported, but 1–2 observations
+  remain unexplained (e.g. noisy S8 plateau, a signal only partially cleared, an
+  unexpected-but-non-contradicting event). → Close B provisionally; log the open items;
+  do not over-claim.
+- **LOW** — operational improvement (S6/S7 down) but the mechanism is **not** directly
+  demonstrated (S8 inconclusive, or S1–S3 did not fully clear). Could be coincidence or
+  a partial fix. → Do **not** close B; keep observing or reconsider H₁.
+
+Record the level, the specific evidence supporting it, and every observation left
+unexplained. **An unexplained observation caps confidence at MEDIUM** regardless of how
+clean the headline numbers look.
+
 ### Then — revisit Investigation A (do not continue it by inertia)
 
 Once B is closed, ask A a single question: **does A still answer an *unanswered*
@@ -150,6 +172,59 @@ operational behavior (the whole cascade collapsing when bounded), then A's freez
 FAE adds nothing new — **stop.** We set out to explain and stop the freeze; if the
 evidence has done that, the project is complete. Only continue A if a closure box
 *failed* in a way that points to a second, independent cause A could still isolate.
+
+---
+
+## 8. Unexpected observations
+
+Findings the investigation surfaced that were **not** part of the original hypothesis
+but are valuable engineering knowledge in their own right. Future operators may learn as
+much from these as from the fix itself.
+
+1. **Helm chart V1↔V2 key mismatch is silent.** `global.jobs.resources` (chart-V1) does
+   not populate `JOB_MAIN_CONTAINER_MEMORY_LIMIT` in chart V2, so a limit set there is
+   completely inert — no error, no warning. On abctl chart-V2 a values file is a
+   *request*, not a guarantee; **only the rendered pod spec is truth.**
+2. **"Config present" ≠ "config applied."** A 4 GiB limit sat in the live Helm values the
+   whole time while the pods ran unbounded. This is why propagation is a **hard gate**,
+   not a formality — and why the April migration silently regressed with nobody noticing.
+3. **Out-of-band ops config becomes false institutional memory.** The believed "1 GiB
+   limit" was a real patch — on a host (Airbyte 1.5.1) later discarded, never
+   version-controlled, never carried to the new box; `ed0567ff` only deleted a planning
+   doc. Un-versioned operational state drifts from belief. Version-controlling it (this
+   PR) is the fix for that class of error.
+4. **A persistent failure can decay before it can be cleanly captured.** In Investigation
+   A, a freeze's onset evidence (k8s events, ~1 h TTL) aged out before its contamination
+   (from manual recovery bounces) cleared — captured fresh-but-contaminated OR
+   clean-but-decayed, never both. **The observer can destroy the evidence;** operational
+   triage and RCA had to be kept strictly separate.
+5. **On single-node kind, an unbounded container is a NODE-level availability risk.** The
+   global OOM did not merely kill the offending JVM — it left *containerd itself*
+   unresponsive (`context deadline exceeded`), cascading to node `NotReady` and a
+   control-plane crash-loop. The blast radius of one unbounded workload container is the
+   **whole platform**, not just that container. (This is why S2/S3 are first-class signals.)
+6. **The safety net can fight the diagnosis.** The auto-remediation Lambda's kind-bounce,
+   triggered by the stale freshness a contained `OOMKilled` produces, would destroy the
+   exact pod state the experiment must observe — hence the "pause remediation during the
+   window" precondition. Automated recovery and controlled observation are in tension.
+
+## 9. Retrospective — the investigation in four phases
+
+1. **Detection** — understand the symptom; quantify the freezes (signature
+   `bytesSynced=0, lastUpdatedAt=null`; ~23/day).
+2. **Instrumentation** — build and *validate* the evidence collector before trusting any
+   evidence; establish trustworthy, contamination-classified observations.
+3. **Root-cause analysis** — identify the operational failure chain; eliminate competing
+   hypotheses; reconcile the historical configuration (V1/V2 key, `ed0567ff`).
+4. **Scientific validation** — controlled experiment: propagation verification →
+   steady-state observation → evidence-based closure with recorded confidence.
+
+If H₁ validates and the full cascade disappears, this RCA will have demonstrated, end to
+end: **what failed, why it failed, why the fix should work, that it actually propagated,
+that it eliminated the mechanism (not just the symptom), and the explicit evidence and
+confidence under which the investigation was closed.** At that point the project is
+complete — not because "the system works again," but because the mechanism is understood
+and its removal is demonstrated.
 
 ---
 
