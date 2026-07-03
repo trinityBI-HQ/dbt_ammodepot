@@ -393,7 +393,14 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     this SNAPSHOT. job_id (the frozen Airbyte job) identifies the FREEZE — many
     snapshots of one ongoing freeze share job_id, so analysis groups by job_id to
     build per-freeze timelines and to count DISTINCT freezes for the >=4/5 bar.
+
+    ROLLBACK: set env var CAPTURE_ENABLED=false to disable the collector in ~30s
+    (aws lambda update-function-configuration) with no redeploy; remediation is
+    unaffected either way.
     """
+    if os.environ.get("CAPTURE_ENABLED", "true").strip().lower() != "true":
+        return
+
     start_ts = time.time()
 
     if not _has_budget_for(CAPTURE_TOTAL_BUDGET_SECONDS):
