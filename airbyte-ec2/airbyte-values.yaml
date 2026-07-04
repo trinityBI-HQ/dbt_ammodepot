@@ -1,7 +1,7 @@
 # =============================================================================
 # Airbyte abctl (Helm chart V2) installation values
 # Instance: i-075043415ebad732f (c6a.2xlarge, 8 vCPU / 16 GB, AL2023, us-east-1)
-# abctl: v0.30.4  |  chart: airbyte 2.0.19  |  appVersion: 2.0.1
+# abctl: v0.30.4  |  chart: airbyte 2.1.0  |  appVersion: 2.1.0  (was 2.0.19/2.0.1 pre-2026-07-03)
 # Release: airbyte-abctl  namespace: airbyte-abctl
 #
 # WHY THIS FILE EXISTS
@@ -40,6 +40,22 @@ server:
 
 workloadLauncher:
   env_vars:
+    # ==========================================================================
+    # THE ACTUAL OOM FIX (2026-07-04, verified live)
+    # --------------------------------------------------------------------------
+    # The workload-launcher builds every replication pod from its OWN inline env,
+    # NOT from the airbyte-abctl-airbyte-env ConfigMap (its envFrom only pulls
+    # ...-telemetry-env). The chart leaves the launcher's JOB_MAIN_CONTAINER_MEMORY_LIMIT
+    # BLANK, so it interpolates the `${...:0}` fallback -> source/dest render
+    # limits.memory=0 (unbounded) -> global host OOM. Setting `global.workloads.
+    # resources.mainContainer.memory.limit` (below) only populates the ConfigMap,
+    # which the LAUNCHER NEVER READS -- that is why the 2026-07-03 Helm fix looked
+    # applied (ConfigMap=2Gi) but the pods still ran at 0. The fix must live HERE,
+    # on the launcher's own env. Verified: with this set, a fresh replication job
+    # renders source=2Gi dest=2Gi and cgroup memory.max=2147483648.
+    JOB_MAIN_CONTAINER_MEMORY_LIMIT: "2Gi"
+    JOB_MAIN_CONTAINER_MEMORY_REQUEST: "0"
+    # ==========================================================================
     # Requests pinned to 0 so the k8s scheduler never reserves for check/discover/
     # spec/sidecar helper pods on the single node. (Limits are set separately below
     # for the sync main containers, which is where the OOM originated.)

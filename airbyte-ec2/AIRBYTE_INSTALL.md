@@ -8,7 +8,7 @@ procedure for applying + **verifying** the replication-container memory-limit fi
 | **Instance** | `i-075043415ebad732f` (c6a.2xlarge, 8 vCPU / 16 GB, AL2023, us-east-1) |
 | **Access** | AWS Session Manager only (no SSH). EIP `18.204.90.52`. |
 | **Runtime** | abctl `v0.30.4` → kind (k8s-in-Docker), single node |
-| **Chart / app** | airbyte `2.0.19` / appVersion `2.0.1` |
+| **Chart / app** | airbyte `2.1.0` / appVersion `2.1.0` (was 2.0.19/2.0.1 pre-2026-07-03; see Incident log) |
 | **Release** | `airbyte-abctl` (namespace `airbyte-abctl`) |
 | **Values** | [`airbyte-values.yaml`](./airbyte-values.yaml) — the single source of truth |
 
@@ -17,6 +17,47 @@ procedure for applying + **verifying** the replication-container memory-limit fi
 > replication memory limits to unbounded and nobody could see it because
 > nothing was version-controlled. This directory now versions the whole config
 > so a reinstall/instance-swap is reproducible and reviewable.
+
+---
+
+## ⚠️ 2026-07-04 — the ACTUAL propagation point (config layers falsified)
+
+The 2026-07-03 design assumed a cgroup memory **limit** set via Helm
+`global.workloads.resources.mainContainer.memory.limit` (→ ConfigMap key
+`JOB_MAIN_CONTAINER_MEMORY_LIMIT`) would bind the replication source/dest
+containers. **Live testing on 2026-07-04 falsified that — and two fallbacks:**
+
+| Layer set to `2Gi` | Result on a **fresh** replication pod |
+|---|---|
+| Helm `global.workloads…memory.limit` (→ ConfigMap `JOB_MAIN_CONTAINER_MEMORY_LIMIT=2Gi`) | source/dest still `limits.memory=0` |
+| DB `actor.resource_requirements` (both sources + shared S3 dest) | still `0` (proven on a job created *after* a worker+server restart) |
+| DB `connection.resource_requirements` (both connections) | still `0` |
+
+**Root cause of the non-propagation:** the **workload-launcher builds every
+replication pod from its OWN inline env**, and its `envFrom` pulls only
+`airbyte-abctl-airbyte-telemetry-env` — **NOT** the `airbyte-abctl-airbyte-env`
+ConfigMap that holds the `2Gi`. The chart leaves the launcher's inline
+`JOB_MAIN_CONTAINER_MEMORY_LIMIT` **blank**, so it interpolates the `${…:0}`
+fallback → source/dest render `limits.memory=0` (unbounded). Every config layer
+we set populated things the launcher never reads. (This is *not* the
+discussion#72436 "Workload-API drops overrides" story — it is a plain
+env-wiring gap in the chart.)
+
+**The fix that works:** set `JOB_MAIN_CONTAINER_MEMORY_LIMIT` (+ `_REQUEST`) on
+the **launcher's own env** — i.e. under `workloadLauncher.env_vars` in
+[`airbyte-values.yaml`](./airbyte-values.yaml). Verified live: fresh replication
+jobs render `orch/source/dest = 1Gi,2Gi,2Gi`, cgroup `memory.max=2147483648`,
+consecutive syncs stayed bounded, host memory flat, **zero global OOM**.
+
+> **Live-state note:** the 2026-07-04 fix was applied ephemerally via
+> `kubectl set env deploy/airbyte-abctl-workload-launcher JOB_MAIN_CONTAINER_MEMORY_LIMIT=2Gi JOB_MAIN_CONTAINER_MEMORY_REQUEST=0`.
+> It survives pod restart / kind-bounce / EC2 reboot (the Deployment spec is in
+> etcd on the PV) and reverts **only** on a manual `abctl local install`. It is
+> now committed to `workloadLauncher.env_vars` so the next reinstall bakes it in.
+> The `global.workloads…mainContainer` block below is kept (harmless — it only
+> feeds the ConfigMap) but is **INERT for replication**; do not treat it as the
+> fix. The DB `actor`/`connection` `resource_requirements=2Gi` were left in place
+> (inert + harmless; remove in a future maintenance window if desired).
 
 ---
 
@@ -42,9 +83,12 @@ the host. The kernel then caps **total** RSS at the limit, converting any future
 overrun into a contained per-container `OOMKilled` (one failed sync, retried by
 auto-remediation) instead of a global host OOM that freezes the whole node.
 
-See the memory-fix block in [`airbyte-values.yaml`](./airbyte-values.yaml) for
-the full root-cause note, the ineffective pre-fix `global.jobs.resources` (V1
-key) it replaces, and the sizing/blast-radius math.
+**The limit must be set on `workloadLauncher.env_vars.JOB_MAIN_CONTAINER_MEMORY_LIMIT`**
+— see the §2026-07-04 section above for why the ConfigMap / actor / connection
+layers do **not** reach the replication pod. See the `workloadLauncher.env_vars`
+and memory-fix blocks in [`airbyte-values.yaml`](./airbyte-values.yaml) for the
+full root-cause note, the ineffective pre-fix `global.jobs.resources` (V1 key),
+and the sizing/blast-radius math.
 
 ---
 
@@ -74,17 +118,18 @@ key) it replaces, and the sizing/blast-radius math.
    pods and can collide with the 10-min sync cron / EIP. Budget for EIP re-attach.
 5. **Baseline captured** (see §Verify Step 0) so before/after is measurable.
 
-> 🔴 **MANDATORY: always pin `--chart-version 2.0.19`.** `abctl local install`
-> **without** a version pin fetches the **latest** chart (2.1.0+) and silently turns
-> a values change into a **platform upgrade** — which on 2026-07-03 partially applied,
-> failed on a Helm strategic-merge env-list bug, and could not be rolled back the same
-> way (see §Incident log). Both the apply and rollback commands below pin the version.
+> 🔴 **MANDATORY: always pin `--chart-version 2.1.0`** (the current live chart —
+> was `2.0.19` before the 2026-07-03 incident). `abctl local install` **without** a
+> version pin fetches the **latest** chart and silently turns a values change into a
+> **platform upgrade** — which on 2026-07-03 partially applied, failed on a Helm
+> strategic-merge env-list bug, and could not be rolled back the same way (see
+> §Incident log). Both the apply and rollback commands below pin the version.
 > 🔴 **Do NOT stage large files in `/tmp`** — it is a **7.7 GB tmpfs**; a full `/tmp`
 > makes `runc` fail with `no space left on device` and abctl's cluster creation dies
 > *silently* (exit 1, zero output). Put backups on `/var` (root fs).
 
 ```bash
-CV=2.0.19   # <-- pin the chart version to match the running platform
+CV=2.1.0   # <-- pin the chart version to match the running platform (was 2.0.19 pre-2026-07-03)
 
 # 1. Stage values on the instance (SSM; no SSH), sha256-verified against the repo:
 aws ssm send-command --profile ammodepot --region us-east-1 \
@@ -161,11 +206,15 @@ sudo docker exec $CP kubectl get pods -n $NS -o custom-columns=\
 # (helpers are tiny) but confirm requests did NOT jump off 0.
 ```
 
-> ❗ If 1a/1b still show `0`/unbounded, the override was **ignored** on this
-> version (discussion#72436 — Workload-API drops Helm overrides in the pod
-> manifest). Do **not** proceed to stability. This is then a **DB-level** fix
-> (actor `scoped_resource_requirements`), not Helm — **roll back** (§Rollback)
-> and reassess. This is the exact April failure mode, now a *failing test*.
+> ❗ If 1a/1b still show `0`/unbounded, the limit is not reaching the launcher's
+> pod-build path. **RESOLVED 2026-07-04 (see §2026-07-04 above):** this is NOT a
+> DB-level fix — the DB `actor`/`connection` `resource_requirements` layers were
+> *also* falsified. The limit must be set on the **launcher's own inline env**
+> (`workloadLauncher.env_vars.JOB_MAIN_CONTAINER_MEMORY_LIMIT`), because the
+> launcher does not read the `airbyte-abctl-airbyte-env` ConfigMap. Confirm the
+> launcher env with:
+> `kubectl get deploy airbyte-abctl-workload-launcher -n $NS -o jsonpath='{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{"\n"}{end}' | grep JOB_MAIN_CONTAINER_MEMORY_LIMIT`
+> (must be `=2Gi`, not empty).
 
 ### Step 2 — JVM heap now sized off the limit, not the host
 
@@ -236,7 +285,7 @@ else (c) leave dest unbounded and cap source only via a connection-level API ove
 
 ```bash
 # copy the COMMITTED prev artifact to the instance via SSM, then reinstall — PINNED:
-sudo env HOME=/usr/bin abctl local install --chart-version 2.0.19 --values /tmp/airbyte-values-prev.yaml
+sudo env HOME=/usr/bin abctl local install --chart-version 2.1.0 --values /tmp/airbyte-values-prev.yaml
 # re-attach EIP/ingress if abctl reset it
 ```
 
@@ -266,7 +315,7 @@ sudo docker exec airbyte-abctl-control-plane tar czf - -C /var/local-path-provis
 # 1. Kill any stuck install; 2. data-preserving uninstall (removes the kind cluster, KEEPS data):
 sudo env HOME=/usr/bin abctl local uninstall            # NO --persisted
 # 3. Fresh install, version-pinned (re-attaches persisted DB/storage):
-sudo env HOME=/usr/bin abctl local install --chart-version 2.0.19 --values /tmp/airbyte-values-prev.yaml
+sudo env HOME=/usr/bin abctl local install --chart-version 2.1.0 --values /tmp/airbyte-values-prev.yaml
 # 4. Verify: single deployed helm rev, 0 pods on the wrong version, connections intact.
 ```
 
@@ -303,9 +352,18 @@ deployment-tooling defect aborted it before any behavioral observation.
 - **`/tmp` is a small tmpfs** — never stage large files there; a full `/tmp` makes abctl
   fail silently at cluster creation.
 
-**Verified after recovery:** a **version-pinned** `abctl local install` stays on 2.0.19
-(no upgrade attempt) — the corrected procedure works. The experiment is **re-armed from
-Step 0** with the pinned commands.
+**Verified after recovery:** a **version-pinned** `abctl local install` stays on the
+pinned chart (no upgrade attempt) — the corrected procedure works.
+
+**Subsequent history (2026-07-03/04):** the 2.0.19 recovery hit an HTTP 409 (the failed
+upgrade's bootloader had already migrated the config DB to `2.1.0.017`, so 2.0.1 code on
+a 2.1.0 schema broke `getInstanceConfiguration`). Resolved by a data-preserving
+uninstall + fresh **pinned `--chart-version 2.1.0`** install → the platform is now
+**Airbyte 2.1.0 / chart 2.1.0** (the mem-limit fix mechanism is version-independent). The
+memory-limit experiment was then executed on 2.1.0 on **2026-07-04** — see the
+**§2026-07-04** section at the top for the result (config layers falsified; the launcher's
+inline `JOB_MAIN_CONTAINER_MEMORY_LIMIT` is the actual propagation point) and the current
+observation period.
 
 ---
 

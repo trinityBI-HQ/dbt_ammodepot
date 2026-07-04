@@ -1,6 +1,6 @@
 # =============================================================================
 # ROLLBACK VALUES — pre-fix Airbyte install config (2026-07-03)
-# Instance: i-075043415ebad732f  |  abctl v0.30.4  |  chart airbyte 2.0.19 / app 2.0.1
+# Instance: i-075043415ebad732f  |  abctl v0.30.4  |  chart airbyte 2.1.0 / app 2.1.0  (platform was 2.0.19 when this was captured 2026-07-03; pin 2.1.0 to match live)
 #
 # This is the EXACT live config decoded from the deployed Helm release
 # (sh.helm.release.v1.airbyte-abctl.v1) BEFORE the replication memory-limit fix
@@ -8,9 +8,13 @@
 # UNBOUNDED (the OOM-prone state). It exists so rollback is a real, reviewable
 # artifact and not a mid-incident hand-reconstruction.
 #
-# ROLL BACK WITH:
-#   sudo abctl local install --values /tmp/airbyte-values-prev.yaml
+# ROLL BACK WITH (PIN the chart version — abctl otherwise pulls latest):
+#   sudo env HOME=/usr/bin abctl local install --chart-version 2.1.0 --values /tmp/airbyte-values-prev.yaml
 #   (re-attach EIP/ingress if abctl reset it)
+#
+# NOTE: this prev artifact predates the 2026-07-04 launcher-env fix, so it also
+# lacks workloadLauncher.env_vars.JOB_MAIN_CONTAINER_MEMORY_LIMIT — rolling back
+# to it restores the UNBOUNDED replication state (the whole point of a rollback).
 #
 # NOTE: reverting restores the unbounded source/dest JVM (global-OOM risk).
 # Only roll back if the fix (airbyte-values.yaml) triggers a rollback criterion

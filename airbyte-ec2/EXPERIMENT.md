@@ -1,13 +1,30 @@
 # Experiment Record — Bounding Airbyte replication container memory
 
-**Type:** Controlled production experiment (not a deployment). **Status:** BEFORE
-baseline captured; **execution attempt 1 (2026-07-03) ABORTED at the apply step** by a
-deployment-tooling defect (unpinned `abctl` chart version → unintended 2.1.0 upgrade;
-see [`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md) §Incident log). **Never reached the
-propagation gate → no behavioral observations; the experiment remains NOT executed.**
-Platform recovered to a clean 2.0.19 baseline; re-armed from Step 0 with version-pinned
-install commands. **Investigation:** B (operational root cause).
-**Related:** [`airbyte-values.yaml`](./airbyte-values.yaml), [`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md).
+**Type:** Controlled production experiment (not a deployment). **Investigation:** B
+(operational root cause). **Platform:** Airbyte **2.1.0 / chart 2.1.0** (mechanism is
+version-independent).
+
+**Status (2026-07-04): EXECUTED — fix applied and propagation-confirmed; steady-state
+OBSERVATION window OPEN.** Prior attempt 1 (2026-07-03) aborted at apply on a
+deployment-tooling defect (unpinned `abctl` → unintended 2.1.0 upgrade; see
+[`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md) §Incident log) — no behavioral data.
+
+**Key result — the propagation gate falsified the designed fix location.** Setting the
+2 GiB limit via Helm `global.workloads…memory.limit` (→ ConfigMap
+`JOB_MAIN_CONTAINER_MEMORY_LIMIT=2Gi`) did **NOT** bind the replication pod; neither did
+DB `actor.resource_requirements` nor `connection.resource_requirements` (proven on a
+job created *after* a worker+server restart). **Root cause:** the workload-launcher
+builds replication pods from its OWN inline env (its `envFrom` excludes the
+`airbyte-abctl-airbyte-env` ConfigMap), and the chart leaves that inline
+`JOB_MAIN_CONTAINER_MEMORY_LIMIT` blank → `:0` fallback → `limits.memory=0`. **The
+effective fix is `workloadLauncher.env_vars.JOB_MAIN_CONTAINER_MEMORY_LIMIT=2Gi`.**
+Propagation gate then PASSED: fresh jobs render `orch/source/dest = 1Gi,2Gi,2Gi`,
+cgroup `memory.max=2147483648`; consecutive syncs bounded, host memory flat, zero
+global OOM. H₁'s mechanism is confirmed at the propagation layer; the **behavioral**
+claim (whole cascade collapses) is now under test in the observation window below.
+
+**Related:** [`airbyte-values.yaml`](./airbyte-values.yaml), [`AIRBYTE_INSTALL.md`](./AIRBYTE_INSTALL.md),
+memory `project_airbyte_oom_fix_launcher_env`.
 
 > Filled now: Objective, Hypothesis, Expected mechanism, Success criteria, Rollback
 > criteria, the BEFORE column of Observed Results, and the Unexpected observations (§8)
