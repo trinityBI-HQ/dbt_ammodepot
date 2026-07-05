@@ -1,7 +1,7 @@
 # Capacity Planning — Airbyte large-CDC workload sizing
 
 **Type:** Production-optimization workstream (NOT root-cause analysis). **Opened:** 2026-07-05.
-**Status:** OPEN — evidence gathered; Experiment 1 (controlled drain) designed, **not yet run**.
+**Status:** Recovery **EXECUTED 2026-07-05** (guarded controlled drain) — Magento drained + caught up, platform stable, cap **held at 3 GiB** (per-connector). Active workstream = steady-state observation → maintenance-window sizing decision. **See §0.**
 **Predecessor:** [`EXPERIMENT.md`](./EXPERIMENT.md) — Investigation B (RCA) is **CLOSED**; the
 platform-wide global-OOM cascade is eliminated. This workstream inherits the *contained*
 residual, not a platform failure.
@@ -9,6 +9,39 @@ residual, not a platform failure.
 > **Scope boundary (keep it clean).** Investigation B answered *why the platform failed*
 > and removed it. This workstream answers *how to operate the platform efficiently* as CDC
 > workloads grow. The RCA does not depend on any conclusion here; nothing here reopens the RCA.
+
+---
+
+## 0. Recovery executed (2026-07-05) — validated findings
+
+Experiment 1 (§6) was executed as a **production recovery** (owner prioritized service restoration
+over the sizing step-down). Outcome:
+
+- **Drain succeeded:** job 23848 committed **81,724 records in one 4.5-min pass at 3 GiB**; the CDC
+  checkpoint advanced `mysql-bin-changelog.037229/59421641 → 037286` (+57 binlog files); the next
+  sync advanced +1 file ⇒ **Magento caught up**. Freshness 707 min ALERT → OK; ~46k rows landed.
+- **Platform stability preserved:** zero global OOM, node Ready throughout, min host-avail **4.7 GiB**
+  (guards never near the 1.5 GiB abort floor). Fishbowl healthy.
+- **Pivotal question (§4.1) — answered from observation:** demand is **backlog-proportional**, not a
+  fixed structural floor near 2 GiB. Evidence: emitted-at-OOM grew 1:1 with the ~9k rec/hr CDC rate;
+  genuine pre-freeze incrementals committed under 2 GiB; source cold-start floor ≈ **0.7 GiB**;
+  destination (previously unmeasured) ≈ **0.65–0.9 GiB** — never the constraint.
+- **Propagation model CORRECTED (supersedes §3a):** the **connection-level `resourceRequirements`
+  GOVERNS** rendered replication-pod memory. Raising the launcher env alone did NOT change the pods —
+  the Magento connection's leftover RR=2Gi overrode it. **Precedence: connection RR > actor RR >
+  launcher inline env > `:0`.** ⇒ **per-connector sizing works.** Applied cleanly: Magento connection
+  RR = **3 GiB** (LARGE), Fishbowl connection RR = **2 GiB** (SMALL) — no global raise required.
+- **Live config (normal operation restored):** Magento 3 GiB / Fishbowl 2 GiB via connection RR;
+  launcher fallback 3 GiB; auto-remediation live; both connections active + healthy.
+  `airbyte-values.yaml` intentionally still 2 GiB (divergence recorded here, not silent drift —
+  persist during the maintenance window).
+
+**OPEN (Capacity Planning, not RCA):** the first post-drain incremental peaked **~2.7 GiB** on the
+source — above the pre-freeze estimate. Whether settled steady-state is **≤2 GiB (transient — clean
+step-down)** or **~2.5 GiB (structural — 3 GiB correctly sized)** is the input to a future
+maintenance-window step-down decision. Observe several normal cycles first; do **not** step down
+immediately after recovery. Auto-remediation follow-up: distinguish a backlog spiral from a transient
+hang (don't cancel a committing drain).
 
 ---
 

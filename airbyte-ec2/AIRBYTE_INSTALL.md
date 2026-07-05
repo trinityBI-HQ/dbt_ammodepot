@@ -61,6 +61,29 @@ consecutive syncs stayed bounded, host memory flat, **zero global OOM**.
 
 ---
 
+## ✅ 2026-07-05 — connection-level `resourceRequirements` is the GOVERNING knob (correction)
+
+During the Magento backlog recovery, raising the launcher inline `JOB_MAIN_CONTAINER_MEMORY_LIMIT`
+2Gi→3Gi did **NOT** change the rendered replication pods (still `source/dest=2Gi`) — the **Magento
+connection carried `resourceRequirements.memory_limit=2Gi`** (the "inert leftover" from 07-04 — it is
+in fact the governing layer). **Precedence: connection RR > actor RR > launcher inline env > `:0`.**
+The launcher inline env is only the fallback when connection/actor RR is null.
+
+Fix that binds per-connector memory — `POST /api/v1/connections/update` with
+`{"connectionId":…,"resourceRequirements":{"memory_limit":"3Gi","memory_request":"0"}}` (partial-merge:
+preserves catalog/schedule/status). Fresh pods then render `orch/source/dest = 1Gi/3Gi/3Gi`, cgroup
+`memory.max=3221225472`. ⇒ **per-connector sizing works** (Magento 3Gi LARGE, Fishbowl 2Gi SMALL — no
+global raise). **Verify propagation on a pod created AFTER the change** — jobs already running keep
+their old limit. Durability: connection RR lives in the Postgres config DB (survives reinstall since
+data is preserved); the launcher inline env reverts on `abctl local install` unless
+`airbyte-values.yaml` is updated.
+
+**Current live config (2026-07-05):** Magento connection RR **3Gi**, Fishbowl connection RR **2Gi**,
+launcher fallback 3Gi. `airbyte-values.yaml` is still 2Gi (intentional divergence pending the
+capacity-planning steady-state decision — see [`CAPACITY_PLANNING.md`](./CAPACITY_PLANNING.md) §0).
+
+---
+
 ## The problem this fixes
 
 ```mermaid
