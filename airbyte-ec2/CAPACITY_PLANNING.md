@@ -1,7 +1,7 @@
 # Capacity Planning — Airbyte large-CDC workload sizing
 
 **Type:** Production-optimization workstream (NOT root-cause analysis). **Opened:** 2026-07-05.
-**Status:** Recovery **EXECUTED 2026-07-05** (guarded controlled drain) — Magento drained + caught up, platform stable, cap **held at 3 GiB** (per-connector). Active workstream = steady-state observation → maintenance-window sizing decision. **See §0.**
+**Status:** Recovery **EXECUTED 2026-07-05** (guarded controlled drain) — Magento drained + caught up, platform stable. **Magento 3 GiB / Fishbowl 2 GiB (per-connector) is now the accepted operating baseline** (owner policy) — remains unless production evidence indicates otherwise; keeping 3 GiB long-term is acceptable. Active workstream = steady-state observation; the only open question is whether Magento can *optionally* be reduced below 3 GiB. **See §0.**
 **Predecessor:** [`EXPERIMENT.md`](./EXPERIMENT.md) — Investigation B (RCA) is **CLOSED**; the
 platform-wide global-OOM cascade is eliminated. This workstream inherits the *contained*
 residual, not a platform failure.
@@ -36,12 +36,15 @@ over the sizing step-down). Outcome:
   `airbyte-values.yaml` intentionally still 2 GiB (divergence recorded here, not silent drift —
   persist during the maintenance window).
 
-**OPEN (Capacity Planning, not RCA):** the first post-drain incremental peaked **~2.7 GiB** on the
-source — above the pre-freeze estimate. Whether settled steady-state is **≤2 GiB (transient — clean
-step-down)** or **~2.5 GiB (structural — 3 GiB correctly sized)** is the input to a future
-maintenance-window step-down decision. Observe several normal cycles first; do **not** step down
-immediately after recovery. Auto-remediation follow-up: distinguish a backlog spiral from a transient
-hang (don't cancel a committing drain).
+**Owner policy (baseline, not a pending step-down):** Magento 3 GiB / Fishbowl 2 GiB is the **accepted
+operating configuration** and an acceptable long-term state. The only remaining maintenance question is
+*whether* Magento can **safely be reduced below 3 GiB** — an **optional, evidence-gated** call, **not** a
+required step-down: if production stays stable and no operational benefit justifies the change, keeping
+3 GiB is fine. The first post-drain incremental peaked **~2.7 GiB** (above the pre-freeze estimate);
+whether settled steady-state is **≤2 GiB (reduction possible)** or **~2.5 GiB (3 GiB correctly sized)**
+informs that optional call — observe several normal cycles before deciding. Separate follow-ups:
+auto-remediation should distinguish a backlog spiral from a transient hang (don't cancel a committing
+drain), and the 3 GiB should be persisted to `airbyte-values.yaml` + documented if it's kept.
 
 ---
 
