@@ -66,11 +66,25 @@ log "Disk usage before: ${BEFORE}%"
 # --- Step 1: Count what will be cleaned (always runs) ---
 log "--- Analyzing records to clean ---"
 
-MINIO_LOG_PATH="/var/local-path-provisioner/airbyte-minio-pv/airbyte-storage/job-logging/workspace"
+# Airbyte 2.x serves job logs from airbyte-local-pv, not the old airbyte-minio-pv
+# layout. The stale path meant `find` errored, 2>/dev/null swallowed it, and the
+# step still logged "complete" — so job logs were NEVER pruned. By 2026-07-15 that
+# was 26,948 dirs / 17 GB, the oldest stamped 2026-04-07 00:28 (instance launch).
+JOB_LOG_PATH="/var/local-path-provisioner/airbyte-local-pv/job-logging/workspace"
 
-MINIO_COUNT=$(docker exec "$CONTAINER" find "$MINIO_LOG_PATH" \
-    -mindepth 1 -maxdepth 1 -mtime +"${DAYS}" 2>/dev/null | wc -l || echo 0)
-log "Minio job log dirs older than ${DAYS} days: $MINIO_COUNT"
+# Fail loudly if the path moves again. A cleanup step that cannot find its target
+# must never report success — that silence is exactly what hid this for 3 months.
+if ! docker exec "$CONTAINER" test -d "$JOB_LOG_PATH"; then
+    log "ERROR: job log path not found in container: $JOB_LOG_PATH"
+    log "       Airbyte's storage layout likely changed — fix JOB_LOG_PATH before relying on this."
+    exit 1
+fi
+
+# `|| echo 0` under `set -o pipefail` appends a second value when find fails,
+# yielding a literal "0\n0". Count without the pipeline fallback instead.
+JOB_LOG_COUNT=$(docker exec "$CONTAINER" find "$JOB_LOG_PATH" \
+    -mindepth 1 -maxdepth 1 -type d -mtime +"${DAYS}" 2>/dev/null | wc -l)
+log "Job log dirs older than ${DAYS} days: $JOB_LOG_COUNT"
 
 ATTEMPTS_COUNT=$(run_psql "SELECT count(*) FROM attempts WHERE created_at < NOW() - INTERVAL '${DAYS} days';")
 JOBS_COUNT=$(run_psql "SELECT count(*) FROM jobs WHERE created_at < NOW() - INTERVAL '${DAYS} days';")
@@ -81,11 +95,15 @@ if [[ "$DRY_RUN" == "true" ]]; then
     exit 0
 fi
 
-# --- Step 2: Clean Minio job logs ---
-log "--- Cleaning Minio job logs older than ${DAYS} days ---"
-docker exec "$CONTAINER" find "$MINIO_LOG_PATH" \
-    -mindepth 1 -maxdepth 1 -mtime +"${DAYS}" -exec rm -rf {} + 2>/dev/null || true
-log "Minio cleanup complete"
+# --- Step 2: Clean job logs ---
+# Unlike VACUUM, this is a real file deletion: space returns to the OS immediately,
+# with no lock and no maintenance window.
+log "--- Cleaning job logs older than ${DAYS} days (${JOB_LOG_COUNT} dirs) ---"
+docker exec "$CONTAINER" find "$JOB_LOG_PATH" \
+    -mindepth 1 -maxdepth 1 -type d -mtime +"${DAYS}" -exec rm -rf {} + 2>/dev/null || true
+REMAINING=$(docker exec "$CONTAINER" find "$JOB_LOG_PATH" \
+    -mindepth 1 -maxdepth 1 -type d -mtime +"${DAYS}" 2>/dev/null | wc -l)
+log "Job log cleanup complete (${REMAINING} stale dirs remain)"
 
 # --- Step 3: Clean dependent DB tables (FK references to attempts) ---
 log "--- Cleaning dependent database tables ---"
@@ -143,5 +161,5 @@ fi
 AFTER=$(get_disk_pct)
 log "Disk usage after: ${AFTER}%"
 log "Cleanup complete. Disk: ${BEFORE}% -> ${AFTER}%"
-log "Deleted: ${ATTEMPTS_COUNT} attempts, ${JOBS_COUNT} jobs, ${MINIO_COUNT} log dirs"
+log "Deleted: ${ATTEMPTS_COUNT} attempts, ${JOBS_COUNT} jobs, ${JOB_LOG_COUNT} log dirs"
 log "Done."
