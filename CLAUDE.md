@@ -306,18 +306,28 @@ streamlit_analyst/
 
 ```
 airbyte-ec2/
-├── airbyte-cleanup.sh      # Monthly cleanup: Minio logs + DB pruning + VACUUM (~123 lines)
-├── disk-alert.sh           # 6-hourly disk usage alert to log (~43 lines)
-└── deploy.sh               # One-command installer for EC2 (~76 lines)
+├── airbyte-cleanup.sh      # Weekly cleanup: Minio logs + DB pruning + VACUUM (+ --vacuum-full)
+├── disk-alert.sh           # 6-hourly disk usage alert → SNS + log
+├── deploy.sh               # One-command installer (systemd timers, verifies arming)
+└── systemd/                # 4 units: {airbyte-cleanup,disk-alert}.{service,timer}
 ```
 
-- **Deployed to**: `/opt/` on EC2 instance `i-075043415ebad732f` (c6a.2xlarge, 8 vCPU, 16 GB, AL2023, ~$223/mo)
-- **Airbyte**: v2.0.1 (Chart 2.0.19), abctl v0.30.4 (kind/k8s), EIP 18.204.90.52
+- **Deployed to**: `/opt/scripts/` on EC2 instance `i-075043415ebad732f` (c6a.2xlarge, 8 vCPU, 16 GB, AL2023, ~$223/mo)
+- **Airbyte**: v2.1.0 (Chart 2.1.0), abctl (kind/k8s), EIP 18.204.90.52
 - **Old instance**: `i-0c6727e56deafaf36` (AL2, pending termination)
-- **Cron**: Monthly cleanup (1st at 3am UTC), disk alert (every 6h)
-- **Logs**: `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log`
+- **Schedule**: **systemd timers** — weekly cleanup (Sun 03:00 UTC), disk alert (every 6h). **NOT cron: AL2023 does not ship cronie.**
+- **Alerting**: `disk-alert.sh` publishes to SNS `airbyte-auto-remediate-events` at ≥70%. Requires `sns:Publish` on the instance role (`EC2_SSM_Access`).
+- **Logs**: `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log` (also in journal)
 - **Dry run**: `sudo /opt/scripts/airbyte-cleanup.sh --dry-run`
+- **Reclaim disk**: `sudo /opt/scripts/airbyte-cleanup.sh --vacuum-full` — plain `VACUUM` never shrinks pgdata; `VACUUM FULL` takes an ACCESS EXCLUSIVE lock, so use a maintenance window.
+- **Verify armed**: `systemctl list-timers 'airbyte*' 'disk*'`
 - **Docs**: see `docs/` folder
+
+> **History (2026-07-15):** these scripts were present at `/opt/` but **never ran once** on this
+> instance. `deploy.sh` installs to `/opt/scripts/` and wired jobs via `crontab -`, which does not
+> exist on AL2023 — so the install died before scheduling anything. With no cleanup and no disk
+> alert since 2026-04-07, the root disk reached 100%, starving the workload-launcher; syncs then
+> reported `succeeded` with **0 bytes/0 rows** for ~4.5h. See `docs/AIRBYTE_INCIDENT_RUNBOOK.md`.
 
 ### ECS Fargate (dbt Orchestration)
 

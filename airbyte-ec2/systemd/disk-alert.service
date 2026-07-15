@@ -1,0 +1,15 @@
+[Unit]
+Description=Airbyte EC2 disk usage alert (publishes to SNS on threshold breach)
+Documentation=https://github.com/trinityBI-HQ/dbt_ammodepot/blob/main/airbyte-ec2/README.md
+After=docker.service
+
+[Service]
+Type=oneshot
+# SNS_TOPIC_ARN is what turns this from a logfile nobody reads into a page.
+# If unset the script still logs, but silently — which is how a disk reached 100%.
+Environment=SNS_TOPIC_ARN=arn:aws:sns:us-east-1:746669199691:airbyte-auto-remediate-events
+Environment=AWS_DEFAULT_REGION=us-east-1
+ExecStart=/opt/scripts/disk-alert.sh
+StandardOutput=append:/var/log/disk-alert.log
+StandardError=append:/var/log/disk-alert.log
+TimeoutStartSec=300

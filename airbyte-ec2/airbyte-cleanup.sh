@@ -1,15 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
-# Airbyte monthly cleanup — run on 1st of each month at 3am UTC
+# Airbyte cleanup — run weekly via systemd timer (airbyte-cleanup.timer)
 # Retains 30 days of history, logs to /var/log/airbyte-cleanup.log
 #
 # Usage:
-#   ./airbyte-cleanup.sh              # Normal run
-#   ./airbyte-cleanup.sh --dry-run    # Preview only (no deletions)
+#   ./airbyte-cleanup.sh                # Normal run (prune + plain VACUUM)
+#   ./airbyte-cleanup.sh --dry-run      # Preview only (no deletions)
+#   ./airbyte-cleanup.sh --vacuum-full  # Also reclaim disk — LOCKS Airbyte, see below
 #
 # Environment:
 #   RETENTION_DAYS — Override default 30-day retention (optional)
+#
+# VACUUM vs VACUUM FULL — why both exist:
+#   Plain VACUUM only marks pages reusable INSIDE the table file; it never returns
+#   space to the OS, so pgdata is a ratchet that grows and never shrinks. That is
+#   safe to run weekly (no lock). Reclaiming disk requires VACUUM FULL, which
+#   rewrites the table under an ACCESS EXCLUSIVE lock — Airbyte cannot write to
+#   jobs/attempts while it runs. Hence: plain VACUUM on the timer, --vacuum-full
+#   by hand in a maintenance window.
 
 # --- Configuration ---
 DAYS="${RETENTION_DAYS:-30}"
@@ -19,11 +28,13 @@ DB_USER="airbyte"
 DB_NAME="db-airbyte"
 LOG_PREFIX="[airbyte-cleanup]"
 DRY_RUN=false
+VACUUM_FULL=false
 
 # --- Parse arguments ---
 for arg in "$@"; do
     case "$arg" in
         --dry-run) DRY_RUN=true ;;
+        --vacuum-full) VACUUM_FULL=true ;;
         *) echo "Unknown argument: $arg"; exit 1 ;;
     esac
 done
@@ -108,12 +119,25 @@ DELETED=$(run_psql \
     ) SELECT count(*) FROM deleted;")
 log "  jobs: deleted $DELETED rows"
 
-# --- Step 6: VACUUM (regular, not FULL — less disruptive for scheduled runs) ---
-log "--- Running VACUUM ---"
-for table in attempts jobs stream_attempt_metadata stream_stats sync_stats; do
-    run_psql "VACUUM ${table};" > /dev/null 2>&1
-    log "  VACUUM $table complete"
-done
+# --- Step 6: VACUUM ---
+# Default: plain VACUUM (no lock, safe on the weekly timer, does NOT shrink files).
+# --vacuum-full: rewrites tables to actually return space to the OS. Takes an
+# ACCESS EXCLUSIVE lock, so only run it in a maintenance window.
+if [[ "$VACUUM_FULL" == "true" ]]; then
+    log "--- Running VACUUM FULL (ACCESS EXCLUSIVE lock — Airbyte writes will block) ---"
+    for table in attempts jobs stream_attempt_metadata stream_stats sync_stats; do
+        log "  VACUUM FULL $table starting..."
+        run_psql "VACUUM FULL ${table};" > /dev/null 2>&1
+        log "  VACUUM FULL $table complete"
+    done
+else
+    log "--- Running VACUUM (plain — reusable pages only, does not shrink files) ---"
+    for table in attempts jobs stream_attempt_metadata stream_stats sync_stats; do
+        run_psql "VACUUM ${table};" > /dev/null 2>&1
+        log "  VACUUM $table complete"
+    done
+    log "  NOTE: disk not reclaimed. Use --vacuum-full in a window to shrink pgdata."
+fi
 
 # --- Report results ---
 AFTER=$(get_disk_pct)

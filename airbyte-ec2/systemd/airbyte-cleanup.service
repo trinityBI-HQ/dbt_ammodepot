@@ -1,0 +1,15 @@
+[Unit]
+Description=Airbyte maintenance cleanup (Minio job logs + DB prune + VACUUM)
+Documentation=https://github.com/trinityBI-HQ/dbt_ammodepot/blob/main/airbyte-ec2/README.md
+# Airbyte must be up: the script talks to the kind control-plane container.
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/scripts/airbyte-cleanup.sh
+# Journal captures stdout/stderr; also mirrored to the legacy logfile for the runbook.
+StandardOutput=append:/var/log/airbyte-cleanup.log
+StandardError=append:/var/log/airbyte-cleanup.log
+# A stuck psql must never wedge the timer forever.
+TimeoutStartSec=1800
