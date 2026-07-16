@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Airbyte cleanup weekly (Sunday 03:00 UTC)
+
+[Timer]
+# Weekly, not monthly: retention is 30 days, so a monthly run left up to 60 days
+# of jobs/attempts on disk between passes.
+OnCalendar=Sun *-*-* 03:00:00 UTC
+# Run on next boot if the machine was down at the scheduled time. Without this a
+# reboot near the window silently skips a whole cycle.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
