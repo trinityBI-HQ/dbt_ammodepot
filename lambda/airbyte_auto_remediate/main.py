@@ -385,7 +385,7 @@ def _emit_capture_metric(conn_id: str, outcome: str, start_ts: float,
     }))
 
 
-def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
+def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> dict | None:
     """v1 freeze-evidence collector — capture an unbiased, fact-only evidence
     bundle BEFORE any remediation touches the cluster, then persist it append-only.
 
@@ -411,15 +411,20 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
     ROLLBACK: set env var CAPTURE_ENABLED=false to disable the collector in ~30s
     (aws lambda update-function-configuration) with no redeploy; remediation is
     unaffected either way.
+
+    RETURNS: the parsed Airbyte attempt dict when the capture succeeded, else None.
+    The progress gate consumes this; every failure path returns None, which the
+    gate treats as "cannot prove progress" and falls back to acting — so the
+    "must never block remediation" contract above is preserved unchanged.
     """
     if os.environ.get("CAPTURE_ENABLED", "true").strip().lower() != "true":
-        return
+        return None
 
     start_ts = time.time()
 
     if not _has_budget_for(CAPTURE_TOTAL_BUDGET_SECONDS):
         _emit_capture_metric(conn_id, "skipped_budget", start_ts, persisted=False)
-        return
+        return None
 
     try:
         template = CAPTURE_EVIDENCE_PAYLOAD_TEMPLATE_PATH.read_text()
@@ -436,7 +441,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
             "capture_status": "ssm_send_failed", "capture_detail": str(exc)[:500],
         })
         _emit_capture_metric(conn_id, "ssm_send_failed", start_ts, persisted=persisted)
-        return
+        return None
 
     command_id = send_resp["Command"]["CommandId"]
     try:
@@ -447,7 +452,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
             "capture_status": "ssm_poll_error", "capture_detail": str(exc)[:500],
         })
         _emit_capture_metric(conn_id, "ssm_poll_error", start_ts, persisted=persisted)
-        return
+        return None
 
     if inv is None or inv.get("Status") not in _SSM_TERMINAL_STATUSES:
         persisted = _write_evidence_row(snowflake_conn, {
@@ -455,7 +460,7 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
             "capture_status": "ssm_poll_timeout",
         })
         _emit_capture_metric(conn_id, "ssm_poll_timeout", start_ts, persisted=persisted)
-        return
+        return None
 
     output = inv.get("StandardOutputContent", "") or ""
     kv = _parse_kv(output)
@@ -467,11 +472,13 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
         status, detail = "partial", f"ssm_status={inv.get('Status')}"
 
     job_id = None
+    attempt = None
     try:
         attempt = json.loads(kv.get("ATTEMPT_JSON") or "{}")
         job_id = (str(attempt.get("jobId") or attempt.get("id") or "").strip() or None)
     except Exception:
         job_id = None
+        attempt = None
 
     persisted = _write_evidence_row(snowflake_conn, {
         "event_id": event_id,
@@ -485,6 +492,136 @@ def _capture_evidence(snowflake_conn, conn_id: str, event_id: str) -> None:
         "node_conditions_json": kv.get("NODE_CONDITIONS_JSON"),
     })
     _emit_capture_metric(conn_id, status, start_ts, persisted=persisted)
+    return attempt if isinstance(attempt, dict) and attempt else None
+
+
+# ----------------------------------------------------------------------------
+# Progress gate: distinguish "stuck" from "slow but progressing"
+# ----------------------------------------------------------------------------
+
+PROGRESS_GATE_ENABLED = os.environ.get("PROGRESS_GATE_ENABLED", "true").strip().lower() == "true"
+PROGRESS_OBS_TTL_SECONDS = int(os.environ.get("PROGRESS_OBS_TTL_SECONDS", "21600"))  # 6h
+_PROGRESS_KEY_PREFIX = "progress#"
+# Airbyte job states that mean "a job is alive right now and could still commit".
+_LIVE_JOB_STATUSES = {"running", "pending", "incomplete"}
+
+
+def _progress_key(conn_id: str) -> str:
+    """Namespaced DDB key.
+
+    MUST stay distinct from the bare connection_id used by the circuit breaker:
+    _open_breaker writes with put_item, which REPLACES the whole item. Sharing a
+    key would silently clobber breaker_until and disable the breaker.
+    """
+    return f"{_PROGRESS_KEY_PREFIX}{conn_id}"
+
+
+def _read_progress_observation(conn_id: str) -> dict | None:
+    try:
+        resp = ddb_client.get_item(
+            TableName=DDB_TABLE,
+            Key={"connection_id": {"S": _progress_key(conn_id)}},
+            ConsistentRead=True,
+        )
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "progress_read_failure", "connection_id": conn_id, "error": str(exc),
+        }))
+        return None
+
+    item = resp.get("Item")
+    if not item:
+        return None
+    try:
+        return {
+            "job_id": item.get("job_id", {}).get("S") or None,
+            "bytes_synced": int(item.get("bytes_synced", {}).get("N", "0")),
+            "rows_synced": int(item.get("rows_synced", {}).get("N", "0")),
+            "observed_at": int(item.get("observed_at", {}).get("N", "0")),
+        }
+    except Exception:
+        return None
+
+
+def _write_progress_observation(conn_id: str, job_id: str | None,
+                                bytes_synced: int, rows_synced: int) -> None:
+    now_epoch = int(time.time())
+    try:
+        ddb_client.put_item(
+            TableName=DDB_TABLE,
+            Item={
+                "connection_id": {"S": _progress_key(conn_id)},
+                "job_id": {"S": str(job_id or "")},
+                "bytes_synced": {"N": str(int(bytes_synced))},
+                "rows_synced": {"N": str(int(rows_synced))},
+                "observed_at": {"N": str(now_epoch)},
+                "ttl": {"N": str(now_epoch + PROGRESS_OBS_TTL_SECONDS)},
+            },
+        )
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "progress_write_failure", "connection_id": conn_id, "error": str(exc),
+        }))
+
+
+def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, str]:
+    """Decide whether cancel+restart is safe. Returns (decision, reason).
+
+    WHY THIS EXISTS (2026-07-22 incident): staleness alone cannot tell "frozen"
+    from "slow but committing". On 2026-07-22 Magento was draining a backlog —
+    every sync WAS moving data, just slower than the 30-min threshold — and this
+    Lambda cancelled it four times. Each cancel discarded real work (job 28578 lost
+    1h21m) and the restart re-read the binlog from the last committed offset, so
+    the connection could never catch up. The remediation became the outage.
+
+    Decisions:
+      ACT                -> cancel+restart is appropriate (frozen, or unprovable)
+      SKIP_PROGRESSING   -> a live job is committing; leave it alone
+      SKIP_NEED_BASELINE -> data is moving but there is no prior sample to compare;
+                            record one and re-evaluate next invocation (~15 min)
+
+    Bias: only SKIP when there is positive evidence of movement. Absent or
+    unparseable evidence always falls through to ACT, preserving prior behaviour.
+    """
+    if not PROGRESS_GATE_ENABLED:
+        return "ACT", "gate_disabled"
+
+    if not isinstance(attempt, dict) or not attempt:
+        return "ACT", "no_attempt_evidence"
+
+    status = str(attempt.get("status") or "").strip().lower()
+    job_id = str(attempt.get("jobId") or attempt.get("id") or "").strip() or None
+
+    try:
+        bytes_synced = int(attempt.get("bytesSynced") or 0)
+        rows_synced = int(attempt.get("rowsSynced") or 0)
+    except (TypeError, ValueError):
+        return "ACT", "unparseable_counters"
+
+    # No live job => nothing to protect; the classic freeze also lands here once
+    # the stuck job has been reaped.
+    if status not in _LIVE_JOB_STATUSES:
+        return "ACT", f"job_not_live:{status or 'unknown'}"
+
+    # Canonical freeze signature (2026-05-03): a live job that has moved nothing.
+    # Act immediately — do NOT spend a cycle collecting a baseline for this case.
+    if bytes_synced == 0 and rows_synced == 0:
+        return "ACT", "zero_progress_live_job"
+
+    previous = _read_progress_observation(conn_id)
+    _write_progress_observation(conn_id, job_id, bytes_synced, rows_synced)
+
+    if previous is None or previous.get("job_id") != (job_id or ""):
+        # Different job (or first sighting): counters are not comparable across
+        # jobs, since each job restarts them at zero.
+        return "SKIP_NEED_BASELINE", "no_comparable_prior_sample"
+
+    if bytes_synced > previous["bytes_synced"] or rows_synced > previous["rows_synced"]:
+        delta_b = bytes_synced - previous["bytes_synced"]
+        delta_r = rows_synced - previous["rows_synced"]
+        return "SKIP_PROGRESSING", f"advanced_bytes={delta_b},rows={delta_r}"
+
+    return "ACT", "counters_flat_between_samples"
 
 
 # ----------------------------------------------------------------------------
@@ -509,8 +646,9 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
     # Capture-then-remediate: snapshot the freeze evidence BEFORE any tier acts,
     # so protection is never disabled. Double-wrapped + budget-gated internally so
     # a capture fault can never delay, block, or fail remediation.
+    attempt_evidence = None
     try:
-        _capture_evidence(snowflake_conn, conn_id, base_audit["event_id"])
+        attempt_evidence = _capture_evidence(snowflake_conn, conn_id, base_audit["event_id"])
     except Exception as exc:
         LOGGER.warning(json.dumps({
             "event": "capture_evidence_uncaught",
@@ -529,6 +667,26 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
             "event": "skipped_breaker_open",
             "connection_id": conn_id,
             "breaker_until": breaker_until.isoformat(),
+        }))
+        return
+
+    # Progress gate — must run BEFORE the observe-only branch so that a soak in
+    # observe-only mode exercises (and reports on) the real decision, instead of
+    # reporting "would cancel" for drains the gate would actually have spared.
+    gate_decision, gate_reason = _evaluate_progress_gate(conn_id, attempt_evidence)
+    if gate_decision != "ACT":
+        _write_audit_row(snowflake_conn, {
+            **base_audit,
+            "outcome": "SKIPPED_PROGRESSING",
+            "action_taken": "none",
+            "failure_reason": f"{gate_decision}:{gate_reason}"[:500],
+        })
+        LOGGER.info(json.dumps({
+            "event": "skipped_progress_gate",
+            "connection_id": conn_id,
+            "decision": gate_decision,
+            "reason": gate_reason,
+            "pre_staleness_min": pre_staleness,
         }))
         return
 

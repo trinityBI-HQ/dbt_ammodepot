@@ -10,6 +10,8 @@ Every 15 min on `cron(5,20,35,50)` UTC, this Lambda:
 1. Reads `AD_ANALYTICS.OPS.V_AIRBYTE_FRESHNESS` (Phase 1's view).
 2. For every connection in `ALERT` tier (≥30 min stale by default):
    - Checks the per-connection DynamoDB circuit breaker. Skips if open.
+   - **Progress gate:** skips entirely if the running job is *committing*
+     (see below). Staleness alone cannot tell "frozen" from "slow".
    - **Tier 1 (cancel+restart):** if `OBSERVE_ONLY=true`, logs the would-be
      action. Otherwise cancels the running Airbyte job + triggers a fresh
      sync via SSM, sleeps 5 min, verifies recovery.
@@ -24,6 +26,43 @@ Every 15 min on `cron(5,20,35,50)` UTC, this Lambda:
 
 Phase 1's email layer (`[Airbyte WARN]` / `[Airbyte ALERT]`) is unchanged
 and continues to fire independently.
+
+## Progress gate (added 2026-07-22)
+
+**Why:** on 2026-07-22 Magento was draining a backlog — every sync *was* moving
+data, just slower than the 30-min threshold — and this Lambda cancelled it four
+times. Each cancel discarded real work (job 28578 lost **1h21m**) and the restart
+re-read the binlog from the last committed offset, so the connection could never
+catch up. **The remediation became the outage.**
+
+Staleness alone conflates two opposite states:
+
+| State | Signature | Correct action |
+|---|---|---|
+| **Frozen** | live job, `bytesSynced=0`, offset stuck | cancel + restart |
+| **Slow but committing** | counters advancing between samples | **leave it alone** |
+
+The gate runs after the breaker and *before* the observe-only branch, so an
+observe-only soak reports the real decision. Decisions:
+
+| Decision | When |
+|---|---|
+| `ACT` | no live job · `bytesSynced=0` on a live job (classic freeze — acts immediately, no baseline wait) · counters flat between two samples · **any** missing/unparseable evidence |
+| `SKIP_PROGRESSING` | counters advanced vs the prior sample for the same job |
+| `SKIP_NEED_BASELINE` | data is moving but no comparable prior sample (first sighting, or a new job — counters reset per job); records one and re-evaluates next run (~15 min) |
+
+**Bias: only skip on positive evidence of movement.** Any doubt falls through to
+`ACT`, preserving pre-gate behaviour. Skips write an audit row with outcome
+`SKIPPED_PROGRESSING` and log `skipped_progress_gate`.
+
+Prior observations live in the same DynamoDB table under a **separate key**
+(`progress#<connection_id>`) — the breaker writes with `put_item`, which replaces
+the whole item, so sharing a key would silently clobber `breaker_until`.
+
+Rollback without redeploy: `PROGRESS_GATE_ENABLED=false`
+(`aws lambda update-function-configuration`) restores the old always-cancel path.
+
+Tests: `python3 test_progress_gate.py` (9 cases, no AWS/Snowflake needed).
 
 ## Architecture (one-liner)
 
