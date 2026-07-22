@@ -1,7 +1,7 @@
 # Capacity Planning — Airbyte large-CDC workload sizing
 
 **Type:** Production-optimization workstream (NOT root-cause analysis). **Opened:** 2026-07-05.
-**Status:** Recovery **EXECUTED 2026-07-05** (guarded controlled drain) — Magento drained + caught up, platform stable. **Magento 3 GiB / Fishbowl 2 GiB (per-connector) is now the accepted operating baseline** (owner policy) — remains unless production evidence indicates otherwise; keeping 3 GiB long-term is acceptable. Active workstream = steady-state observation; the only open question is whether Magento can *optionally* be reduced below 3 GiB. **See §0.**
+**Status:** **Magento raised 3 GiB → 5 GiB on 2026-07-22** after a second backlog spiral OOM'd repeatedly at 3 GiB (19 attempts). **Current baseline: Magento 5 GiB / Fishbowl 2 GiB.** The "optional step-down below 3 GiB" question from 2026-07-05 is **CLOSED — answered in the opposite direction**: 3 GiB was not enough. This is the production evidence the owner policy was waiting for. **See §0.1.**
 **Predecessor:** [`EXPERIMENT.md`](./EXPERIMENT.md) — Investigation B (RCA) is **CLOSED**; the
 platform-wide global-OOM cascade is eliminated. This workstream inherits the *contained*
 residual, not a platform failure.
@@ -12,7 +12,58 @@ residual, not a platform failure.
 
 ---
 
+## 0.1. Second spiral + raise to 5 GiB (2026-07-22) — supersedes the §0 baseline
+
+Magento stalled ~3h45 (freshness 224 min). Root cause: **`OutOfMemoryError: Java heap space` in the
+`source-mysql` container at the 3 GiB connection limit** — `-XX:+ExitOnOutOfMemoryError` kills the JVM
+immediately (surfacing as `Source process exited with non-zero exit code 3`), the attempt fails, retries.
+Reached **attempt 19** of job 28621. **Not** a cgroup or global OOM: `dmesg` clean, node `Ready` —
+the 2026-07-05 memory fix held and kept the failure *contained per-connector*.
+
+**Recovery:** same guarded drain as §0 — `observe-only=true`, backup both connections, Magento RR
+**3 → 5 GiB** (propagation verified on a pod created after the change: `source=5Gi, destination=5Gi`),
+pause Fishbowl to serialize, drain, restore Fishbowl. Job 28632 **succeeded in 2m49s**; freshness
+**224 min BREACH → 17 min OK**; zero global OOM; min host-avail 3.2 GiB (guards never breached).
+
+### The bistable feedback loop (why this recurs)
+
+Sync duration is **uncorrelated with row volume** — the cost is *scanning binlog*, not writing rows:
+
+| Duration | Rows |
+|---|---|
+| 1h02m | **311** |
+| 55m14s | 4,964 |
+| 2m49s | 649 |
+| 2m36s | 1,304 |
+
+Schedule is `0 5/10 * * * ?` (**every 10 min**) while a behind-schedule sync takes 20–60 min. That is a
+**bistable system**: *caught up* → ~2m30 syncs, stable; *behind* → long binlog scan → higher memory →
+OOM → further behind. Once it tips into the bad state it **cannot self-recover** — which is exactly what
+"it breaks every week" looks like.
+
+> **5 GiB raises the threshold at which the loop trips; it does NOT eliminate the loop.** Any event that
+> puts Magento far enough behind can restart the spiral. Treat 5 GiB as headroom, not as a fix.
+
+### Auto-remediation made it worse (open bug)
+
+The Lambda treats `freshness > 30 min` as "stuck" and cancels + restarts. But these jobs **were
+progressing**, only slowly — each cancel discarded the progress (job 28578 lost **1h21m** of work;
+28615 cancelled at 31m, matching `ssm_command_sent` at 14:36). The correct remediation for a
+*progressing but behind* connection is to **let it drain**, not to restart it. `observe-only=true` is
+currently set and auto-remediation is **OFF** pending a progress gate (see §0.2).
+
+## 0.2. Required fix — progress gate before cancelling
+
+Cancel only when the running job shows **no progress between two consecutive observations**
+(`bytesSynced`/`rowsSynced` flat AND binlog offset not advancing). If it is progressing, do nothing and
+let it finish. The stuck signature from the 2026-05-03 incident (`bytesSynced=0, lastUpdatedAt=null`)
+is already the right discriminator — the Lambda simply does not gate on it today.
+
 ## 0. Recovery executed (2026-07-05) — validated findings
+
+> **Superseded by §0.1 (2026-07-22):** the "Magento 3 GiB baseline / optional step-down" conclusion
+> below no longer holds — 3 GiB proved insufficient and the live config is now **5 GiB**. The
+> propagation model and the backlog-proportional demand model below remain valid and were re-confirmed.
 
 Experiment 1 (§6) was executed as a **production recovery** (owner prioritized service restoration
 over the sizing step-down). Outcome:
@@ -31,10 +82,11 @@ over the sizing step-down). Outcome:
   the Magento connection's leftover RR=2Gi overrode it. **Precedence: connection RR > actor RR >
   launcher inline env > `:0`.** ⇒ **per-connector sizing works.** Applied cleanly: Magento connection
   RR = **3 GiB** (LARGE), Fishbowl connection RR = **2 GiB** (SMALL) — no global raise required.
-- **Live config (normal operation restored):** Magento 3 GiB / Fishbowl 2 GiB via connection RR;
-  launcher fallback 3 GiB; auto-remediation live; both connections active + healthy.
+- **Live config (as of 2026-07-05; superseded — see §0.1):** Magento 3 GiB / Fishbowl 2 GiB via
+  connection RR; launcher fallback 3 GiB; auto-remediation live; both connections active + healthy.
   `airbyte-values.yaml` intentionally still 2 GiB (divergence recorded here, not silent drift —
-  persist during the maintenance window).
+  persist during the maintenance window). **Current live config is Magento 5 GiB / Fishbowl 2 GiB
+  with auto-remediation OFF.**
 
 **Owner policy (baseline, not a pending step-down):** Magento 3 GiB / Fishbowl 2 GiB is the **accepted
 operating configuration** and an acceptable long-term state. The only remaining maintenance question is

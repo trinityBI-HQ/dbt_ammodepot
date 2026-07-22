@@ -78,9 +78,14 @@ their old limit. Durability: connection RR lives in the Postgres config DB (surv
 data is preserved); the launcher inline env reverts on `abctl local install` unless
 `airbyte-values.yaml` is updated.
 
-**Current live config (2026-07-05):** Magento connection RR **3Gi**, Fishbowl connection RR **2Gi**,
-launcher fallback 3Gi. `airbyte-values.yaml` is still 2Gi (intentional divergence pending the
-capacity-planning steady-state decision — see [`CAPACITY_PLANNING.md`](./CAPACITY_PLANNING.md) §0).
+**Current live config (2026-07-22):** Magento connection RR **5Gi**, Fishbowl connection RR **2Gi**,
+launcher fallback 3Gi. Magento was raised 3Gi → 5Gi after a second backlog spiral OOM'd repeatedly at
+3Gi (`OutOfMemoryError: Java heap space` in `source-mysql`, 19 attempts). `airbyte-values.yaml` is
+still 2Gi (intentional divergence — persist during a maintenance window). See
+[`CAPACITY_PLANNING.md`](./CAPACITY_PLANNING.md) §0.1.
+
+> **Sizing note:** demand is backlog-proportional and the failure is a *bistable loop* — caught-up syncs
+> run ~2m30, behind-schedule ones take 20–60 min and need far more heap. 5Gi is headroom, not a cure.
 
 ---
 
