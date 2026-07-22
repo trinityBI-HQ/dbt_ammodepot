@@ -5,3 +5,4 @@ sdd-archive/
 DISCOVERY_POWERBI.md
 POWERBI_MIGRATION_PLAN.md
 ecs/.env
+__pycache__

@@ -41,12 +41,19 @@ create table if not exists ad_analytics.ops.airbyte_remediation_log (
     lambda_log_stream     varchar(256),               -- /aws/lambda/airbyte-auto-remediate/[date]/[stream]
     breaker_until_at      timestamp_ltz,              -- breaker expiry, populated on ESCALATE
     constraint pk_airbyte_remediation_log primary key (event_id),
+    -- NOTE: Snowflake does NOT enforce CHECK constraints on standard tables (and
+    -- does not even register these — information_schema.table_constraints shows
+    -- only the PK, itself unenforced). The list below is DOCUMENTATION of the
+    -- allowed vocabulary, not a guardrail: adding a value here changes nothing at
+    -- runtime, and writing an unlisted value will NOT fail. Keep it in sync by
+    -- hand whenever main.py grows a new outcome.
     constraint chk_outcome check (
         outcome in (
             'AUTO_FIX',
             'ESCALATE',
             'BREAKER_OPEN',
-            'OBSERVE_ONLY_WOULD_ACT'
+            'OBSERVE_ONLY_WOULD_ACT',
+            'SKIPPED_PROGRESSING'      -- progress gate spared a committing drain
         )
     ),
     constraint chk_tier check (tier = 'ALERT'),
