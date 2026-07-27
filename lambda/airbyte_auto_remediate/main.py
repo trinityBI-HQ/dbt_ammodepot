@@ -936,7 +936,17 @@ def _ssm_cancel_and_restart(
     if inv["Status"] != "Success":
         stderr = (inv.get("StandardErrorContent") or "")[:400]
         stdout = (inv.get("StandardOutputContent") or "")[:200]
-        return None, None, f"ssm_command_status={inv['Status']}; stderr={stderr}; stdout={stdout}"
+        # The payload is `set -e`, so a failure here usually means the CANCEL
+        # already went through and the RESTART is what died. Report the cancelled
+        # job id anyway: without it the audit row records cancelled_job_id=NULL
+        # and the log reads as "nothing happened", which is how 11 ESCALATEs in
+        # 72h hid the fact that live jobs were being killed and never restarted
+        # (2026-07-27). Losing this evidence delayed the diagnosis by days.
+        return (
+            _extract_var(inv.get("StandardOutputContent", "") or "", "CANCEL_JOB_ID"),
+            None,
+            f"ssm_command_status={inv['Status']}; stderr={stderr}; stdout={stdout}",
+        )
 
     output = inv.get("StandardOutputContent", "") or ""
     cancelled_job = _extract_var(output, "CANCEL_JOB_ID")

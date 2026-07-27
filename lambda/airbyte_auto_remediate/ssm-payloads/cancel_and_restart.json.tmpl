@@ -12,8 +12,8 @@
     "echo CANCEL_JOB_ID=$CANCEL_JOB_ID",
     "echo CANCEL_STATUS=$CANCEL_STATUS",
     "if [ -n \"$CANCEL_JOB_ID\" ] && [ \"$CANCEL_STATUS\" = \"running\" ]; then curl -fsS -X DELETE -H \"Authorization: Bearer $TOKEN\" \"http://localhost:8000/api/public/v1/jobs/$CANCEL_JOB_ID\" || { echo CANCEL_FAILURE >&2; exit 42; }; echo CANCEL_OK; sleep 5; else echo CANCEL_SKIPPED_NOT_RUNNING; fi",
-    "RESTART_JSON=$(curl -fsS -X POST -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' 'http://localhost:8000/api/public/v1/jobs' -d \"{\\\"connectionId\\\":\\\"__CONNECTION_ID__\\\",\\\"jobType\\\":\\\"sync\\\"}\")",
-    "RESTART_JOB_ID=$(echo \"$RESTART_JSON\" | jq -r '.jobId // .id // empty')",
+    "RESTART_JSON=$(curl -fsS -X POST -H \"Authorization: Bearer $TOKEN\" -H 'Content-Type: application/json' 'http://localhost:8000/api/v1/connections/sync' -d \"{\\\"connectionId\\\":\\\"__CONNECTION_ID__\\\"}\")",
+    "RESTART_JOB_ID=$(echo \"$RESTART_JSON\" | jq -r '.job.id // .jobId // .id // empty')",
     "echo RESTART_JOB_ID=$RESTART_JOB_ID",
     "if [ -z \"$RESTART_JOB_ID\" ]; then echo RESTART_FAILURE >&2; exit 43; fi",
     "echo RESTART_OK"
