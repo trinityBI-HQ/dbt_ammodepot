@@ -10,6 +10,7 @@
 --   4. AD_ANALYTICS.OPS.V_AIRBYTE_FRESHNESS_PER_STREAM — stream-level view
 --   5. AD_ANALYTICS.OPS.SP_SEND_AIRBYTE_FRESHNESS_EMAIL(tier) — email sender
 --   6. AD_ANALYTICS.OPS.ALERT_AIRBYTE_FRESHNESS_WARN — edge-triggered WARN
+--        ** CREATED SUSPENDED ON PURPOSE (2026-07-27) — see §5 for why. **
 --   7. AD_ANALYTICS.OPS.ALERT_AIRBYTE_FRESHNESS_ALERT — edge-triggered ALERT
 --   8. Grants for DASHBOARD_VIEWER_ROLE and POWERBI_READONLY_ROLE
 --
@@ -557,7 +558,31 @@ if (
 then
     call ad_analytics.ops.sp_send_airbyte_freshness_email('WARN');
 
-alter alert ad_analytics.ops.alert_airbyte_freshness_warn resume;
+-- ----------------------------------------------------------------------------
+-- WARN IS DELIBERATELY LEFT SUSPENDED (2026-07-27) — do NOT add a RESUME here.
+-- ----------------------------------------------------------------------------
+-- `create or replace alert` yields a SUSPENDED alert, so omitting the RESUME is
+-- what keeps this tier off. The object is kept (not dropped) so the tier can be
+-- re-armed with one statement if it ever earns its keep again.
+--
+-- WHY: the WARN tier produced ~27 emails in 26h and never once corresponded to
+-- an actionable fault. Measured connection-level extract gaps over 7 days:
+--   magento_s3   p50  9 min · p90 10 · p99 20   (healthy: 4 gaps >25 min total)
+--   fishbowl_s3  p50 10 min · p90 40 · p99 60   (126 of 544 gaps >25 min)
+-- Fishbowl's tail is BUSINESS-HOURS SEASONALITY, not a fault: 02-09 UTC
+-- (overnight US) averages 27-53 min because there is genuinely nothing to
+-- extract, and a destination-freshness monitor cannot distinguish "no changes
+-- upstream" from "frozen". A WARN tier sitting below normal overnight data age
+-- can only ever cry wolf, and the noise actively hid a real incident.
+--
+-- ALERT (below) stays armed — that is the actionable tier, and at 45/90 min it
+-- still catches real outages comfortably (the 4.5h outage of 2026-07-15 would
+-- have tripped it). The WARN *status* remains in v_airbyte_freshness and on the
+-- Infra Monitor Page 6 RAG cards: a colour on a dashboard costs nothing, an
+-- email at 03:00 does.
+--
+-- To re-arm:  ALTER ALERT ad_analytics.ops.alert_airbyte_freshness_warn RESUME;
+-- ----------------------------------------------------------------------------
 
 create or replace alert ad_analytics.ops.alert_airbyte_freshness_alert
     warehouse = etl_wh
