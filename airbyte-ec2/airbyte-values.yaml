@@ -29,7 +29,89 @@ postgresql:
   image:
     tag: 1.7.0-17
 
+# =============================================================================
+# CONTROL-PLANE MEMORY BOUNDS  (2026-07-27)
+# =============================================================================
+# SAME BUG AS THE REPLICATION OOM BELOW, on the other half of the cluster.
+# Every platform pod shipped with resources={} (BestEffort, no cgroup limit)
+# while 5 of them run -XX:MaxRAMPercentage=75.0. With no container limit each
+# JVM sizes max heap at 75% of the HOST's 16 GB (~11.4 GiB) and G1 never
+# returns it, so the control plane inflates to fill whatever the box has.
+#
+# MEASURED 2026-07-27 (cgroup memory.current, before this fix):
+#   server 2.44 GiB · cron 2.12 GiB · workload-api-server 1.57 GiB
+#   temporal 0.85 · worker 0.56 · workload-launcher 0.49 · db 0.35
+#   -> besteffort slice TOTAL = 8.5 GiB, against the ~2.4 GiB this file
+#      budgets for the control plane in the SIZING note below. 3.5x over.
+#   A `cron` pod (a scheduler) holding 2.12 GiB has no other explanation.
+#
+# CONSEQUENCE: 8.5 GiB control plane + Magento replication at 5Gi source +
+#   5Gi dest on a 15.25 GiB usable node -> kernel global_oom
+#   (constraint=CONSTRAINT_NONE, observed 19:03 UTC 2026-07-27). Because every
+#   platform pod was BestEffort (oom_score_adj 1000) the kernel picked the
+#   CONTROL PLANE as victim -- the worst possible one: killing airbyte-server
+#   breaks the API, the UI and auto-remediation's ability to restart anything.
+#   Restart counts at diagnosis: launcher 45, worker 33, server 8.
+#
+# THE FIX: bound every platform container. Limits make each JVM size its heap
+#   off the cgroup (MaxRAMPercentage now tracks the LIMIT, as intended), and
+#   requests lift the pods out of BestEffort into Burstable so replication --
+#   which is retryable -- absorbs any future pressure instead of the control
+#   plane. Applied live via `kubectl set resources`; recorded here so the next
+#   abctl reinstall does not silently revert to unbounded.
+#   Reclaimed immediately: host available 5.3 GiB -> 8.6 GiB.
+#
+# Limits are ceilings, not reservations: ~7.75 GiB of limits vs ~3.9 GiB of
+# requests. Sized above measured steady state, not above the inflated heaps.
+#
+# Key names below were verified against the deployed release's chart values
+# (`.chart.values | keys`): cron, temporal, manifestServer, worker,
+# workloadApiServer, server and workloadLauncher all declare a `resources`
+# sub-key. Do NOT add blocks here without that check -- an unrecognised key is
+# accepted silently and does nothing, which is exactly how the V1
+# `global.jobs.resources` mistake documented below went unnoticed.
+#
+# !! GAP -- airbyte-db (postgres) IS NOT COVERED HERE !!
+#   The chart's `postgresql` block exposes no `resources` key at all (verified
+#   2026-07-27), so there is no supported Helm value for it. It was bounded
+#   LIVE ONLY via:
+#     kubectl set resources sts/airbyte-db -n airbyte-abctl \
+#       -c airbyte-db-container --limits=memory=1Gi --requests=memory=512Mi
+#   That patch WILL BE LOST on the next `abctl local install`. Re-apply it by
+#   hand after any reinstall, or airbyte-db drops back to BestEffort and
+#   becomes an OOM-killer candidate again. Measured usage: 0.35 GiB.
+# =============================================================================
+
+cron:
+  resources:
+    limits: { memory: "768Mi" }
+    requests: { memory: "384Mi" }
+
+temporal:
+  resources:
+    limits: { memory: "1Gi" }
+    requests: { memory: "512Mi" }
+
+manifestServer:
+  resources:
+    limits: { memory: "512Mi" }
+    requests: { memory: "256Mi" }
+
+worker:
+  resources:
+    limits: { memory: "1Gi" }
+    requests: { memory: "512Mi" }
+
+workloadApiServer:
+  resources:
+    limits: { memory: "1Gi" }
+    requests: { memory: "512Mi" }
+
 server:
+  # See CONTROL-PLANE MEMORY BOUNDS above. Measured at 2.44 GiB unbounded.
+  resources:
+    limits: { memory: "1536Mi" }
+    requests: { memory: "768Mi" }
   env_vars:
     # Routes job resource resolution to the "lowresource" resource variant.
     # SUSPECT #2 for override non-propagation: if the memory limit below does
@@ -39,6 +121,10 @@ server:
     WEBAPP_URL: http://airbyte-abctl-airbyte-server-svc
 
 workloadLauncher:
+  # See CONTROL-PLANE MEMORY BOUNDS above.
+  resources:
+    limits: { memory: "1Gi" }
+    requests: { memory: "512Mi" }
   env_vars:
     # ==========================================================================
     # THE ACTUAL OOM FIX (2026-07-04, verified live)

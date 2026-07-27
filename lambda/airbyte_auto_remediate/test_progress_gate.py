@@ -9,6 +9,7 @@ committing (job 28578 lost 1h21m of work) because staleness alone cannot tell
 "frozen" from "slow but progressing". Case 5 is that exact scenario.
 """
 import sys, types, os, time
+from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("SNS_TOPIC_ARN", "arn:aws:sns:us-east-1:000000000000:test")
 # stub boto3/snowflake antes do import
@@ -42,10 +43,15 @@ def run(name, attempt, expect, conn="magento_s3"):
     print(f"{ok}  {name}: -> {d} ({r})")
     return d == expect
 
+def iso_ago(seconds, with_seconds=True):
+    """startTime de um job iniciado ha N segundos, no formato do jobs API."""
+    t = datetime.now(timezone.utc) - timedelta(seconds=seconds)
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ" if with_seconds else "%Y-%m-%dT%H:%MZ")
+
 results = []
 STORE.clear()
-# 1. Assinatura clássica de travamento: job vivo, zero bytes -> AGE JÁ (sem esperar baseline)
-results.append(run("travado: live + 0 bytes", {"jobId":1,"status":"running","bytesSynced":0,"rowsSynced":0}, "ACT"))
+# 1. Assinatura clássica de travamento: job vivo, zero bytes, VELHO -> AGE JÁ
+results.append(run("travado: live + 0 bytes + 2h", {"jobId":1,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(7200)}, "ACT"))
 # 2. Sem evidência (captura falhou) -> comportamento antigo (AGE)
 results.append(run("sem evidencia", None, "ACT"))
 # 3. Job já terminado -> AGE
@@ -66,6 +72,50 @@ k = main._progress_key("magento_s3")
 ok = k != "magento_s3" and k.startswith("progress#")
 print(("PASS" if ok else "**FAIL**") + f"  chave DDB isolada do breaker: {k}")
 results.append(ok)
+
+# --- Guarda de idade minima (incidente 2026-07-27) -------------------------
+# Job 30043 do Magento foi cancelado com 83s de vida e bytesSynced=0. Contadores
+# so aparecem no commit, e syncs saudaveis chegam a ~20 min (p99). Zero contador
+# num job novo nao prova nada.
+STORE.clear()
+# 10. O caso exato do incidente: 83s de vida -> NAO cancela
+results.append(run("30043: live + 0 bytes + 83s (incidente 07-27)",
+    {"jobId":30043,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(83)},
+    "SKIP_JOB_TOO_YOUNG"))
+# 11. Logo abaixo do piso (24 min) -> ainda protegido
+STORE.clear()
+results.append(run("0 bytes + 24min (abaixo do piso)",
+    {"jobId":30044,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(1440)},
+    "SKIP_JOB_TOO_YOUNG"))
+# 12. Acima do piso -> travamento real, cancela
+STORE.clear()
+results.append(run("0 bytes + 26min (acima do piso)",
+    {"jobId":30044,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(1560)},
+    "ACT"))
+# 13. startTime SEM segundos (o jobs API emite os dois formatos)
+STORE.clear()
+results.append(run("startTime sem segundos",
+    {"jobId":30046,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(120, with_seconds=False)},
+    "SKIP_JOB_TOO_YOUNG"))
+# 14. startTime ausente -> vies preservado: evidencia ausente nunca poupa cancel
+STORE.clear()
+results.append(run("sem startTime -> vies ACT",
+    {"jobId":30046,"status":"running","bytesSynced":0,"rowsSynced":0},
+    "ACT"))
+# 15. startTime ilegivel -> mesmo vies
+STORE.clear()
+results.append(run("startTime ilegivel -> vies ACT",
+    {"jobId":30046,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":"ontem de manha"},
+    "ACT"))
+# 16. Job novo e travado permanece detectavel: amostra gravada agora, contadores
+#     parados na proxima invocacao ja acima do piso -> cancela
+STORE.clear()
+run("piso: 1a amostra grava baseline",
+    {"jobId":30060,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(60)},
+    "SKIP_JOB_TOO_YOUNG")
+results.append(run("piso: mesmo job ja velho e parado -> ACT",
+    {"jobId":30060,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(1800)},
+    "ACT"))
 
 print()
 print(f"{sum(results)}/{len(results)} passaram")
