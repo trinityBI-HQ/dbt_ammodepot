@@ -505,6 +505,16 @@ _PROGRESS_KEY_PREFIX = "progress#"
 # Airbyte job states that mean "a job is alive right now and could still commit".
 _LIVE_JOB_STATUSES = {"running", "pending", "incomplete"}
 
+# A live job reporting bytesSynced=0 is only evidence of a freeze once it is older
+# than any normal sync. Airbyte reports byte/row counters on commit, so a healthy
+# sync sits at 0 for its whole run. Measured 2026-07-27 over the last ~95 succeeded
+# jobs per connection: magento p50=168s p90=557s p99/max=1157s; fishbowl p50=116s
+# p90=382s p99/max=1199s. 1500s clears the observed 20-min max with margin.
+# This costs real-freeze detection nothing: the Lambda only looks at a connection
+# after it has already breached its staleness threshold (30-90 min), by which time
+# a genuinely frozen job is far older than this floor.
+MIN_ZERO_PROGRESS_JOB_AGE_SEC = int(os.environ.get("MIN_ZERO_PROGRESS_JOB_AGE_SEC", "1500"))
+
 
 def _progress_key(conn_id: str) -> str:
     """Namespaced DDB key.
@@ -564,6 +574,27 @@ def _write_progress_observation(conn_id: str, job_id: str | None,
         }))
 
 
+def _job_age_seconds(attempt: dict) -> float | None:
+    """Seconds since the job started, or None if startTime is absent/unparseable.
+
+    The public jobs API is inconsistent about seconds: it emits both
+    "2026-07-27T16:05:01Z" and "2026-07-27T16:55Z" (observed in the same
+    response). Returning None on failure lets the caller fall through to ACT,
+    preserving the "absent evidence never spares a cancel" bias.
+    """
+    raw = str(attempt.get("startTime") or "").strip()
+    if not raw:
+        return None
+    normalised = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        started = datetime.fromisoformat(normalised)
+    except ValueError:
+        return None
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - started).total_seconds()
+
+
 def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, str]:
     """Decide whether cancel+restart is safe. Returns (decision, reason).
 
@@ -579,6 +610,8 @@ def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, st
       SKIP_PROGRESSING   -> a live job is committing; leave it alone
       SKIP_NEED_BASELINE -> data is moving but there is no prior sample to compare;
                             record one and re-evaluate next invocation (~15 min)
+      SKIP_JOB_TOO_YOUNG -> counters are zero but the job is younger than any
+                            normal sync, so zero proves nothing yet (2026-07-27)
 
     Bias: only SKIP when there is positive evidence of movement. Absent or
     unparseable evidence always falls through to ACT, preserving prior behaviour.
@@ -605,7 +638,23 @@ def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, st
 
     # Canonical freeze signature (2026-05-03): a live job that has moved nothing.
     # Act immediately — do NOT spend a cycle collecting a baseline for this case.
+    #
+    # ...but only once the job is old enough for zero counters to MEAN anything.
+    # 2026-07-27 incident: this branch cancelled Magento job 30043 at 83 seconds
+    # old. Counters are published on commit, so every healthy sync reads
+    # bytesSynced=0 for its whole run — and runs reach ~20 min at p99. The
+    # restart then failed (the server pod was OOMKilled, API 500), so the
+    # connection was left with nothing running at all. Below the floor, zero
+    # counters are indistinguishable from a normal young sync: record the sample
+    # and let the flat-counters comparison decide on a later invocation.
     if bytes_synced == 0 and rows_synced == 0:
+        age_sec = _job_age_seconds(attempt)
+        if age_sec is not None and age_sec < MIN_ZERO_PROGRESS_JOB_AGE_SEC:
+            _write_progress_observation(conn_id, job_id, bytes_synced, rows_synced)
+            return "SKIP_JOB_TOO_YOUNG", (
+                f"zero_counters_but_job_age={int(age_sec)}s"
+                f"<{MIN_ZERO_PROGRESS_JOB_AGE_SEC}s"
+            )
         return "ACT", "zero_progress_live_job"
 
     previous = _read_progress_observation(conn_id)
