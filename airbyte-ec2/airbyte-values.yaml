@@ -109,10 +109,43 @@ workloadApiServer:
 
 server:
   # See CONTROL-PLANE MEMORY BOUNDS above. Measured at 2.44 GiB unbounded.
+  #
+  # RESIZED 2026-08-10 (1536Mi/75% -> 2Gi/65%). The 2026-07-27 bound was set
+  # BELOW this pod's real working set, which converted the global OOM into a
+  # chronic per-container one: `airbyte-server-container` was cgroup-OOMKilled
+  # (exit 137) every ~2.7h -- 114 kills in 13 days, and 100% of ALL cgroup OOM
+  # kills on this node since 2026-07-27 were this one pod. The kill point was
+  # deterministic at anon-rss ~1525 MiB against the 1536 MiB cap.
+  #
+  # WHY IT COULD NOT FIT: MaxRAMPercentage=75 on a 1536Mi limit caps the heap at
+  # 1152Mi and leaves only 384Mi for everything non-heap (metaspace, code cache,
+  # thread stacks, Netty direct buffers, GC structures). This Micronaut app needs
+  # ~375Mi there, so heap-at-ceiling + non-heap exceeded the cap by construction.
+  # It was not a leak: the JVM was doing exactly what it was configured to do.
+  #   2Gi @ 65% -> heap 1331Mi + ~375Mi non-heap = ~1706Mi, ~342Mi headroom.
+  # Strictly better on both axes than the old setting: MORE heap AND real margin.
+  #
+  # BLAST RADIUS OF THE OLD SETTING: any sync whose orchestrator started inside a
+  # server-restart window got `Connection refused` to airbyte-server-svc:8001,
+  # failed `WorkloadHeartbeatSender` -> never transitioned to RUNNING, and hung
+  # as a 3/3 Running pod forever (Airbyte has no reaper for that state, and will
+  # not schedule a new sync while one is in flight). Cost a 4h Fishbowl outage on
+  # 2026-08-10 (job 34044, 12:25->16:09 UTC, 0 rows).
   resources:
-    limits: { memory: "1536Mi" }
-    requests: { memory: "768Mi" }
+    limits: { memory: "2Gi" }
+    requests: { memory: "1Gi" }
   env_vars:
+    # !! UNVERIFIED ON REINSTALL -- same caveat class as airbyte-db above !!
+    #   The chart sets JAVA_OPTS itself (stock -XX:MaxRAMPercentage=75.0). This
+    #   override was applied LIVE via `kubectl patch deploy` and is recorded here
+    #   on the assumption that server.env_vars is appended after the chart's own
+    #   env (last duplicate wins in k8s) -- that precedence was NOT tested.
+    #   AFTER ANY `abctl local install`, VERIFY and re-patch by hand if needed:
+    #     kubectl -n airbyte-abctl get deploy airbyte-abctl-server \
+    #       -o jsonpath='{range .spec.template.spec.containers[0].env[?(@.name=="JAVA_OPTS")]}{.value}{"\n"}{end}'
+    #   If it still reads 75.0, the resize is HALF-APPLIED: the 2Gi limit alone
+    #   raises the heap ceiling to 1536Mi and re-creates the same overrun.
+    JAVA_OPTS: "-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=65.0 -XX:FlightRecorderOptions=stackdepth=256"
     # Routes job resource resolution to the "lowresource" resource variant.
     # SUSPECT #2 for override non-propagation: if the memory limit below does
     # NOT show up in the rendered pod spec after install, this variant override
