@@ -135,6 +135,20 @@ KIND_BOUNCE_REPEAT_COUNT = int(os.environ.get("KIND_BOUNCE_REPEAT_COUNT", "2"))
 # clears that floor and captures the natural ESCALATE-cluster duration
 # (3-5 attempts over 4-5 hours per incident cluster).
 KIND_BOUNCE_REPEAT_WINDOW_MIN = int(os.environ.get("KIND_BOUNCE_REPEAT_WINDOW_MIN", "240"))
+
+# --- AUTO-FIX notification: page on the REPEAT, not on each success ---------
+# A single successful auto-fix is the system doing its job and needs no human.
+# The same connection needing several fixes in a day DOES -- that is a broken
+# thing being papered over, and it was exactly the signal that stayed invisible
+# on 2026-08-11: magento_s3 was auto-fixed 5 times in 15h and every individual
+# email read as a success, so nobody looked. Meanwhile the one situation that
+# did need hands (a 4h Fishbowl wedge) was found by accident.
+#
+# Window is deliberately NOT KIND_BOUNCE_REPEAT_WINDOW_MIN (240): those 5 fixes
+# never reached 3-in-4h (max was 2), so reusing it would have stayed silent.
+# 24h is the horizon at which "this keeps happening" becomes visible.
+AUTOFIX_NOTIFY_WINDOW_MIN = int(os.environ.get("AUTOFIX_NOTIFY_WINDOW_MIN", "1440"))
+AUTOFIX_NOTIFY_COUNT = int(os.environ.get("AUTOFIX_NOTIFY_COUNT", "3"))
 GLOBAL_KIND_BOUNCE_KEY = "_GLOBAL_KIND_BOUNCE"
 
 KIND_BOUNCE_PAYLOAD_TEMPLATE_PATH = (
@@ -868,13 +882,42 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
             "post_staleness_min": post_staleness,
             "verification_method": verification_method,
         })
-        _publish_sns(
-            f"[Airbyte AUTO-FIX] {conn_id} recovered ({pre_staleness}m → {post_staleness}m)",
-            _build_autofix_email(conn_id, pre_staleness, post_staleness, cancelled_job, restart_job),
-        )
-        _post_clickup_comment(_build_clickup_autofix_comment(
-            conn_id, pre_staleness, post_staleness, cancelled_job, restart_job,
-        ))
+        # Notify on the REPEAT, not on the success. The audit row above is
+        # already written, so a first-ever fix counts 1 — which means 0 can only
+        # come from a failed count query. Bias that case to NOTIFY: losing a page
+        # to a query glitch is worse than one extra email.
+        repeat_count = _count_recent_cancel_restarts(
+            snowflake_conn, conn_id, window_min=AUTOFIX_NOTIFY_WINDOW_MIN)
+        notify = _should_notify_autofix(repeat_count)
+
+        LOGGER.info(json.dumps({
+            "event": "autofix_notify_decision",
+            "connection_id": conn_id,
+            "repeat_count": repeat_count,
+            "window_min": AUTOFIX_NOTIFY_WINDOW_MIN,
+            "threshold": AUTOFIX_NOTIFY_COUNT,
+            "notified": notify,
+        }))
+
+        if notify:
+            if repeat_count >= AUTOFIX_NOTIFY_COUNT:
+                subject = (f"[Airbyte REPEAT AUTO-FIX] {conn_id} fixed "
+                           f"{repeat_count}x in {AUTOFIX_NOTIFY_WINDOW_MIN // 60}h "
+                           f"— needs a human")
+            else:
+                subject = (f"[Airbyte AUTO-FIX] {conn_id} recovered "
+                           f"({pre_staleness}m → {post_staleness}m)")
+            _publish_sns(
+                subject,
+                _build_autofix_email(conn_id, pre_staleness, post_staleness,
+                                     cancelled_job, restart_job),
+            )
+            _post_clickup_comment(_build_clickup_autofix_comment(
+                conn_id, pre_staleness, post_staleness, cancelled_job, restart_job,
+            ))
+        # Suppressed successes are NOT lost: every one is a row in
+        # AIRBYTE_REMEDIATION_LOG and an autofix_notify_decision line in
+        # CloudWatch. Only the push channels go quiet.
 
 
 # ----------------------------------------------------------------------------
@@ -1121,11 +1164,35 @@ def _open_global_kind_bounce_cooldown() -> datetime:
     return breaker_until_dt
 
 
-def _count_recent_cancel_restarts(snowflake_conn, conn_id: str) -> int:
-    """Count prior `cancel_and_restart` attempts on this connection in the
-    last KIND_BOUNCE_REPEAT_WINDOW_MIN minutes. Excludes the current attempt
-    (called before its audit row is written). Returns 0 on query failure
-    (fail open — don't block a real trigger because of a query glitch)."""
+def _should_notify_autofix(repeat_count: int) -> bool:
+    """Whether a SUCCESSFUL auto-fix warrants a push notification.
+
+    `repeat_count` is read AFTER this fix's audit row is written, so a first-ever
+    fix counts 1. That makes 0 unreachable in normal operation — it only occurs
+    when the count query failed. Bias that to True (fail loud): losing a page to
+    a query glitch is worse than one redundant email.
+
+    1..COUNT-1  -> silent. The system handled it; a human adds nothing.
+    >= COUNT    -> page. Repeated fixes mean something underneath is broken and
+                   auto-remediation is only papering over it.
+    """
+    if repeat_count == 0:
+        return True
+    return repeat_count >= AUTOFIX_NOTIFY_COUNT
+
+
+def _count_recent_cancel_restarts(
+    snowflake_conn, conn_id: str, window_min: int | None = None
+) -> int:
+    """Count `cancel_and_restart` attempts on this connection in the last
+    `window_min` minutes (default KIND_BOUNCE_REPEAT_WINDOW_MIN).
+
+    Whether the CURRENT attempt is included depends on the caller: the
+    kind-bounce path calls this before writing its audit row (so the current
+    attempt is excluded), the AUTO-FIX notification path calls it after (so a
+    first-ever fix returns 1, and 0 can only mean the query failed).
+
+    Returns 0 on query failure — callers must decide what that means for them."""
     try:
         cur = snowflake_conn.cursor(snowflake.connector.DictCursor)
         cur.execute(f"""
@@ -1134,7 +1201,8 @@ def _count_recent_cancel_restarts(snowflake_conn, conn_id: str) -> int:
             where connection_id = %(conn_id)s
               and action_taken = 'cancel_and_restart'
               and event_time >= dateadd(minute, %(window)s, current_timestamp())
-        """, {"conn_id": conn_id, "window": -KIND_BOUNCE_REPEAT_WINDOW_MIN})
+        """, {"conn_id": conn_id,
+              "window": -(window_min or KIND_BOUNCE_REPEAT_WINDOW_MIN)})
         rows = cur.fetchall()
         return int(rows[0]["N"]) if rows else 0
     except Exception as exc:
