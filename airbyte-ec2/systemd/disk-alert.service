@@ -9,6 +9,13 @@ Type=oneshot
 # If unset the script still logs, but silently — which is how a disk reached 100%.
 Environment=SNS_TOPIC_ARN=arn:aws:sns:us-east-1:746669199691:airbyte-auto-remediate-events
 Environment=AWS_DEFAULT_REGION=us-east-1
+# Raised 70 -> 85 on 2026-08-11. The disk has sat at 78-80% for over a week, so a
+# 70% threshold fired every 6h on a condition that is simply this host's normal
+# steady state — it was pure noise, and noise is what trained the operator to
+# ignore the whole channel (an actual 4h outage on 2026-08-10 was caught by hand,
+# not by an alert). Growth is ~0.5%/day, so 85% still leaves ~30 days of runway
+# after the first page. Lower it again only if the growth rate changes.
+Environment=DISK_THRESHOLD=85
 ExecStart=/opt/scripts/disk-alert.sh
 StandardOutput=append:/var/log/disk-alert.log
 StandardError=append:/var/log/disk-alert.log
