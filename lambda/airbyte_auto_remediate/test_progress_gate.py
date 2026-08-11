@@ -117,6 +117,32 @@ results.append(run("piso: mesmo job ja velho e parado -> ACT",
     {"jobId":30060,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(1800)},
     "ACT"))
 
+
+# ---------------------------------------------------------------------------
+# AUTO-FIX notification gate (2026-08-11): page on the REPEAT, not on success.
+# Guards the alert-fatigue failure: magento_s3 was auto-fixed 5x in 15h and each
+# email read as a success, so the operator stopped reading the channel entirely.
+# ---------------------------------------------------------------------------
+def run_notify(name, repeat_count, expect):
+    got = main._should_notify_autofix(repeat_count)
+    ok = got == expect
+    print(f"{'PASS' if ok else 'FALHOU'}  {name}: count={repeat_count} -> notify={got}")
+    return ok
+
+print()
+results.append(run_notify("query falhou (0) -> notifica, vies fail-loud", 0, True))
+results.append(run_notify("1o fix -> silencio", 1, False))
+results.append(run_notify("2o fix -> silencio", 2, False))
+results.append(run_notify("3o fix -> pagina", 3, True))
+results.append(run_notify("5o fix (caso magento 2026-08-11) -> pagina", 5, True))
+
+# A janela deve ser 24h, nao a de kind-bounce (240min): os 5 fixes do magento
+# nunca chegaram a 3 em 4h (max 2), entao reusar aquela constante ficaria mudo.
+_ok = main.AUTOFIX_NOTIFY_WINDOW_MIN == 1440 and main.AUTOFIX_NOTIFY_COUNT == 3
+print(f"{'PASS' if _ok else 'FALHOU'}  janela 24h / limiar 3 "
+      f"(got {main.AUTOFIX_NOTIFY_WINDOW_MIN}min / {main.AUTOFIX_NOTIFY_COUNT})")
+results.append(_ok)
+
 print()
 print(f"{sum(results)}/{len(results)} passaram")
 sys.exit(0 if all(results) else 1)
