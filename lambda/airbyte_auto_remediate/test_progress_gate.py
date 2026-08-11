@@ -143,6 +143,60 @@ print(f"{'PASS' if _ok else 'FALHOU'}  janela 24h / limiar 3 "
       f"(got {main.AUTOFIX_NOTIFY_WINDOW_MIN}min / {main.AUTOFIX_NOTIFY_COUNT})")
 results.append(_ok)
 
+
+# ---------------------------------------------------------------------------
+# Control-plane restart monitor (2026-08-11). Guards the 13-day blind spot:
+# airbyte-abctl-server OOM-killed ~8x/day while freshness stayed green.
+# ---------------------------------------------------------------------------
+NOW = 1_700_000_000
+H = 3600
+
+def run_cp(name, current, state, now, expect):
+    got, detail, _ = main._evaluate_cp_restarts(current, state, now)
+    ok = got == expect
+    print(f"{'PASS' if ok else 'FALHOU'}  {name}: -> {got} ({detail})")
+    return ok
+
+def anchor(pods, at, alerted=0):
+    return {"pods": pods, "anchored_at": at, "alerted_at": alerted}
+
+print()
+results.append(run_cp("1a amostra -> ancora",
+    {"airbyte-abctl-server-x": 5}, None, NOW, "ANCHOR"))
+results.append(run_cp("amostra vazia -> ancora",
+    {}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H), NOW, "ANCHOR"))
+results.append(run_cp("cedo demais e sem delta -> WAIT",
+    {"airbyte-abctl-server-x": 5}, anchor({"airbyte-abctl-server-x": 5}, NOW - 300), NOW, "WAIT"))
+results.append(run_cp("estavel por 2h -> OK",
+    {"airbyte-abctl-server-x": 5}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H), NOW, "OK"))
+results.append(run_cp("2 restarts (abaixo do limiar) -> OK",
+    {"airbyte-abctl-server-x": 7}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H), NOW, "OK"))
+# O caso real: server morrendo ~8x/dia. Antes disso nao existia alerta nenhum.
+results.append(run_cp("3 restarts em 2h (caso 2026-07-28) -> ALERT",
+    {"airbyte-abctl-server-x": 8}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H), NOW, "ALERT"))
+results.append(run_cp("ja alertou ha 1h -> COOLDOWN",
+    {"airbyte-abctl-server-x": 9}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H, NOW - H), NOW, "COOLDOWN"))
+results.append(run_cp("cooldown vencido (25h) -> ALERT",
+    {"airbyte-abctl-server-x": 9}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H, NOW - 25*H), NOW, "ALERT"))
+results.append(run_cp("janela de 24h rolou -> re-ancora",
+    {"airbyte-abctl-server-x": 9}, anchor({"airbyte-abctl-server-x": 5}, NOW - 25*H), NOW, "ANCHOR"))
+# Pod trocou de nome: historico do container antigo sumiu, conta desde 0.
+results.append(run_cp("pod novo com 4 restarts -> ALERT",
+    {"airbyte-abctl-server-y": 4}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H), NOW, "ALERT"))
+results.append(run_cp("pod novo ainda com 0 -> OK",
+    {"airbyte-abctl-server-y": 0}, anchor({"airbyte-abctl-server-x": 5}, NOW - 2*H), NOW, "OK"))
+# Um pod normalmente estavel (0 por 15 dias) subindo sozinho tambem dispara.
+results.append(run_cp("workload-launcher subindo -> ALERT",
+    {"airbyte-abctl-server-x": 5, "airbyte-abctl-workload-launcher-z": 3},
+    anchor({"airbyte-abctl-server-x": 5, "airbyte-abctl-workload-launcher-z": 0}, NOW - 3*H),
+    NOW, "ALERT"))
+# Uma taxa de 1/h teria ficado MUDA durante os 13 dias (~0.35/h): por isso o
+# gatilho e contagem-por-janela, nao taxa horaria.
+_ok = main.CP_RESTART_THRESHOLD == 3 and main.CP_RESTART_WINDOW_HOURS == 24
+print(f"{'PASS' if _ok else 'FALHOU'}  limiar 3/24h "
+      f"(got {main.CP_RESTART_THRESHOLD}/{main.CP_RESTART_WINDOW_HOURS}h)")
+results.append(_ok)
+
 print()
 print(f"{sum(results)}/{len(results)} passaram")
 sys.exit(0 if all(results) else 1)

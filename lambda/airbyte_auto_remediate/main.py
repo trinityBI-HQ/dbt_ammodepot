@@ -211,6 +211,12 @@ def handler(event, context):
     snowflake_conn = _open_snowflake_connection()
     try:
         _set_query_tag(snowflake_conn)
+
+        # Runs on EVERY invocation, before the no-breach early return below.
+        # The control plane crash-looped for 13 days while freshness stayed green,
+        # so this must not be gated on a breach — that is precisely the blind spot.
+        _check_control_plane_restarts()
+
         breached = _detect_breaches(snowflake_conn)
         LOGGER.info(json.dumps({
             "event": "detection_done",
@@ -1582,6 +1588,210 @@ def _execute_kind_bounce_tier(
 # ----------------------------------------------------------------------------
 # Step 3 helpers: DynamoDB breaker
 # ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Control-plane restart monitor (2026-08-11)
+#
+# THE GAP THIS CLOSES: airbyte-abctl-server OOM-killed itself ~8x/day for 13 days
+# and nobody knew. Monitoring watched destination freshness only, which by
+# construction reports the DAMAGE (a wedged sync) and only when a restart happens
+# to land on a sync start. Two incidents were found by hand, late.
+#
+# WHY A RATE AND NOT "any restart": the healthy baseline for these pods is
+# literally zero -- cron/temporal/manifest-server/workload-api have 0 restarts
+# over 15 days. But the server currently restarts by design-failure, so alerting
+# on every one would re-create the noise problem this is meant to solve.
+# Threshold is "N restarts inside one anchor window", edge-triggered with a
+# cooldown, so a persistent condition pages once a day, not every 15 minutes.
+#
+# A 1/h rate threshold was considered and REJECTED: the original condition was
+# ~0.35/h, so a 1/h trigger would have stayed silent through the entire 13-day
+# outage window it is supposed to catch.
+# ----------------------------------------------------------------------------
+_CP_STATE_KEY = "cpstate#control-plane"
+CP_RESTART_THRESHOLD = int(os.environ.get("CP_RESTART_THRESHOLD", "3"))
+CP_RESTART_WINDOW_HOURS = int(os.environ.get("CP_RESTART_WINDOW_HOURS", "24"))
+CP_RESTART_COOLDOWN_HOURS = int(os.environ.get("CP_RESTART_COOLDOWN_HOURS", "24"))
+CP_RESTART_MIN_EVAL_MIN = int(os.environ.get("CP_RESTART_MIN_EVAL_MIN", "30"))
+
+
+def _evaluate_cp_restarts(current: dict, state: dict | None, now_epoch: int):
+    """Pure decision: should the current control-plane restart counts page?
+
+    `current` maps pod name -> restartCount. `state` is the stored anchor:
+    {"pods": {name: count}, "anchored_at": epoch, "alerted_at": epoch|0}.
+
+    Returns (decision, detail, new_state). decision ∈
+      ANCHOR   -- first sample, or pod set changed, or window rolled: just store
+      WAIT     -- anchored too recently to judge
+      OK       -- under threshold
+      ALERT    -- >= CP_RESTART_THRESHOLD restarts since the anchor
+      COOLDOWN -- would alert, but already paged inside the cooldown
+
+    A pod whose name changed (deployment replaced) contributes its full current
+    count: the old container's history is gone, so counting from 0 is correct and
+    never over-reports.
+    """
+    if not current:
+        return ("ANCHOR", "empty_sample", state or {})
+
+    prev_pods = (state or {}).get("pods") or {}
+    anchored_at = int((state or {}).get("anchored_at") or 0)
+    alerted_at = int((state or {}).get("alerted_at") or 0)
+
+    fresh_anchor = {"pods": dict(current), "anchored_at": now_epoch,
+                    "alerted_at": alerted_at}
+
+    if not prev_pods or not anchored_at:
+        return ("ANCHOR", "first_sample", fresh_anchor)
+
+    elapsed_h = (now_epoch - anchored_at) / 3600.0
+    if elapsed_h >= CP_RESTART_WINDOW_HOURS:
+        return ("ANCHOR", f"window_rolled_{elapsed_h:.1f}h", fresh_anchor)
+
+    delta = 0
+    for pod, count in current.items():
+        base = prev_pods.get(pod)
+        # Unknown pod -> replaced/new: its whole count is restarts we can attribute.
+        # Lower than baseline -> counter reset under the same name; count from 0.
+        delta += count if base is None or count < base else count - base
+
+    detail = (f"{delta} restarts in {elapsed_h:.1f}h "
+              f"(threshold {CP_RESTART_THRESHOLD}/{CP_RESTART_WINDOW_HOURS}h)")
+
+    if elapsed_h * 60 < CP_RESTART_MIN_EVAL_MIN and delta < CP_RESTART_THRESHOLD:
+        return ("WAIT", detail, state or fresh_anchor)
+
+    if delta < CP_RESTART_THRESHOLD:
+        return ("OK", detail, state or fresh_anchor)
+
+    if alerted_at and (now_epoch - alerted_at) / 3600.0 < CP_RESTART_COOLDOWN_HOURS:
+        return ("COOLDOWN", detail, state or fresh_anchor)
+
+    alerted = {"pods": dict(prev_pods), "anchored_at": anchored_at,
+               "alerted_at": now_epoch}
+    return ("ALERT", detail, alerted)
+
+
+def _read_cp_state() -> dict | None:
+    try:
+        resp = ddb_client.get_item(
+            TableName=DDB_TABLE,
+            Key={"connection_id": {"S": _CP_STATE_KEY}},
+            ConsistentRead=True,
+        )
+    except Exception as exc:
+        LOGGER.warning(json.dumps({"event": "cp_state_read_failure", "error": str(exc)}))
+        return None
+    item = resp.get("Item")
+    if not item:
+        return None
+    try:
+        return {
+            "pods": json.loads(item.get("pods", {}).get("S") or "{}"),
+            "anchored_at": int(item.get("anchored_at", {}).get("N", "0")),
+            "alerted_at": int(item.get("alerted_at", {}).get("N", "0")),
+        }
+    except Exception:
+        return None
+
+
+def _write_cp_state(state: dict) -> None:
+    try:
+        ddb_client.put_item(
+            TableName=DDB_TABLE,
+            Item={
+                "connection_id": {"S": _CP_STATE_KEY},
+                "pods": {"S": json.dumps(state.get("pods") or {})},
+                "anchored_at": {"N": str(int(state.get("anchored_at") or 0))},
+                "alerted_at": {"N": str(int(state.get("alerted_at") or 0))},
+            },
+        )
+    except Exception as exc:
+        LOGGER.warning(json.dumps({"event": "cp_state_write_failure", "error": str(exc)}))
+
+
+def _collect_control_plane_restarts() -> dict | None:
+    """pod name -> restartCount for the control-plane pods, via SSM. None on failure."""
+    cmd = (
+        "sudo docker exec airbyte-abctl-control-plane kubectl -n airbyte-abctl "
+        "get pods -o jsonpath="
+        "'{range .items[*]}{.metadata.name}{\" \"}"
+        "{.status.containerStatuses[0].restartCount}{\"\\n\"}{end}' "
+        "| grep -E '^airbyte-(abctl|db)' | grep -v bootloader"
+    )
+    try:
+        send_resp = ssm_client.send_command(
+            InstanceIds=[AIRBYTE_INSTANCE_ID],
+            DocumentName="AWS-RunShellScript",
+            Parameters={"commands": [cmd]},
+            TimeoutSeconds=120,
+        )
+        inv = _poll_ssm_invocation(send_resp["Command"]["CommandId"], time.time() + 120)
+    except Exception as exc:
+        LOGGER.warning(json.dumps({"event": "cp_collect_ssm_failure", "error": str(exc)}))
+        return None
+
+    if not inv or inv.get("Status") != "Success":
+        LOGGER.warning(json.dumps({
+            "event": "cp_collect_ssm_not_success",
+            "status": (inv or {}).get("Status"),
+        }))
+        return None
+
+    pods = {}
+    for line in (inv.get("StandardOutputContent") or "").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[1].isdigit():
+            pods[parts[0]] = int(parts[1])
+    return pods or None
+
+
+def _check_control_plane_restarts() -> None:
+    """Page when control-plane pods are restarting. Never raises: this is a
+    monitor bolted onto the remediation path and must not be able to break it."""
+    try:
+        current = _collect_control_plane_restarts()
+        if current is None:
+            return
+        state = _read_cp_state()
+        now_epoch = int(time.time())
+        decision, detail, new_state = _evaluate_cp_restarts(current, state, now_epoch)
+
+        LOGGER.info(json.dumps({
+            "event": "cp_restart_check",
+            "decision": decision,
+            "detail": detail,
+            "pods": current,
+        }))
+
+        if decision in ("ANCHOR", "ALERT"):
+            _write_cp_state(new_state)
+
+        if decision == "ALERT":
+            worst = max(current.items(), key=lambda kv: kv[1])
+            _publish_sns(
+                f"[Airbyte CONTROL-PLANE] {detail}",
+                "Airbyte control-plane pods are restarting.\n\n"
+                f"{detail}\n\n"
+                "Restart counts now:\n"
+                + "\n".join(f"  {p}: {c}" for p, c in sorted(
+                    current.items(), key=lambda kv: -kv[1]))
+                + f"\n\nMost restarts: {worst[0]} ({worst[1]}).\n\n"
+                "Why this matters: any sync whose orchestrator starts inside a\n"
+                "server restart window fails its WorkloadHeartbeatSender, never\n"
+                "transitions to RUNNING, and hangs as a 3/3 Running pod that\n"
+                "Airbyte never reaps. That is a silent multi-hour data stall.\n\n"
+                "Check:  kubectl -n airbyte-abctl get pods\n"
+                "        dmesg -T | grep 'Memory cgroup out of memory'\n"
+                "Runbook: docs/AIRBYTE_INCIDENT_RUNBOOK.md\n"
+                f"\nThis alert re-arms after {CP_RESTART_COOLDOWN_HOURS}h.",
+            )
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "cp_restart_check_failed", "error": str(exc),
+        }))
+
 
 def _check_breaker(conn_id: str) -> datetime | None:
     """Returns breaker_until datetime if open, else None."""
