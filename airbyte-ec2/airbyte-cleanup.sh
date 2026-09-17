@@ -10,7 +10,7 @@ set -euo pipefail
 #   ./airbyte-cleanup.sh --vacuum-full  # Also reclaim disk — LOCKS Airbyte, see below
 #
 # Environment:
-#   RETENTION_DAYS — Override default 30-day retention (optional)
+#   RETENTION_DAYS — Override the default 14-day retention (optional)
 #
 # VACUUM vs VACUUM FULL — why both exist:
 #   Plain VACUUM only marks pages reusable INSIDE the table file; it never returns
@@ -21,7 +21,13 @@ set -euo pipefail
 #   by hand in a maintenance window.
 
 # --- Configuration ---
-DAYS="${RETENTION_DAYS:-30}"
+# 14, not 30: Airbyte writes ~5 MB into attempts.attempt_sync_config per attempt
+# (~1.5 GB/day), so retention is a direct multiplier on disk. This default MUST
+# match Environment=RETENTION_DAYS in systemd/airbyte-cleanup.service — every
+# documented manual path (the disk-alert email, the runbook, deploy.sh --dry-run)
+# invokes this script WITHOUT systemd, so a mismatch silently prunes to the old
+# window during exactly the incident the alert was raised for.
+DAYS="${RETENTION_DAYS:-14}"
 CONTAINER="airbyte-abctl-control-plane"
 NAMESPACE="airbyte-abctl"
 DB_USER="airbyte"
