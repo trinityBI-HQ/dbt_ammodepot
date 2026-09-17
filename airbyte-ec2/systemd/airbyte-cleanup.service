@@ -7,6 +7,14 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
+# Lowered 30 -> 14 on 2026-09-17. Airbyte writes a full configured-catalog
+# snapshot into attempts.attempt_sync_config on EVERY attempt: measured at
+# 5.03 MB/attempt x ~298 attempts/day = ~1.5 GB/day. Retention is therefore a
+# direct multiplier on steady-state disk: 30d = 46 GB of LIVE data (measured,
+# only 6% bloat), 14d = ~21 GB. The weekly prune was always working correctly —
+# the disk sat at 88% because 30 days of this simply does not fit on the volume.
+# Raising this back to 30 re-creates that condition; size the disk first if you do.
+Environment=RETENTION_DAYS=14
 ExecStart=/opt/scripts/airbyte-cleanup.sh
 # Journal captures stdout/stderr; also mirrored to the legacy logfile for the runbook.
 StandardOutput=append:/var/log/airbyte-cleanup.log

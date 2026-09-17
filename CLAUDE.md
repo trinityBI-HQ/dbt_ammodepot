@@ -313,15 +313,47 @@ airbyte-ec2/
 ```
 
 - **Deployed to**: `/opt/scripts/` on EC2 instance `i-075043415ebad732f` (c6a.2xlarge, 8 vCPU, 16 GB, AL2023, ~$223/mo)
+- **Root volume**: `vol-06a30feea2ddc25d0`, gp3, **160 GB** (grown from 100 GB on 2026-09-17, online, XFS — +$4.80/mo). Usage 88% → 55%.
 - **Airbyte**: v2.1.0 (Chart 2.1.0), abctl (kind/k8s), EIP 18.204.90.52
 - **Old instance**: `i-0c6727e56deafaf36` (AL2, pending termination)
 - **Schedule**: **systemd timers** — weekly cleanup (Sun 03:00 UTC), disk alert (every 6h). **NOT cron: AL2023 does not ship cronie.**
-- **Alerting**: `disk-alert.sh` publishes to SNS `airbyte-auto-remediate-events` at ≥70%. Requires `sns:Publish` on the instance role (`EC2_SSM_Access`).
+- **Alerting**: `disk-alert.sh` publishes to SNS `airbyte-auto-remediate-events` at **≥85%** (`DISK_THRESHOLD` in `systemd/disk-alert.service`; the script's own default is 70). Requires `sns:Publish` on the instance role (`EC2_SSM_Access`).
 - **Logs**: `/var/log/airbyte-cleanup.log`, `/var/log/disk-alert.log` (also in journal)
 - **Dry run**: `sudo /opt/scripts/airbyte-cleanup.sh --dry-run`
-- **Reclaim disk**: `sudo /opt/scripts/airbyte-cleanup.sh --vacuum-full` — plain `VACUUM` never shrinks pgdata; `VACUUM FULL` takes an ACCESS EXCLUSIVE lock, so use a maintenance window.
+- **Retention**: `RETENTION_DAYS=14` in `systemd/airbyte-cleanup.service` (lowered from 30 on 2026-09-17).
+- **Reclaim disk**: `sudo /opt/scripts/airbyte-cleanup.sh --vacuum-full` — plain `VACUUM` never shrinks pgdata; `VACUUM FULL` takes an ACCESS EXCLUSIVE lock, so use a maintenance window. **It is rarely the right tool here — see below.**
 - **Verify armed**: `systemctl list-timers 'airbyte*' 'disk*'`
 - **Docs**: see `docs/` folder
+
+#### Disk sizing: retention is the dial, not cleanup frequency (2026-09-17)
+
+The weekly prune has never been the bottleneck. Airbyte writes a full
+configured-catalog snapshot into `attempts.attempt_sync_config` on **every
+attempt** — measured **5.03 MB/attempt × ~298 attempts/day = ~1.5 GB/day**. Steady
+state is therefore a straight multiple of retention:
+
+| Retention | Steady-state `attempts` |
+|---|---|
+| 30 days | ~46 GB |
+| 14 days | ~21 GB |
+| 7 days | ~11 GB |
+
+Measured 2026-09-17 at 30-day retention: 10,148 rows, main heap **20 MB**, TOAST
+**49 GB**, of which `sum(pg_column_size(t.*))` = **46 GB is LIVE data** (only ~6%
+bloat; `output` is 1.5 KB/row, `attempt_sync_config` is all of it).
+
+**Consequences — read before touching disk on this host:**
+- **`VACUUM FULL` was the wrong instinct and the alert used to recommend it blindly.**
+  It reclaims only *dead* space, and it rewrites the table into new files before
+  dropping the old ones, so it needs **free space ≥ table size**. At 49 GB of table
+  and 13 GB free it would have reclaimed ~3 GB at best and filled the disk to 100%
+  at worst — the exact failure mode of the 2026-07-15 outage. `disk-alert.sh` now
+  computes this and says so instead of recommending it unconditionally.
+- **A clean prune plus a full disk means the data is live, not bloat.** The fix is
+  retention or a bigger volume; more vacuuming does nothing.
+- The 2026-07→09 curve is the signature of live data reaching steady state, not a
+  leak: 53% (16 Jul, post-reinstall) → 83% (16 Aug, +0.97 pts/day as the 30-day
+  window filled) → 88% (17 Sep, +0.16 pts/day, flat).
 
 > **History (2026-07-15):** these scripts were present at `/opt/` but **never ran once** on this
 > instance. `deploy.sh` installs to `/opt/scripts/` and wired jobs via `crontab -`, which does not
