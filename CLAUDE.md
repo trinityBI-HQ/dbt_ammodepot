@@ -673,6 +673,56 @@ Built 2026-05-03 — autonomous cancel + restart of stuck Airbyte → S3 Iceberg
 - **Runbook**: `docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md` — what each email tier means, how to toggle observe-only, reset the breaker, disable Lambda in emergency.
 - **DEFINE/DESIGN**: `.claude/sdd/features/{DEFINE,DESIGN}_AIRBYTE_AUTO_REMEDIATION.md`. ClickUp: `86ah8bpmj`.
 
+### Auto-Remediation Caused a 13h Outage (2026-09-19/20)
+
+The worst self-inflicted incident so far. Three compounding failures:
+
+1. **The real fault was permanent and un-remediable.** Magento's CDC binlog offset
+   expired at ~22:50 UTC: `Incumbent CDC state is invalid ... Saved offset no longer
+   present on the server`. Connector was at `mysql-bin-changelog.043239`; the server's
+   oldest was `043278` — a **39-file gap**. `failureType: config_error`. Every sync
+   from 22:50 onward failed in ~60s. **Only a connection reset fixes this.**
+2. **The remediation could not tell "failing" from "frozen".** It measures only
+   destination freshness, and a connection failing every 10 min looks exactly like a
+   frozen one — both produce stale data. The progress gate's `job_not_live` branch
+   sent `failed` straight to `ACT`. So: cancel+restart (nothing to cancel) → verify
+   "inconclusive" (the fault is permanent) → **escalate to kind-bounce**.
+3. **The kind-bounce corrupted containerd.** `docker restart` with **no `-t`** gives
+   10s of grace; the kind node's systemd cannot stop kubelet + containerd + all shims
+   in 10s, so containerd was SIGKILLed mid-write and came back with **duplicate
+   container-name records**. CRI then aborted on every start
+   (`failed to recover state: failed to reserve container name ... is reserved for`),
+   kubelet crash-looped **36,894 times**, no API server, **ingestion dead 13h** —
+   Fishbowl included, which had been perfectly healthy.
+
+**Manual recovery that worked** (~10 min, images preserved, etcd intact):
+```bash
+docker exec airbyte-abctl-control-plane systemctl stop kubelet containerd
+# back up, then add: disabled_plugins = ["io.containerd.grpc.v1.cri"] to /etc/containerd/config.toml
+docker exec airbyte-abctl-control-plane systemctl start containerd     # core API only, CRI off
+docker exec airbyte-abctl-control-plane sh -c 'ctr -n k8s.io containers ls -q | xargs -r -n1 ctr -n k8s.io containers rm'
+docker exec airbyte-abctl-control-plane rm -rf /var/lib/containerd/io.containerd.grpc.v1.cri /run/containerd/io.containerd.grpc.v1.cri
+# restore config.toml, then:
+docker exec airbyte-abctl-control-plane systemctl restart containerd
+docker exec airbyte-abctl-control-plane systemctl start kubelet
+```
+114 container records removed, **58 images untouched** (no re-pull), node came back
+`Ready` with 78d of etcd state, Airbyte recreated every pod and self-scheduled catch-up.
+
+**A reboot does NOT fix this** — the corrupt metadata lives in `/var/lib/containerd`
+on the host bind mount and survives any restart.
+
+**Fixes shipped (PR #42):** `docker restart -t 120` + readiness 180s +
+`KIND_BOUNCE_SSM_RECONCILE_SECONDS` 240→420; and a new `SKIP_JOB_FAILED` gate
+decision so a `failed`/`cancelled` last job **never** triggers infrastructure
+action — it pages a human instead (once per 12h). A "no job at all" status still
+returns `ACT`, preserving freeze recovery.
+
+**Still open:** Magento needs a connection reset (full re-snapshot of 21 streams —
+the OOM-prone connection) **and** a binlog-retention increase on the MySQL source,
+or the offset will expire again. **Auto-remediation is `observe-only=true` and must
+stay that way until Magento is fixed**, or it will walk the same ladder again.
+
 ### Control-Plane OOM + Alert Thrash (2026-07-27)
 
 Three compounding failures found while investigating "lots of alert email + webserver error":

@@ -108,7 +108,11 @@ KIND_BOUNCE_COOLDOWN_SECONDS = int(os.environ.get("KIND_BOUNCE_COOLDOWN_SECONDS"
 # so a still-running bounce is never mislabeled a failure. Worst-case tier
 # timing with 240s here stays under the 900s Lambda ceiling (budget noted in
 # _execute_kind_bounce_tier).
-KIND_BOUNCE_SSM_RECONCILE_SECONDS = int(os.environ.get("KIND_BOUNCE_SSM_RECONCILE_SECONDS", "240"))
+# 420, not 240: the bounce now stops the kind node GRACEFULLY (docker restart -t 120),
+# so the command can spend up to 120s stopping, ~30s starting and up to 180s waiting
+# for readiness. At the old 240s budget a perfectly successful bounce could time out
+# and be classified UNKNOWN, which needlessly opens the breaker.
+KIND_BOUNCE_SSM_RECONCILE_SECONDS = int(os.environ.get("KIND_BOUNCE_SSM_RECONCILE_SECONDS", "420"))
 # Invariant: reconcile MUST exceed the primary poll, else Phase 2 collapses to a
 # zero-length no-op and every slow bounce is misclassified UNKNOWN (the SUCCESS
 # path — cooldown + fresh-sync kick — would never run). Clamp defensively.
@@ -525,6 +529,22 @@ _PROGRESS_KEY_PREFIX = "progress#"
 # Airbyte job states that mean "a job is alive right now and could still commit".
 _LIVE_JOB_STATUSES = {"running", "pending", "incomplete"}
 
+# Job states that mean "Airbyte already RAN this sync and it ended badly".
+# These are NOT freezes: the connector started, errored and exited. Airbyte's own
+# scheduler retries on the next tick, so there is nothing for this Lambda to
+# restart and nothing a control-plane bounce can repair. See the gate docstring.
+_FAILED_JOB_STATUSES = {"failed", "cancelled"}
+
+# How often a persistently-failing connection may page a human. The condition
+# persists for hours or days (it needs a connection reset), and this Lambda runs
+# every 15 min, so without a cooldown one broken connection would send ~96
+# emails/day — the exact noise that trained the operator to stop reading the
+# channel (see the 2026-08-11 alerting redesign).
+FAILED_JOB_NOTIFY_COOLDOWN_SECONDS = int(
+    os.environ.get("FAILED_JOB_NOTIFY_COOLDOWN_HOURS", "12")
+) * 3600
+_FAILED_NOTIFY_KEY_PREFIX = "failednotify#"
+
 # A live job reporting bytesSynced=0 is only evidence of a freeze once it is older
 # than any normal sync. Airbyte reports byte/row counters on commit, so a healthy
 # sync sits at 0 for its whole run. Measured 2026-07-27 over the last ~95 succeeded
@@ -632,6 +652,9 @@ def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, st
                             record one and re-evaluate next invocation (~15 min)
       SKIP_JOB_TOO_YOUNG -> counters are zero but the job is younger than any
                             normal sync, so zero proves nothing yet (2026-07-27)
+      SKIP_JOB_FAILED    -> the last sync ran and FAILED; restarting cannot fix it
+                            and bouncing the cluster is actively harmful. Page a
+                            human instead (2026-09-19)
 
     Bias: only SKIP when there is positive evidence of movement. Absent or
     unparseable evidence always falls through to ACT, preserving prior behaviour.
@@ -650,6 +673,26 @@ def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, st
         rows_synced = int(attempt.get("rowsSynced") or 0)
     except (TypeError, ValueError):
         return "ACT", "unparseable_counters"
+
+    # A sync that RAN AND FAILED is not a freeze, and no amount of restarting or
+    # bouncing can fix it.
+    #
+    # WHY THIS EXISTS (2026-09-19 incident): Magento's CDC binlog offset expired
+    # ("Saved offset no longer present on the server ... please reset the
+    # connection") — a permanent config_error. Every sync from 22:50 UTC onward
+    # failed in ~60s. From the destination-freshness view that is INDISTINGUISHABLE
+    # from a frozen connection: both just produce stale data. So this gate returned
+    # ACT, cancel+restart did nothing (there was no stuck job to cancel), the
+    # verification came back "inconclusive" because the fault is permanent, and the
+    # ladder escalated to the kind bounce — which corrupted containerd's metadata
+    # and took the WHOLE platform down for 13 hours, Fishbowl included. Magento had
+    # been broken for 10 minutes; the remediation cost 13 hours.
+    #
+    # Airbyte's own scheduler already retries failed syncs every 10 min, so
+    # restarting one adds nothing even when the failure IS transient. Page a human
+    # instead — a repeatedly-failing connection is exactly what a human should see.
+    if status in _FAILED_JOB_STATUSES:
+        return "SKIP_JOB_FAILED", f"last_job_{status}:needs_human_not_restart"
 
     # No live job => nothing to protect; the classic freeze also lands here once
     # the stuck job has been reaped.
@@ -743,6 +786,45 @@ def _process_connection(snowflake_conn, breach, observe_only, request_id, log_st
     # observe-only mode exercises (and reports on) the real decision, instead of
     # reporting "would cancel" for drains the gate would actually have spared.
     gate_decision, gate_reason = _evaluate_progress_gate(conn_id, attempt_evidence)
+
+    # A failing connection must never be silently skipped: it will not self-heal
+    # (2026-09-19 Magento needed a connection reset), so a human has to see it.
+    # Rate-limited, because the condition persists for days.
+    if gate_decision == "SKIP_JOB_FAILED":
+        cooldown_until = _check_failed_job_notify_cooldown(conn_id)
+        _write_audit_row(snowflake_conn, {
+            **base_audit,
+            "outcome": "ESCALATE",
+            "action_taken": "none",
+            "failure_reason": f"{gate_decision}:{gate_reason}"[:500],
+        })
+        LOGGER.info(json.dumps({
+            "event": "skipped_job_failed",
+            "connection_id": conn_id,
+            "reason": gate_reason,
+            "pre_staleness_min": pre_staleness,
+            "notified": cooldown_until is None,
+        }))
+        if cooldown_until is None:
+            _publish_sns(
+                f"[Airbyte ESCALATE] {conn_id} sync FAILING @ {pre_staleness}m stale",
+                (
+                    f"Connection {conn_id} is stale ({pre_staleness} min) because its syncs are "
+                    f"FAILING, not because they are frozen ({gate_reason}).\n\n"
+                    "Auto-remediation deliberately took NO action. Restarting a failed sync "
+                    "cannot fix it, and escalating to a control-plane bounce took the whole "
+                    "platform down for 13h on 2026-09-19.\n\n"
+                    "This needs a human. Check the failure reason:\n"
+                    "  select jsonb_pretty(failure_summary::jsonb) from attempts\n"
+                    "  where job_id = (select max(id) from jobs where scope = '<connection uuid>');\n\n"
+                    "A config_error (e.g. expired CDC binlog offset) requires a connection reset.\n"
+                    f"Further pages for this connection are suppressed for "
+                    f"{FAILED_JOB_NOTIFY_COOLDOWN_SECONDS // 3600}h."
+                ),
+            )
+            _open_failed_job_notify_cooldown(conn_id)
+        return
+
     if gate_decision != "ACT":
         _write_audit_row(snowflake_conn, {
             **base_audit,
@@ -1168,6 +1250,38 @@ def _open_global_kind_bounce_cooldown() -> datetime:
             "error": str(exc),
         }))
     return breaker_until_dt
+
+
+def _check_failed_job_notify_cooldown(conn_id: str) -> datetime | None:
+    return _check_breaker(_FAILED_NOTIFY_KEY_PREFIX + conn_id)
+
+
+def _open_failed_job_notify_cooldown(conn_id: str) -> datetime:
+    """Suppress further failed-job pages for this connection for a while.
+
+    Uses its own DynamoDB key, never the connection's bare id: put_item replaces
+    the whole item, so writing the cooldown under `conn_id` would silently clobber
+    the circuit breaker's `breaker_until` (the same trap the progress gate hit in
+    PR #32).
+    """
+    until_epoch = int(time.time()) + FAILED_JOB_NOTIFY_COOLDOWN_SECONDS
+    try:
+        ddb_client.put_item(
+            TableName=DDB_TABLE,
+            Item={
+                "connection_id": {"S": _FAILED_NOTIFY_KEY_PREFIX + conn_id},
+                "breaker_until": {"N": str(until_epoch)},
+                "last_attempt_at": {"N": str(int(time.time()))},
+                "ttl": {"N": str(until_epoch + 60)},
+            },
+        )
+    except Exception as exc:
+        LOGGER.warning(json.dumps({
+            "event": "failed_job_notify_cooldown_write_failure",
+            "connection_id": conn_id,
+            "error": str(exc),
+        }))
+    return datetime.fromtimestamp(until_epoch, tz=timezone.utc)
 
 
 def _should_notify_autofix(repeat_count: int) -> bool:
