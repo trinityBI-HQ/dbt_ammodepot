@@ -54,8 +54,25 @@ STORE.clear()
 results.append(run("travado: live + 0 bytes + 2h", {"jobId":1,"status":"running","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(7200)}, "ACT"))
 # 2. Sem evidência (captura falhou) -> comportamento antigo (AGE)
 results.append(run("sem evidencia", None, "ACT"))
-# 3. Job já terminado -> AGE
-results.append(run("job nao vivo", {"jobId":1,"status":"failed","bytesSynced":5,"rowsSynced":5}, "ACT"))
+# 3. Job que RODOU E FALHOU -> NUNCA age na infra (regressao 2026-09-19).
+#    Antes isto retornava ACT: o offset de binlog do Magento expirou (config_error
+#    permanente), todo sync falhava em ~60s, e da visao de frescura isso e
+#    indistinguivel de um congelamento. A escada subiu ate o kind bounce, que
+#    corrompeu o containerd e derrubou a plataforma inteira por 13h.
+results.append(run("ultimo job failed -> SKIP (precisa humano, nao restart)",
+    {"jobId":1,"status":"failed","bytesSynced":5,"rowsSynced":5}, "SKIP_JOB_FAILED"))
+results.append(run("failed com contadores zerados -> SKIP",
+    {"jobId":2,"status":"failed","bytesSynced":0,"rowsSynced":0,"startTime":iso_ago(60)}, "SKIP_JOB_FAILED"))
+results.append(run("cancelled -> SKIP",
+    {"jobId":3,"status":"cancelled","bytesSynced":0,"rowsSynced":0}, "SKIP_JOB_FAILED"))
+results.append(run("FAILED maiusculo -> SKIP (status e normalizado)",
+    {"jobId":4,"status":"FAILED","bytesSynced":0,"rowsSynced":0}, "SKIP_JOB_FAILED"))
+# Sem job nenhum (o congelado ja foi ceifado) continua sendo ACT: esse e o caso
+# que a remediacao existe para resolver, e nao pode ser atingido pelo novo branch.
+results.append(run("sem job / status desconhecido -> ACT",
+    {"jobId":5,"status":"","bytesSynced":0,"rowsSynced":0}, "ACT"))
+results.append(run("succeeded (stale mas ultimo job ok) -> ACT",
+    {"jobId":6,"status":"succeeded","bytesSynced":10,"rowsSynced":10}, "ACT"))
 # 4. Primeira observação com dados -> precisa de baseline (NÃO cancela)
 STORE.clear()
 results.append(run("1a amostra c/ dados", {"jobId":28621,"status":"running","bytesSynced":100,"rowsSynced":10}, "SKIP_NEED_BASELINE"))
@@ -196,6 +213,18 @@ _ok = main.CP_RESTART_THRESHOLD == 3 and main.CP_RESTART_WINDOW_HOURS == 24
 print(f"{'PASS' if _ok else 'FALHOU'}  limiar 3/24h "
       f"(got {main.CP_RESTART_THRESHOLD}/{main.CP_RESTART_WINDOW_HOURS}h)")
 results.append(_ok)
+
+# O cooldown existe para nao mandar ~96 emails/dia enquanto a conexao segue quebrada.
+_cd = main.FAILED_JOB_NOTIFY_COOLDOWN_SECONDS
+_ok_cd = _cd >= 3600 and main._FAILED_NOTIFY_KEY_PREFIX != ""
+print(f"{'PASS' if _ok_cd else '**FAIL**'}  cooldown de page para conexao falhando "
+      f"({_cd//3600}h, prefixo {main._FAILED_NOTIFY_KEY_PREFIX!r})")
+results.append(_ok_cd)
+# A chave do cooldown NAO pode colidir com a do breaker: put_item substitui o item
+# inteiro, entao gravar sob o conn_id puro apagaria breaker_until (armadilha do PR #32).
+_ok_key = main._FAILED_NOTIFY_KEY_PREFIX not in ("", None) and main._FAILED_NOTIFY_KEY_PREFIX != main._PROGRESS_KEY_PREFIX
+print(f"{'PASS' if _ok_key else '**FAIL**'}  chave de cooldown isolada do breaker/progress")
+results.append(_ok_key)
 
 print()
 print(f"{sum(results)}/{len(results)} passaram")

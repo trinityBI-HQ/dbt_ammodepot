@@ -18,7 +18,7 @@ Every 15 min on `cron(5,20,35,50)` UTC, this Lambda:
    - **Tier 2 (kind-bounce, Phase 2.1):** if Tier 1 left `post_staleness_min > 60`,
      and global cooldown is clear, and the *other* connection is idle, and
      `kind-bounce-observe-only=false`, then issues
-     `docker restart airbyte-abctl-control-plane` via SSM and re-verifies
+     `docker restart -t 120 airbyte-abctl-control-plane` via SSM and re-verifies
      after 3 min. Opens a global 6h cooldown after any bounce.
    - Writes one row to `AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG`.
    - Publishes one of `[Airbyte AUTO-FIX]`, `[Airbyte ESCALATE]`,
@@ -64,6 +64,25 @@ Rollback without redeploy: `PROGRESS_GATE_ENABLED=false`
 
 Tests: `python3 test_progress_gate.py` (9 cases, no AWS/Snowflake needed).
 
+## A failing sync is never remediated (added 2026-09-19)
+
+The progress gate returns `SKIP_JOB_FAILED` when the connection's last job ended
+`failed` or `cancelled`. No cancel+restart, no kind-bounce — it pages a human
+instead, rate-limited to one email per `FAILED_JOB_NOTIFY_COOLDOWN_HOURS`
+(default 12), because the condition persists for days.
+
+**Why:** on 2026-09-19 Magento's CDC binlog offset expired — a permanent
+`config_error` ("Saved offset no longer present on the server ... please reset the
+connection"). Every sync from 22:50 UTC failed in ~60s. A destination-freshness
+monitor cannot tell that apart from a freeze: both just produce stale data. So the
+ladder ran end to end — cancel+restart (nothing to cancel), verification
+"inconclusive" (the fault is permanent), then the kind bounce, which corrupted
+containerd's metadata and took the whole platform down for **13 hours**, Fishbowl
+included. Magento had been broken for 10 minutes.
+
+Airbyte's own scheduler already retries failed syncs every 10 min, so restarting
+one adds nothing even when the failure IS transient.
+
 ## Architecture (one-liner)
 
 ```
@@ -80,7 +99,7 @@ Detailed design: [`.claude/sdd/features/DESIGN_AIRBYTE_AUTO_REMEDIATION.md`](../
 | `pyproject.toml` | Runtime deps (boto3, snowflake-connector, requests) |
 | `Dockerfile` | Container image — `public.ecr.aws/lambda/python:3.11` base |
 | `ssm-payloads/cancel_and_restart.json.tmpl` | SSM `SendCommand` payload — `__CONNECTION_ID__` substituted at runtime |
-| `ssm-payloads/kind_bounce.json.tmpl` | SSM `SendCommand` payload for Tier 2 — `docker restart airbyte-abctl-control-plane` + readiness probe |
+| `ssm-payloads/kind_bounce.json.tmpl` | SSM `SendCommand` payload for Tier 2 — `docker restart -t 120 airbyte-abctl-control-plane` + readiness probe. **The `-t 120` is load-bearing**: Docker's default 10s grace is not enough for the kind node's systemd to stop containerd cleanly, and a SIGKILL mid-write corrupts its container metadata (2026-09-19, 13h outage). |
 | `iam-policies/lambda-trust.json` | Trust policy for the Lambda role |
 | `iam-policies/lambda-execution-role.json` | Inline execution policy (least-privilege) |
 | `iam-policies/eventbridge-trust.json` | Trust policy for EventBridge → Lambda |
