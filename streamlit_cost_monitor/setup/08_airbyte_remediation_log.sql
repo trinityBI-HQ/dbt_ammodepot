@@ -41,22 +41,26 @@ create table if not exists ad_analytics.ops.airbyte_remediation_log (
     lambda_log_stream     varchar(256),               -- /aws/lambda/airbyte-auto-remediate/[date]/[stream]
     breaker_until_at      timestamp_ltz,              -- breaker expiry, populated on ESCALATE
     constraint pk_airbyte_remediation_log primary key (event_id),
-    -- NOTE: Snowflake does NOT enforce CHECK constraints on standard tables (and
-    -- does not even register these — information_schema.table_constraints shows
-    -- only the PK, itself unenforced). The list below is DOCUMENTATION of the
-    -- allowed vocabulary, not a guardrail: adding a value here changes nothing at
-    -- runtime, and writing an unlisted value will NOT fail. Keep it in sync by
-    -- hand whenever main.py grows a new outcome.
-    constraint chk_outcome check (
-        outcome in (
-            'AUTO_FIX',
-            'ESCALATE',
-            'BREAKER_OPEN',
-            'OBSERVE_ONLY_WOULD_ACT',
-            'SKIPPED_PROGRESSING'      -- progress gate spared a committing drain
-        )
-    ),
+    -- NO chk_outcome CONSTRAINT — deliberately removed 2026-09-21, do not add it back.
+    --
+    -- The comment that used to sit here claimed "Snowflake does NOT enforce CHECK
+    -- constraints on standard tables ... writing an unlisted value will NOT fail".
+    -- That is FALSE, and believing it cost an incident. On 2026-09-21 the Lambda hit:
+    --   001185 (23514): Operation on table AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG
+    --   failed because CHECK constraint CHK_OUTCOME ... was violated
+    -- The write threw, the exception aborted connection processing entirely
+    -- (`connection_processing_failed`), and the audit trail lost the event.
+    --
+    -- Worse, the failure mode is silent until it bites: `create table if not exists`
+    -- never updates an existing CHECK, so the deployed table kept an older vocabulary
+    -- while this file listed a newer one. The code grew SKIPPED_PROGRESSING; the live
+    -- constraint had not heard of it.
+    --
+    -- The vocabulary is owned by main.py. A logging table must never be able to
+    -- reject a row the remediation logic decided to write.
     constraint chk_tier check (tier = 'ALERT'),
+    -- SAME TRAP, still armed: adding a third connector will start throwing here until
+    -- this constraint is dropped or widened. Constraints on this table are enforced.
     constraint chk_connection check (connection_id in ('fishbowl_s3', 'magento_s3'))
 );
 

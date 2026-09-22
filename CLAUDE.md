@@ -723,6 +723,60 @@ the OOM-prone connection) **and** a binlog-retention increase on the MySQL sourc
 or the offset will expire again. **Auto-remediation is `observe-only=true` and must
 stay that way until Magento is fixed**, or it will walk the same ladder again.
 
+### Remediation Bounced a HEALTHY Platform (2026-09-21)
+
+Two days after the 13h outage, auto-remediation bounced the control plane again —
+this time against a platform with nothing wrong with it. **11 pod restarts, zero
+justification.** The `-t 120` graceful restart from PR #42 held, so nothing corrupted
+and Magento recovered on its own, but the action should never have fired.
+
+**There was no incident.** Magento committed rows on *every* sync through the whole
+window — 1292, 1426, 940, 779, 743, 262, 425 — never a failure, never a zero. Fishbowl
+likewise (~3,500 rows per run). dbt builds completed successfully every 15 min, so the
+Iceberg REFRESH was running. The connector was healthy; the freshness view was not.
+
+**Root cause — the gate had the opposite hole from the one PR #42 fixed.**
+
+```python
+if status in _FAILED_JOB_STATUSES:     # failed/cancelled -> SKIP  (PR #42)
+    return "SKIP_JOB_FAILED", ...
+if status not in _LIVE_JOB_STATUSES:   # "succeeded" landed HERE
+    return "ACT", f"job_not_live:{status}"
+```
+
+A **`succeeded`** last job fell straight through to `ACT`. The log says it plainly:
+`job_not_live:succeeded`. The last success had finished **51 seconds** before the
+Lambda decided to cancel+restart and then bounce the cluster.
+
+**Fix (PR #44): `SKIP_JOB_SUCCEEDED`.** A last job that succeeded within
+`MAX_SUCCEEDED_JOB_AGE_SEC` (default 3600) means the connector works, so staleness is
+either source seasonality — the blind spot a destination-freshness monitor
+structurally cannot see past — or monitoring lag, since Snowflake only sees Iceberg
+writes after dbt's `on-run-start` REFRESH and **this Lambda shares dbt's `5,20,35,50`
+cron**. Neither is repaired by restarting anything. Past that age the reading flips (a
+wedged scheduler is real), so it still falls through to `ACT`.
+
+**Second bug, and a documented "fact" that was false.** This file used to state that
+`chk_outcome` on `AIRBYTE_REMEDIATION_LOG` was "documentation only — Snowflake neither
+enforces nor registers CHECK constraints on standard tables". **It is enforced:**
+
+```
+001185 (23514): Operation on table AD_ANALYTICS.OPS.AIRBYTE_REMEDIATION_LOG failed
+because CHECK constraint CHK_OUTCOME ... was violated
+```
+
+The write threw, the exception aborted connection processing outright
+(`connection_processing_failed`), and the event vanished from the audit trail. The trap
+is silent: `create table if not exists` never updates an existing CHECK, so the live
+table kept an older vocabulary while the bootstrap file listed a newer one. **Constraint
+dropped in production 2026-09-21 and removed from `08_airbyte_remediation_log.sql`** — a
+logging table must never reject a row the remediation logic decided to write.
+`chk_connection` carries the same trap and will throw on a third connector.
+
+**Posture after this:** Tier 2 (kind-bounce) set to `observe-only=true` pending a soak;
+Tier 1 (cancel+restart) stays armed — it is far less destructive and still covers a real
+freeze.
+
 ### Control-Plane OOM + Alert Thrash (2026-07-27)
 
 Three compounding failures found while investigating "lots of alert email + webserver error":

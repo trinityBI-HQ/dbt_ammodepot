@@ -529,6 +529,11 @@ _PROGRESS_KEY_PREFIX = "progress#"
 # Airbyte job states that mean "a job is alive right now and could still commit".
 _LIVE_JOB_STATUSES = {"running", "pending", "incomplete"}
 
+# A connection whose last sync SUCCEEDED this recently is demonstrably working, so
+# staleness cannot be a freeze. Beyond this age, a lone old success with nothing new
+# scheduled is a real symptom (a wedged scheduler), so the gate falls through to ACT.
+MAX_SUCCEEDED_JOB_AGE_SEC = int(os.environ.get("MAX_SUCCEEDED_JOB_AGE_SEC", "3600"))
+
 # Job states that mean "Airbyte already RAN this sync and it ended badly".
 # These are NOT freezes: the connector started, errored and exited. Airbyte's own
 # scheduler retries on the next tick, so there is nothing for this Lambda to
@@ -655,6 +660,9 @@ def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, st
       SKIP_JOB_FAILED    -> the last sync ran and FAILED; restarting cannot fix it
                             and bouncing the cluster is actively harmful. Page a
                             human instead (2026-09-19)
+      SKIP_JOB_SUCCEEDED -> the last sync SUCCEEDED recently, so the connector works
+                            and the staleness is seasonality or monitoring lag, not
+                            a freeze (2026-09-21)
 
     Bias: only SKIP when there is positive evidence of movement. Absent or
     unparseable evidence always falls through to ACT, preserving prior behaviour.
@@ -693,6 +701,33 @@ def _evaluate_progress_gate(conn_id: str, attempt: dict | None) -> tuple[str, st
     # instead — a repeatedly-failing connection is exactly what a human should see.
     if status in _FAILED_JOB_STATUSES:
         return "SKIP_JOB_FAILED", f"last_job_{status}:needs_human_not_restart"
+
+    # A sync that RAN AND SUCCEEDED recently proves the connector works.
+    #
+    # WHY THIS EXISTS (2026-09-21 incident): Magento committed rows on EVERY sync
+    # (1292, 1426, 940, 779, 743, 262 ...) yet the freshness view reported it
+    # breached, and this gate sent `succeeded` straight to ACT through the
+    # `job_not_live` branch below. The ladder then cancelled a healthy sync and
+    # bounced the control plane — 11 pod restarts against a platform that was fine.
+    # The last success had finished **51 seconds** before that decision.
+    #
+    # When the last job succeeded, staleness means one of: no changes at the source
+    # (the seasonality blind spot a destination-freshness monitor structurally
+    # cannot see past), or monitoring lag (Snowflake only sees Iceberg writes after
+    # dbt's on-run-start REFRESH, and this Lambda shares its cron). Neither is
+    # repaired by restarting anything.
+    #
+    # Past MAX_SUCCEEDED_JOB_AGE_SEC the reading flips: an old success with nothing
+    # newer scheduled can mean a wedged scheduler, which a restart does fix — so
+    # that case still falls through to ACT.
+    if status == "succeeded":
+        age_sec = _job_age_seconds(attempt)
+        if age_sec is None or age_sec < MAX_SUCCEEDED_JOB_AGE_SEC:
+            age_txt = "unknown" if age_sec is None else f"{int(age_sec)}s"
+            return "SKIP_JOB_SUCCEEDED", (
+                f"last_job_succeeded_{age_txt}_ago:connector_is_working"
+            )
+        return "ACT", f"last_success_stale:{int(age_sec)}s>{MAX_SUCCEEDED_JOB_AGE_SEC}s"
 
     # No live job => nothing to protect; the classic freeze also lands here once
     # the stuck job has been reaped.
