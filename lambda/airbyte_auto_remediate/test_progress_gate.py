@@ -71,8 +71,25 @@ results.append(run("FAILED maiusculo -> SKIP (status e normalizado)",
 # que a remediacao existe para resolver, e nao pode ser atingido pelo novo branch.
 results.append(run("sem job / status desconhecido -> ACT",
     {"jobId":5,"status":"","bytesSynced":0,"rowsSynced":0}, "ACT"))
-results.append(run("succeeded (stale mas ultimo job ok) -> ACT",
-    {"jobId":6,"status":"succeeded","bytesSynced":10,"rowsSynced":10}, "ACT"))
+# 2026-09-21: este caso ANTES retornava ACT e foi exatamente o que derrubou o
+# control plane. Magento commitava linhas em TODO sync (1292, 1426, 940, 779, 743,
+# 262 ...) e o ultimo sucesso tinha 51 SEGUNDOS quando o Lambda decidiu bouncear.
+results.append(run("succeeded ha 51s -> SKIP (conector esta funcionando)",
+    {"jobId":6,"status":"succeeded","bytesSynced":10,"rowsSynced":10,"startTime":iso_ago(51)},
+    "SKIP_JOB_SUCCEEDED"))
+results.append(run("succeeded ha 10min -> SKIP",
+    {"jobId":7,"status":"succeeded","bytesSynced":10,"rowsSynced":10,"startTime":iso_ago(600)},
+    "SKIP_JOB_SUCCEEDED"))
+results.append(run("succeeded sem startTime -> SKIP (nao inventar freeze)",
+    {"jobId":8,"status":"succeeded","bytesSynced":10,"rowsSynced":10}, "SKIP_JOB_SUCCEEDED"))
+# Mas um sucesso ANTIGO sem nada novo agendado pode ser scheduler travado -> ACT.
+results.append(run("succeeded ha 2h -> ACT (scheduler pode estar travado)",
+    {"jobId":9,"status":"succeeded","bytesSynced":10,"rowsSynced":10,"startTime":iso_ago(7200)},
+    "ACT"))
+_ok_age = main.MAX_SUCCEEDED_JOB_AGE_SEC >= 1800
+print(f"{'PASS' if _ok_age else '**FAIL**'}  janela de sucesso recente "
+      f"({main.MAX_SUCCEEDED_JOB_AGE_SEC}s)")
+results.append(_ok_age)
 # 4. Primeira observação com dados -> precisa de baseline (NÃO cancela)
 STORE.clear()
 results.append(run("1a amostra c/ dados", {"jobId":28621,"status":"running","bytesSynced":100,"rowsSynced":10}, "SKIP_NEED_BASELINE"))
