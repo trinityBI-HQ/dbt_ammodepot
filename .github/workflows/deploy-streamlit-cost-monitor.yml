@@ -6,6 +6,8 @@ on:
     paths:
       - 'streamlit_cost_monitor/**'
       - '.github/workflows/deploy-streamlit-cost-monitor.yml'
+      - '!**/AGENTS.md'   # context files never deploy
+      - '!**/CLAUDE.md'
   workflow_dispatch:
 
 jobs:

@@ -6,6 +6,8 @@ on:
     paths:
       - 'streamlit_analyst/**'
       - '.github/workflows/deploy-streamlit-analyst.yml'
+      - '!**/AGENTS.md'   # context files never deploy
+      - '!**/CLAUDE.md'
   workflow_dispatch:
 
 jobs:

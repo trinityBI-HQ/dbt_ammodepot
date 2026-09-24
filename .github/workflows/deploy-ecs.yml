@@ -6,6 +6,8 @@ on:
     paths:
       - 'ammodepot/**'
       - 'ecs/**'
+      - '!**/AGENTS.md'   # context files never deploy
+      - '!**/CLAUDE.md'
 
 jobs:
   deploy:
