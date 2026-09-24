@@ -7,7 +7,7 @@ paths: ["ammodepot/**", "ecs/**", "docs/snowflake_access_setup.md", "*/setup/*.s
 flowchart LR
     SRC[Fishbowl, Magento<br/>MySQL] -->|Airbyte CDC| S3[(S3 Iceberg<br/>Glue catalog)]
     S3 -->|read in place| LND[LAKEHOUSE_LANDING<br/>55 unmanaged tables]
-    LND --> SLV[SILVER<br/>dbt views]
+    LND --> SLV[SILVER<br/>dbt, mostly views]
     SLV --> GLD[GOLD<br/>dbt tables]
     GLD --> PBI[Power BI]
     GLD --> SIS[Streamlit apps]
@@ -19,7 +19,8 @@ Since the cutover of 2026-04-07, Airbyte writes Iceberg to `s3://ammodepot-lakeh
 Snowflake reads it in place — nothing is copied into Snowflake storage. Layout:
 `iceberg/<glue_db>.db/<table>/{data,metadata}/`, with Glue databases `production2018` (Fishbowl, 34
 tables) and `ammuni_prod` (Magento, 21). Snowflake reaches it through the external volume
-`LAKEHOUSE_S3_VOLUME` and the catalog integration `LAKEHOUSE_GLUE_CATALOG`.
+`LAKEHOUSE_S3_VOLUME` and the catalog integration `LAKEHOUSE_GLUE_CATALOG`. Airbyte writes as the IAM
+user `svc_airbyte-s3` (S3 and Glue); Snowflake reads through the role `snowflake-lakehouse-role`.
 
 The 55 tables in `AD_ANALYTICS.LAKEHOUSE_LANDING` are **unmanaged**: Snowflake sees new Iceberg
 commits only after `ALTER ICEBERG TABLE … REFRESH`, which `ecs/refresh_iceberg.py` runs before every

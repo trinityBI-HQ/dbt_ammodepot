@@ -33,7 +33,7 @@ kind-bounce). Read both before assuming either tier acts.
   would be clobbered, since `put_item` replaces the whole item.
 - **A logging table must never reject a row.** `CHK_OUTCOME` on `AIRBYTE_REMEDIATION_LOG` *is*
   enforced; it aborted processing and the event vanished, so it was dropped.
-  `chk_connection` will throw the same way on a third connector.
+  `chk_connection` and `chk_tier` will throw the same way on a third connector or a new tier.
 
 ## Traps
 

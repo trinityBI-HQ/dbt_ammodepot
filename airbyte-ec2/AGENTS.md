@@ -1,8 +1,8 @@
 # airbyte-ec2/ — the Airbyte platform
 
 Airbyte runs under **abctl (kind/k8s) on one EC2 host**, `i-075043415ebad732f` (c6a.2xlarge, 16 GB,
-AL2023; root volume `vol-06a30feea2ddc25d0`, 160 GB gp3, XFS — it grows online), and writes Fishbowl and Magento as Iceberg to S3. **Access is SSM only** — no
-SSH, no SCP: `aws ssm start-session --target i-075043415ebad732f --profile ammodepot`.
+AL2023; root volume `vol-06a30feea2ddc25d0`, 160 GB gp3, XFS — it grows online), and writes Fishbowl
+and Magento as Iceberg to S3. **Access is SSM only** — no SSH, no SCP: `aws ssm start-session --target i-075043415ebad732f --profile ammodepot`.
 
 | Read first | For |
 |---|---|
