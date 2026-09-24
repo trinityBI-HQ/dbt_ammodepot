@@ -2,6 +2,13 @@
 
 **Type:** Production-optimization workstream (NOT root-cause analysis). **Opened:** 2026-07-05.
 **Status:** **Magento raised 3 GiB → 5 GiB on 2026-07-22** after a second backlog spiral OOM'd repeatedly at 3 GiB (19 attempts). **Current baseline: Magento 5 GiB / Fishbowl 2 GiB.** The "optional step-down below 3 GiB" question from 2026-07-05 is **CLOSED — answered in the opposite direction**: 3 GiB was not enough. This is the production evidence the owner policy was waiting for. **See §0.1.**
+> **Deferred by the owner, 2026-08-13 — do not reopen unprompted.** 5 GiB raises the loop's trip
+> point; it does not remove the loop, because sync duration tracks the binlog scan (828 tables), not
+> row volume. The remaining levers: investigate the binlog-scan cost (the biggest win), or a bigger
+> host (c6a.4xlarge, ~$446/mo against ~$223, the last resort). **Revisit when:** Magento OOMs or
+> spirals again at 5 GiB · a third connector is added · caught-up syncs take > 30 min for a sustained
+> period · host available memory drops below 2 GiB repeatedly.
+
 **Predecessor:** [`EXPERIMENT.md`](./EXPERIMENT.md) — Investigation B (RCA) is **CLOSED**; the
 platform-wide global-OOM cascade is eliminated. This workstream inherits the *contained*
 residual, not a platform failure.

@@ -1,3 +1,6 @@
+---
+paths: ["snowflake_setup/**", "docs/sql/**", "*/setup/*.sql"]
+---
 # Snowflake Access Setup Guide
 
 Setup guide for two service roles on Snowflake:

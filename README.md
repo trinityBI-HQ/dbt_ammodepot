@@ -228,8 +228,9 @@ dbt_ammodepot/
 ├── docs/
 │   ├── snowflake_access_setup.md
 │   ├── SNOWFLAKE_COST_DASHBOARD.md
-│   ├── POC_S3_DUCKDB_LAKEHOUSE.md
-│   ├── AIRBYTE_2_0_UPGRADE_PLAN.md
+│   ├── architecture/                  # How it works — warehouse, AI features, observability, SiS
+│   ├── decisions/                     # Why it is this way — one record per decision
+│   ├── incidents/                     # What broke, why, and what changed
 │   ├── AIRBYTE_INCIDENT_RUNBOOK.md           # Manual cancel + restart playbook
 │   └── AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md   # Phase 2 Lambda — toggle, breaker, escalation
 ├── sdd-archive/                       # Shipped feature archives (BRAINSTORM/DEFINE/DESIGN/SHIPPED docs)
@@ -551,8 +552,8 @@ When Tier 1 cancel+restart leaves a connection at `post_staleness_min > 60`, the
 |----------|-------------|
 | `docs/snowflake_access_setup.md` | Roles, warehouses, RSA keys, Power BI access, SiS setup, SSO |
 | `docs/SNOWFLAKE_COST_DASHBOARD.md` | Cost monitoring queries, Snowsight dashboard (8 tiles), alerts |
-| `docs/POC_S3_DUCKDB_LAKEHOUSE.md` | S3 + Iceberg migration plan and POC results |
-| `docs/AIRBYTE_2_0_UPGRADE_PLAN.md` | Airbyte upgrade procedure, rollback plan, risk assessment |
+| `docs/decisions/0003-duckdb-lakehouse-poc.md` | The DuckDB lakehouse plan — superseded by the Iceberg cutover (0004) |
+| `docs/decisions/0007-airbyte-2-upgrade-plan.md` | The Airbyte 2.0 in-place upgrade plan — superseded; see `airbyte-ec2/AIRBYTE_INSTALL.md` |
 | `docs/AIRBYTE_INCIDENT_RUNBOOK.md` | Manual cancel + restart playbook for stuck Airbyte syncs (SSM-only, 5-min target) |
 | `docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md` | Phase 2 Lambda — email tiers, observe-only toggle, breaker reset, emergency disable |
 | `ecs/README.md` | ECS Fargate deployment guide (one-time setup + ongoing ops) |

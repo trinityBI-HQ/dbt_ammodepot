@@ -1,3 +1,11 @@
+---
+paths: ["ecs/refresh_iceberg.py", "ammodepot/models/bronze/**"]
+---
+> **Superseded by [0004](0004-iceberg-lakehouse-option-b.md), 2026-04-07.** This is the plan for a full
+> S3 + DuckDB lakehouse. The POC validated DuckDB, and the design was set aside: it would have saved
+> ~$4,152 a year more than Option B, at the cost of four helper scripts, Iceberg write bugs, OOMs and
+> 3–4-hour initial loads. Kept as the record of what was evaluated.
+
 # POC: S3 + DuckDB + Iceberg Lakehouse
 
 **Date:** 2026-03-23
