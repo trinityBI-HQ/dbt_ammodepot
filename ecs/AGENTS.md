@@ -3,7 +3,9 @@
 `deploy-ecs.yml` builds this image and pushes `:latest` to ECR on every push to `main` that touches
 `ammodepot/` or `ecs/`. EventBridge runs it on Fargate Spot at `cron(5,20,35,50 * * * ? *)` UTC —
 five minutes before each Power BI refresh at :00/:15/:30/:45, measured from `QUERY_HISTORY`. A build
-takes ~3.5 minutes. Setup and operations: `README.md`.
+takes ~3.5 minutes. Setup and operations: `README.md`. Why Fargate and automatic deploys:
+`../docs/decisions/0002-dbt-core-on-ecs-fargate.md`; why this schedule:
+`../docs/decisions/0006-dbt-cadence-follows-power-bi.md`.
 
 `entrypoint.sh` runs, in order: `refresh_iceberg.py` (refreshes the 55 Iceberg tables, 8 threads —
 **the only thing that does**, and the run stops if it fails), source freshness, `dbt build`, then

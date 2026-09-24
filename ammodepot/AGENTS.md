@@ -58,6 +58,7 @@ the `adapter.dispatch` macros in `macros/cross_db/`. Business values are vars, n
   Magento) with explicit `identifier:`. **They never refresh on their own, and a local `dbt build` does
   not refresh them**: `../ecs/refresh_iceberg.py` does, from the ECS entrypoint before every scheduled
   build, and the build is skipped if it fails. The `on-run-start` hook that used to do it is gone.
+  Why the lakehouse is built this way: `../docs/decisions/0004-iceberg-lakehouse-option-b.md`.
 - Freshness: Fishbowl and Magento warn at 24h, error at 48h, on `_airbyte_extracted_at`.
 - **Magento product attributes are EAV**, resolved in `int_magento_product_eav_lookups` and
   `int_magento_product_attributes`; attribute ids are the `ammodepot_magento_attr_id_*` vars.

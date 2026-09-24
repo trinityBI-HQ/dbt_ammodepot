@@ -16,7 +16,10 @@ and Magento as Iceberg to S3. **Access is SSM only** — no SSH, no SCP: `aws ss
 
 - **Pin the chart.** `abctl local install` without `--chart-version` pulls upstream's latest, turning
   a values change into a platform upgrade. A failed cross-version upgrade cannot be rolled back in
-  place. Run abctl as `sudo env HOME=/usr/bin abctl …` — its state lives in `/usr/bin/.airbyte/`.
+  place (`AIRBYTE_INSTALL.md`, incident log). Run abctl as `sudo env HOME=/usr/bin abctl …` — its
+  state lives in `/usr/bin/.airbyte/`. Why abctl stays despite its friction:
+  `../docs/decisions/0009-keep-airbyte-on-abctl.md`; the April in-place upgrade this host replaced:
+  `../docs/decisions/0007-airbyte-2-upgrade-plan.md`.
 - **`abctl local uninstall --persisted` deletes the data**; without the flag it keeps it.
 - **`/tmp` is a 7.7 GB tmpfs.** Staging a large file there fills RAM and makes cluster creation fail
   silently.
@@ -32,7 +35,8 @@ and Magento as Iceberg to S3. **Access is SSM only** — no SSH, no SCP: `aws ss
 - **Roll out the control plane at minutes `:x6`–`:x9`.** Magento syncs start at `:x0` and Fishbowl at
   `:x5` (schedules as of 2026-08); a sync whose orchestrator starts while `server` restarts is orphaned.
 - **Scheduled jobs are systemd timers.** AL2023 ships no cron — the first `deploy.sh` wired jobs with
-  `crontab`, scheduled nothing, and the disk filled to 100%.
+  `crontab`, scheduled nothing, and the disk filled to 100%
+  (`../docs/incidents/2026-07-15-airbyte-disk-full.md`).
 
 ## Disk: retention is the dial
 

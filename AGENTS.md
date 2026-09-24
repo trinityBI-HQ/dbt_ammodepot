@@ -26,6 +26,7 @@ when you work there; knowledge that is not a rule is in `docs/`.
 | Cost tags, the cost dashboard | `snowflake_setup/01_governance_tags.sql`, `docs/SNOWFLAKE_COST_DASHBOARD.md` |
 
 `archive/` is decommissioned — the Redshift project and what preceded the cutover — and runs nowhere.
+Redshift's retirement, and the snapshot kept: `docs/decisions/0001-retire-redshift-keep-a-snapshot.md`.
 
 ## Invariants
 
