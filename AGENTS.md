@@ -40,6 +40,6 @@ Redshift's retirement, and the snapshot kept: `docs/decisions/0001-retire-redshi
 - **Every AWS command takes `--profile ammodepot`.** IAM service users are named `svc_<purpose>`.
 - **A change is done when `dbt build` passes** — and, when it moves row counts, when its before/after
   on production data is in the PR (`ammodepot/AGENTS.md`).
-- **Work items live in Linear: team `TRI`, project Ammo Depot.**
+- **No work without a Linear issue** (team `TRI`, project Ammo Depot): the branch carries its `TRI-<n>`, and the `work-item` check fails a PR without it.
 - **`.claude/` is gitignored here**: it links the shared tooling and never enters this history.
   Anything that must reach a colleague goes in an `AGENTS.md` or under `docs/`.
