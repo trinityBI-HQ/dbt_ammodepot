@@ -1,6 +1,3 @@
----
-paths: ["ammodepot/macros/ml_forecast.sql", "ammodepot/models/gold/**", "ammodepot/snapshots/**", "streamlit_app/pages/**"]
----
 # The Cortex features
 
 Everything runs inside Snowflake — the client provides no external LLM or API keys

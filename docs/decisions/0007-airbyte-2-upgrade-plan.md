@@ -1,6 +1,3 @@
----
-paths: ["airbyte-ec2/AIRBYTE_INSTALL.md", "airbyte-ec2/airbyte-values.yaml"]
----
 > **Superseded, 2026-04-06.** This plans an in-place upgrade from 1.5.1. Instead, Airbyte 2.0.1 was
 > installed on a new Amazon Linux 2023 host — the old host's cgroup v1 could not create the kind
 > cluster — and the platform has run 2.1.0 since 2026-07-03. The install and upgrade procedure in

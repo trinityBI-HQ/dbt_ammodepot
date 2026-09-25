@@ -1,6 +1,3 @@
----
-paths: ["lambda/airbyte_auto_remediate/**", "streamlit_cost_monitor/setup/08_airbyte_remediation_log.sql"]
----
 # 2026-09-21 — Auto-remediation bounced a healthy platform
 
 Two days after the 13-hour outage, the Lambda bounced the control plane again — on a platform with

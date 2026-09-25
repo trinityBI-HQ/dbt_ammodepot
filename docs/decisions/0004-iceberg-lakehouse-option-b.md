@@ -1,6 +1,3 @@
----
-paths: ["ecs/refresh_iceberg.py", "ecs/entrypoint.sh", "ammodepot/models/bronze/**", "ammodepot/models/silver/**"]
----
 # 0004 — Snowflake reads Airbyte's Iceberg in place (Option B)
 
 **Status:** accepted; cut over 2026-04-07 ~17:00 UTC. Supersedes

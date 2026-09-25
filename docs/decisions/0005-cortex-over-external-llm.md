@@ -1,6 +1,3 @@
----
-paths: ["streamlit_analyst/**", "streamlit_app/pages/**", "ammodepot/macros/ml_forecast.sql"]
----
 # 0005 — AI features run on Snowflake Cortex, not an external LLM
 
 **Status:** accepted 2026-04-14.

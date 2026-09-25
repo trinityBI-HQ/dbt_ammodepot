@@ -1,6 +1,3 @@
----
-paths: ["lambda/airbyte_auto_remediate/**", "airbyte-ec2/**"]
----
 # 2026-09-19 — Auto-remediation turned a Magento fault into a 13-hour outage
 
 The worst self-inflicted incident so far: ingestion stopped for about 13 hours — **Fishbowl

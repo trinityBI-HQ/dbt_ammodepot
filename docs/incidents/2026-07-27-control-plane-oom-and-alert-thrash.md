@@ -1,6 +1,3 @@
----
-paths: ["airbyte-ec2/airbyte-values.yaml", "airbyte-ec2/AIRBYTE_INSTALL.md", "lambda/airbyte_auto_remediate/**", "streamlit_cost_monitor/setup/07_airbyte_observability.sql"]
----
 # 2026-07-27 — Control-plane OOM, a remediation that could only kill, and alert thrash
 
 Found while investigating "lots of alert email and a webserver error". Three failures compounded.
