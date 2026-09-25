@@ -1,0 +1,32 @@
+# No work without a Linear issue: a PR's branch carries its identifier, TRI-<n>.
+# The rule is `.claude/rules/work-item-lifecycle.md` (from claude-code-config). An approved
+# exception carries the `no-issue` label and says why in the PR body.
+name: work-item
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+
+permissions: {}
+
+jobs:
+  work-item:
+    runs-on: ubuntu-latest
+    steps:
+      - name: The branch carries a Linear issue identifier
+        env:
+          BRANCH: ${{ github.head_ref }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          EXCEPTION: ${{ contains(github.event.pull_request.labels.*.name, 'no-issue') }}
+        run: |
+          # Any case: Linear's "Copy git branch name" gives user/tri-49-slug, and Linear links it.
+          if [[ "$BRANCH" =~ (^|[^A-Za-z0-9])[Tt][Rr][Ii]-[0-9]+($|[^0-9]) ]]; then
+            echo "linked: $BRANCH"
+          elif [[ "$AUTHOR" == "dependabot[bot]" ]]; then
+            echo "dependency update by dependabot: exempt"
+          elif [[ "$EXCEPTION" == "true" ]]; then
+            echo "::notice::approved exception: label no-issue"
+          else
+            echo "::error::Branch '$BRANCH' carries no Linear issue identifier. Create the issue (team TRI, the client's project, the Work item template), then name the branch <type>/TRI-<n>-<slug>. An exception approved by a person carries the 'no-issue' label and says why in the PR body."
+            exit 1
+          fi
