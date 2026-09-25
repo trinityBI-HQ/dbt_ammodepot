@@ -373,6 +373,7 @@ Push to `main` — GitHub Actions (`deploy-ecs.yml`, path-filtered to `ammodepot
 | `deploy-streamlit-analyst.yml` | Push to `streamlit_analyst/` | `snow streamlit deploy --replace` |
 | `deploy-dbt-docs.yml` | Push to `ammodepot/` | `dbt docs generate --static` → upload to S3 |
 | `deploy-lambda-airbyte-auto-remediate.yml` | Push to `lambda/airbyte_auto_remediate/**` | Build + push Lambda image, update function code |
+| `work-item.yml` | Pull request | Fails a PR whose branch carries no Linear `TRI-<n>` (exception: the `no-issue` label) |
 
 ---
 

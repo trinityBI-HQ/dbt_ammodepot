@@ -19,7 +19,8 @@ jobs:
           AUTHOR: ${{ github.event.pull_request.user.login }}
           EXCEPTION: ${{ contains(github.event.pull_request.labels.*.name, 'no-issue') }}
         run: |
-          if [[ "$BRANCH" =~ (^|[^A-Za-z0-9])TRI-[0-9]+($|[^0-9]) ]]; then
+          # Any case: Linear's "Copy git branch name" gives user/tri-49-slug, and Linear links it.
+          if [[ "$BRANCH" =~ (^|[^A-Za-z0-9])[Tt][Rr][Ii]-[0-9]+($|[^0-9]) ]]; then
             echo "linked: $BRANCH"
           elif [[ "$AUTHOR" == "dependabot[bot]" ]]; then
             echo "dependency update by dependabot: exempt"
