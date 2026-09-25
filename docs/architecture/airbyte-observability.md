@@ -1,6 +1,3 @@
----
-paths: ["streamlit_cost_monitor/setup/*airbyte*.sql", "streamlit_cost_monitor/pages/6_Airbyte_Health.py", "lambda/airbyte_auto_remediate/**", "airbyte-ec2/**"]
----
 # Airbyte observability
 
 Two independent layers, on two delivery paths: switching the remediation Lambda off does not silence

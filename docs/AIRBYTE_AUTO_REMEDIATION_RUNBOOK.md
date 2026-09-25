@@ -1,6 +1,3 @@
----
-paths: ["lambda/airbyte_auto_remediate/**"]
----
 # Airbyte Auto-Remediation — Operator Runbook
 
 > Phase 2 follow-up to [Airbyte Observability](AIRBYTE_INCIDENT_RUNBOOK.md).

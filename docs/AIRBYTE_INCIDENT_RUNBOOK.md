@@ -1,6 +1,3 @@
----
-paths: ["airbyte-ec2/**", "lambda/airbyte_auto_remediate/**"]
----
 # Airbyte Incident Runbook
 
 **Target:** First-time operator can complete cancel + restart in 5 minutes following only this document.

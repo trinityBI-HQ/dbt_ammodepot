@@ -1,6 +1,3 @@
----
-paths: ["lambda/airbyte_auto_remediate/**", "docs/AIRBYTE_AUTO_REMEDIATION_RUNBOOK.md"]
----
 # 0008 — Auto-remediation: one Lambda outside the host
 
 **Status:** accepted in stages, 2026-05-03 → 2026-07-02; its detection is being redesigned in TRI-19.

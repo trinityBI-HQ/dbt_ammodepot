@@ -1,6 +1,3 @@
----
-paths: ["ammodepot/**", "ecs/**", "docs/snowflake_access_setup.md", "*/setup/*.sql"]
----
 # The warehouse and the lakehouse
 
 ```mermaid

@@ -1,6 +1,3 @@
----
-paths: ["airbyte-ec2/**"]
----
 # 0009 — Keep Airbyte on abctl for now
 
 **Status:** accepted 2026-08-13; revisit if stability regresses.

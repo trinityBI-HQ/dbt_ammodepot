@@ -1,6 +1,3 @@
----
-paths: ["archive/**"]
----
 # 0001 — Retire Redshift and keep one indefinite snapshot
 
 **Status:** accepted 2026-05-01.

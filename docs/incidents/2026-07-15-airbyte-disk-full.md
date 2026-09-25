@@ -1,6 +1,3 @@
----
-paths: ["airbyte-ec2/**"]
----
 # 2026-07-15 — Airbyte stalled 4.5 hours: the root disk was full
 
 The Airbyte host's root disk reached 100% (20 MB free of 100 GB). From 17:15 UTC `workload-launcher`

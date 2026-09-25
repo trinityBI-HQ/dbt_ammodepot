@@ -1,6 +1,3 @@
----
-paths: ["streamlit_app/**", "streamlit_cost_monitor/**", "streamlit_analyst/**", ".github/workflows/deploy-streamlit-*.yml"]
----
 # Streamlit in Snowflake — what all three apps share
 
 All three apps run on the **container runtime** (`SYSTEM$ST_CONTAINER_RUNTIME_PY3_11`, Streamlit

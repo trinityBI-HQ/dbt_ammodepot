@@ -1,6 +1,3 @@
----
-paths: ["ecs/eventbridge-rule.json", "ecs/**"]
----
 # 0006 — dbt builds on Power BI's cadence
 
 **Status:** accepted; deployed 2026-04-28.

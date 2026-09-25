@@ -1,6 +1,3 @@
----
-paths: ["ecs/**", ".github/workflows/deploy-ecs.yml"]
----
 # 0002 — dbt-core on ECS Fargate Spot, replacing dbt Cloud and MWAA
 
 **Status:** accepted; running since 2026-03-20. MWAA deleted 2026-03-23.
