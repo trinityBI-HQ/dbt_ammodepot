@@ -31,7 +31,7 @@ WHAT TO EXPECT (measured on Magento: 21 streams, 85M rows)
 
   Give the host headroom first: the snapshot wants ~5 GiB source + ~5 GiB
   destination. c6a.2xlarge (~7.6 GiB free) is NOT enough; resize to c6a.4xlarge
-  and back, using the graceful shutdown in CLAUDE.md.
+  and back, using the graceful stop in airbyte-ec2/AGENTS.md.
 
 USAGE
   ./airbyte-ec2/airbyte-connection-refresh.py <connection-uuid> [Truncate|Merge]

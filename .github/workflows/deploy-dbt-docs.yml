@@ -6,6 +6,8 @@ on:
     paths:
       - 'ammodepot/**'
       - '.github/workflows/deploy-dbt-docs.yml'
+      - '!**/AGENTS.md'   # context files never deploy
+      - '!**/CLAUDE.md'
   workflow_dispatch:
 
 jobs:

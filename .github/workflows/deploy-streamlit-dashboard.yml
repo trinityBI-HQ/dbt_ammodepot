@@ -6,6 +6,8 @@ on:
     paths:
       - 'streamlit_app/**'
       - '.github/workflows/deploy-streamlit-dashboard.yml'
+      - '!**/AGENTS.md'   # context files never deploy
+      - '!**/CLAUDE.md'
   workflow_dispatch:
 
 jobs:

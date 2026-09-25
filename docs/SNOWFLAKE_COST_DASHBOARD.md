@@ -1,3 +1,6 @@
+---
+paths: ["snowflake_setup/**", "streamlit_cost_monitor/**"]
+---
 # Snowflake Cost & Usage Monitoring Dashboard
 
 **Date:** 2026-03-23

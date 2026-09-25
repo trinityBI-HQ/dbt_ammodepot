@@ -6,6 +6,8 @@ on:
     paths:
       - 'lambda/airbyte_auto_remediate/**'
       - '.github/workflows/deploy-lambda-airbyte-auto-remediate.yml'
+      - '!**/AGENTS.md'   # context files never deploy
+      - '!**/CLAUDE.md'
 
 jobs:
   deploy:

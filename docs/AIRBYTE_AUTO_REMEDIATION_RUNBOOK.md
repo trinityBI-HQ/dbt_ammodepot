@@ -1,3 +1,6 @@
+---
+paths: ["lambda/airbyte_auto_remediate/**"]
+---
 # Airbyte Auto-Remediation — Operator Runbook
 
 > Phase 2 follow-up to [Airbyte Observability](AIRBYTE_INCIDENT_RUNBOOK.md).
@@ -8,10 +11,14 @@
 
 | Subject prefix | What happened | Action required? |
 |----------------|---------------|------------------|
-| `[Airbyte WARN]`  / `[Airbyte ALERT]` | **Phase 1** detection. Sync is stuck. Lambda will react on its next tick (≤16 min). | None yet — let Lambda try. |
-| `[Airbyte AUTO-FIX]` | Lambda recovered the sync automatically. | None. Audit row written. |
-| `[Airbyte ESCALATE]` | Lambda gave up. Breaker open for 2h. | **Yes** — manual remediation. See "If you got an ESCALATE" below. |
-| `[Airbyte OBSERVE]` | Lambda is in observe-only mode. It would have acted but didn't. | Validate the decision against Phase 1 incident. |
+| `[Airbyte ALERT]` | **Phase 1** detection. Sync is stuck. Lambda will react on its next tick (≤16 min). (`[Airbyte WARN]` is suspended since 2026-07-27.) | None yet — let Lambda try. |
+| `[Airbyte AUTO-FIX]` | Lambda recovered the sync. Since PR #38 a single success sends no email — it is an audit row and a CloudWatch line; this subject appears only when the repeat count could not be read. | None. |
+| `[Airbyte REPEAT AUTO-FIX] … needs a human` | The third auto-fix for one connection within 24h (`AUTOFIX_NOTIFY_COUNT`, `AUTOFIX_NOTIFY_WINDOW_MIN`). Recovery works but something keeps breaking it. | **Yes** — find the cause. |
+| `[Airbyte ESCALATE] … sync FAILING` | The last job **failed**, so nothing was restarted (`SKIP_JOB_FAILED`) — a permanent fault such as an expired CDC offset. At most once per 12h. | **Yes** — read the job's failure. |
+| `[Airbyte ESCALATE]` (other) | Lambda gave up: the restart failed, the sync did not recover, or the Lambda errored. Breaker open for 2h. | **Yes** — manual remediation. See "If you got an ESCALATE" below. |
+| `[Airbyte OBSERVE]`, `[Airbyte KIND-BOUNCE OBSERVE]` | Observe-only mode: it would have acted but didn't. | Validate the decision against the incident. |
+| `[Airbyte KIND-BOUNCE AUTO-FIX / PENDING / UNKNOWN / ESCALATE]` | Tier 2 bounced the control plane: recovered / verification on the next cycle / SSM status unconfirmed / did not recover. | `ESCALATE` and `UNKNOWN`: **yes**. |
+| `[Airbyte CONTROL-PLANE]` | Control-plane pods restarted 3+ times in 24h (`CP_RESTART_THRESHOLD`, `CP_RESTART_WINDOW_HOURS`); 24h cooldown. Syncs starting inside a restart window are orphaned. | **Yes** — check for orphaned syncs and the OOM killer (`dmesg`). |
 
 ## When does Lambda act?
 
