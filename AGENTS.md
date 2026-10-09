@@ -41,5 +41,8 @@ Redshift's retirement, and the snapshot kept: `docs/decisions/0001-retire-redshi
 - **A change is done when `dbt build` passes** — and, when it moves row counts, when its before/after
   on production data is in the PR (`ammodepot/AGENTS.md`).
 - **No work without a Linear issue** (team `TRI`, project Ammo Depot): the branch carries its `TRI-<n>`, and the `work-item` check fails a PR without it; an exception a person approves carries the `no-issue` label.
+- **A pull request stays under about 300 changed lines**, lockfiles and generated files aside (doc 04 §4.3):
+  the `pr-size` check counts them, and past that a person's `large-pr` label, with the reason in the
+  pull request, is the exception.
 - **`.claude/` is gitignored here**: it links the shared tooling and never enters this history.
   Anything that must reach a colleague goes in an `AGENTS.md` or under `docs/`.
