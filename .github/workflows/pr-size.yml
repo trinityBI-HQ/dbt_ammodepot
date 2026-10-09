@@ -1,0 +1,71 @@
+# A pull request's size, as doc 04 §4.3 counts it (TRI-165): the lines it changes from the merge base,
+# lockfiles and files git marks linguist-generated aside, and the total. Past 300 counted lines it fails,
+# unless a person added the `large-pr` label: the exception is theirs, and the check says which applied.
+# The rules are those of claude-code-config's .claude/scripts/pr_size.py, which the Claude Code hook uses.
+name: pr-size
+
+on:
+  pull_request:
+    # edited: a pull request whose base changes, as a chained one's does when its parent merges, counts again.
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+# The last count of a pull request is the one that stands: a label added and removed in quick succession
+# must not let an earlier run finish last.
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Count the changed lines
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LARGE: ${{ contains(github.event.pull_request.labels.*.name, 'large-pr') }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess, sys
+          from pathlib import PurePosixPath
+
+          THRESHOLD = 300
+          LOCKFILES = {
+              "bun.lock", "bun.lockb", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+              "deno.lock", "uv.lock", "poetry.lock", "Pipfile.lock", "Cargo.lock", "Gemfile.lock", "composer.lock",
+              "go.sum", "flake.lock", "mix.lock", "pubspec.lock", "Podfile.lock", "packages.lock.json",
+              "package-lock.yml", ".terraform.lock.hcl", "skills-lock.json", "pdm.lock",
+          }
+
+          def git(*args, stdin=None):
+              return subprocess.run(["git", *args], input=stdin, capture_output=True, text=True, check=True, encoding="utf-8", errors="surrogateescape").stdout
+
+          # From the base branch's tip, as GitHub and pr_size.py count: the event's base SHA can be older.
+          base, head = f"refs/remotes/origin/{os.environ['BASE_REF']}", os.environ["HEAD"]
+          merge_base = git("merge-base", base, head).strip()
+          fields, entries, i = git("diff", "--numstat", "-z", "-M", merge_base, head).split("\0"), [], 0
+          while i < len(fields) and fields[i]:  # "added\tdeleted\tpath", a rename "added\tdeleted\t" then old, new
+              added, deleted, path = fields[i].split("\t", 2)
+              path, i = (path, i + 1) if path else (fields[i + 2], i + 3)
+              entries.append((0 if added == "-" else int(added) + int(deleted), path))
+          kept = [(n, p) for n, p in entries if PurePosixPath(p).name not in LOCKFILES]
+          triples = git("check-attr", f"--source={head}", "-z", "linguist-generated", "--stdin", stdin="".join(p + "\0" for _, p in kept)).split("\0")
+          generated = {triples[j] for j in range(0, len(triples) - 2, 3) if triples[j + 2] in ("set", "true")}
+          counted = sum(n for n, p in kept if p not in generated)
+          total = sum(n for n, _ in entries)
+          size = f"{counted} changed lines counted (lockfiles and generated files aside), {total} in all"
+          if counted <= THRESHOLD:
+              print(f"::notice::{size}: within doc 04 §4.3's threshold of {THRESHOLD}.")
+              sys.exit(0)
+          if os.environ["LARGE"] == "true":
+              print(f"::notice::{size}: past the threshold of {THRESHOLD}, and the large-pr label is on, a person's exception.")
+              sys.exit(0)
+          print(f"::error::{size}: past doc 04 §4.3's threshold of {THRESHOLD}. Split it into a chain of pull requests, or a person adds the large-pr label and says why in the pull request.")
+          sys.exit(1)
+          PY
